@@ -1,0 +1,3 @@
+## AI Agent Orchestration & Workflow Automation Platform
+### Project Description
+Develop a full-stack platform that enables users to create, configure, and orchestrate AI agents through a visual workflow builder. Users can design single-agent or multi-agent workflows, where agents collaborate to accomplish complex tasks by using tools, APIs, and external services. The platform should support event-driven triggers, scheduled executions, asynchronous job processing, caching, real-time monitoring, and workflow analytics while demonstrating scalable backend architecture using the MERN stack.

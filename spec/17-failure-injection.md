@@ -1,0 +1,39 @@
+# Spec: Configurable Failure Injection
+
+**Status:** Stretch
+**Milestone:** M3
+**Depends on:** `05-agent-tool-providers.md`, `07-async-job-queue.md`
+
+## Summary
+
+Lets a user deliberately configure a Tool node's simulated failure rate so retry/backoff behavior (`07`) is easy to demonstrate on demand, instead of relying on the small built-in random failure chance to happen to show up during a demo.
+
+## Goals
+
+- Per-Tool-node override (already stubbed as `mockOverrides.failureRate` in `03-node-configuration-panel.md`) — a 0–100% chance that a given tool invocation simulates failure.
+- A global default failure rate (env or config constant) applies when a node doesn't override it.
+- The Run Monitor/History clearly shows when a failure was "expected" (i.e., a simulated failure) vs. would represent a real bug — in practice, since everything here is simulated, this just means labeling failed attempts as coming from the mock/failure-injection path in the logs, so it reads as intentional rather than confusing.
+
+## Non-goals
+
+- Failure injection for Agent node providers (kept simpler — only Tool nodes get this dial, matching where "external API flakiness" conceptually lives).
+- Fine-grained failure *types* (timeout vs. 500 vs. malformed response) — a single generic simulated failure is enough to exercise retry/backoff.
+
+## Design
+
+`ToolHandler.run()` (from `05`) checks `Math.random() < failureRate` before producing its normal mock output; on a "hit," it rejects with a clear `SimulatedToolFailure` error that the queue (`07`) retries per its normal policy.
+
+## UI Behavior
+
+- Node Configuration Panel: a slider/number input (0–100%) for a Tool node's failure rate, defaulting to the global default if unset.
+- Run Monitor log lines for a simulated failure are phrased distinctly, e.g. `[simulated failure] fake-weather call failed (attempt 1/3), retrying in 500ms...`.
+
+## Edge Cases & Error Handling
+
+- Failure rate set to 100% — the node will always exhaust retries and fail; this is intentional/valid (useful for demoing the failed-run path end-to-end), not something to block or warn about beyond maybe a light UI hint.
+
+## Acceptance Criteria
+
+- [ ] Setting a Tool node's failure rate to 100% reliably produces a failed run after exhausting retries.
+- [ ] Setting it to 0% reliably produces success (no flaky failures leaking in from the global default).
+- [ ] Logs clearly distinguish simulated failures from other log lines.
