@@ -2,13 +2,20 @@ import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useRunSocket } from '../hooks/useRunSocket';
 import { getWorkflow } from '../api/workflows';
+import { cancelRun } from '../api/runs';
+import { apiErrorMessage } from '../api/client';
 import RunGraphView from '../components/RunGraphView';
-import { StatusBadge } from '../components/ui';
+import QueueIndicator from '../components/QueueIndicator';
+import { StatusBadge, Button } from '../components/ui';
+
+const ACTIVE_STATUSES = ['pending', 'running'];
 
 export default function RunMonitor() {
   const { runId } = useParams();
-  const { run, logs } = useRunSocket(runId);
+  const { run, logs, queueStats } = useRunSocket(runId);
   const [workflow, setWorkflow] = useState(null);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState('');
 
   useEffect(() => {
     if (run?.workflowId) {
@@ -16,7 +23,21 @@ export default function RunMonitor() {
     }
   }, [run?.workflowId]);
 
+  async function handleCancel() {
+    setCancelling(true);
+    setCancelError('');
+    try {
+      await cancelRun(runId);
+    } catch (err) {
+      setCancelError(apiErrorMessage(err, 'Failed to cancel run'));
+    } finally {
+      setCancelling(false);
+    }
+  }
+
   if (!run) return <p className="text-sm text-slate-500 dark:text-slate-400">Loading run...</p>;
+
+  const isActive = ACTIVE_STATUSES.includes(run.status);
 
   return (
     <div className="-mx-4 -my-6 flex h-[calc(100vh-57px)] flex-col">
@@ -28,11 +49,23 @@ export default function RunMonitor() {
             </Link>
           )}
           <StatusBadge status={run.status} />
+          {run.cancelReason === 'timeout' && (
+            <span className="text-xs text-amber-600 dark:text-amber-400">timed out</span>
+          )}
+          {isActive && (
+            <Button variant="secondary" className="!px-3 !py-1 text-xs" onClick={handleCancel} disabled={cancelling}>
+              {cancelling ? 'Cancelling...' : 'Cancel run'}
+            </Button>
+          )}
+          {cancelError && <span className="text-xs text-red-500">{cancelError}</span>}
         </div>
-        <span className="text-xs text-slate-400">
-          {run.startedAt && `Started ${new Date(run.startedAt).toLocaleTimeString()}`}
-          {run.finishedAt && ` · Finished ${new Date(run.finishedAt).toLocaleTimeString()}`}
-        </span>
+        <div className="flex items-center gap-4">
+          {isActive && <QueueIndicator stats={queueStats} />}
+          <span className="text-xs text-slate-400">
+            {run.startedAt && `Started ${new Date(run.startedAt).toLocaleTimeString()}`}
+            {run.finishedAt && ` · Finished ${new Date(run.finishedAt).toLocaleTimeString()}`}
+          </span>
+        </div>
       </div>
 
       <div className="flex flex-1 overflow-hidden">
@@ -46,7 +79,22 @@ export default function RunMonitor() {
               <div key={r.nodeId} className="rounded-lg border border-slate-200 bg-white p-2 text-xs dark:border-slate-800 dark:bg-slate-900">
                 <div className="flex items-center justify-between">
                   <span className="font-medium text-slate-700 dark:text-slate-200">{r.nodeId}</span>
-                  <StatusBadge status={r.status} />
+                  <div className="flex items-center gap-1.5">
+                    {r.attempts > 1 && (
+                      <span
+                        title="Retried before settling"
+                        className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-950 dark:text-amber-300"
+                      >
+                        attempt {r.attempts}
+                      </span>
+                    )}
+                    {r.cached && (
+                      <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+                        cached
+                      </span>
+                    )}
+                    <StatusBadge status={r.status} />
+                  </div>
                 </div>
                 {r.output !== undefined && r.output !== null && (
                   <pre className="mt-1 overflow-x-auto whitespace-pre-wrap break-words text-[11px] text-slate-500 dark:text-slate-400">

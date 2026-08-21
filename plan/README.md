@@ -27,6 +27,20 @@ Check off tasks as you go; treat this as a living to-do list, not a fixed docume
 | [16-agent-handoff](16-agent-handoff.md) | Dynamic agent delegation *(stretch)* |
 | [17-failure-injection](17-failure-injection.md) | Configurable simulated failure rate *(stretch)* |
 | [18-rbac](18-rbac.md) | Read-only share links *(stretch)* |
+| [19-engine-parallelism-and-control](19-engine-parallelism-and-control.md) | Concurrent fan-out, run cancellation, queue fixes *(phase 2)* |
+| [20-builder-ux](20-builder-ux.md) | Undo/redo, copy-paste, edge labels, validation panel *(phase 2)* |
+| [21-extended-tool-catalog](21-extended-tool-catalog.md) | Tool config schemas, 4 new mocked tools, event trigger *(phase 2)* |
+
+## Phase 2 ordering
+
+Numeric order stops being the build order at `12`. Phase 2 runs dependency-first:
+
+**`19` → `17` → `20` → `16` → `12`/`13`/`21`'s event trigger → `21` → `15` → `14` → `18`**
+
+`19` goes first because it fixes correctness bugs the rest would inherit and unblocks
+per-node retry for `17`; `20` goes before `16` because editable edge labels are a
+prerequisite for handoff candidate sync. Full rationale and a per-spec audit of what
+phase 1 already left in the tree: [`../PHASE_2_SCOPE.md`](../PHASE_2_SCOPE.md).
 
 ## How to use this alongside `spec/`
 

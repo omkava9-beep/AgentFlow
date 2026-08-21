@@ -23,7 +23,11 @@ Each file is a self-contained spec for one feature from `../PRODUCT.md`: goals, 
 | [10-manual-run-trigger](10-manual-run-trigger.md) | "Run" button → run creation |
 | [11-execution-history](11-execution-history.md) | Past runs list + detail view |
 
-## Milestone 3 — Triggers, Analytics & Polish (Stretch)
+## Milestone 3 — Triggers, Analytics & Polish (Phase 2)
+
+Phase 1 shipped `01`–`11` and left structural stubs for most of `12`–`18`. See
+[`../PHASE_2_SCOPE.md`](../PHASE_2_SCOPE.md) for what already exists per spec, the
+build order, and how the "Coming Soon" scaffolding gets retired.
 
 | Spec | Feature |
 |---|---|
@@ -35,9 +39,19 @@ Each file is a self-contained spec for one feature from `../PRODUCT.md`: goals, 
 | [17-failure-injection](17-failure-injection.md) | Configurable simulated tool failure rate |
 | [18-rbac](18-rbac.md) | Read-only share links |
 
+### Phase 2 extensions
+
+Specs that deepen phase-1 features rather than adding new ones.
+
+| Spec | Feature |
+|---|---|
+| [19-engine-parallelism-and-control](19-engine-parallelism-and-control.md) | Concurrent fan-out, fan-in/skip semantics, per-node retry, run cancellation |
+| [20-builder-ux](20-builder-ux.md) | Undo/redo, copy-paste, edge label editing, live graph validation |
+| [21-extended-tool-catalog](21-extended-tool-catalog.md) | Declarative tool config schemas, 4 new mocked tools, External Event trigger |
+
 ## Conventions used across specs
 
-- **Status** — MVP or Stretch, matching `PRODUCT.md`'s feature split.
+- **Status** — MVP, Stretch, or Phase 2 extension. MVP/Stretch match `PRODUCT.md`'s feature split; "Phase 2 extension" marks a spec that revises an already-shipped feature, so read the spec it extends first.
 - **Milestone** — which of the three rough build phases it belongs to.
 - **Depends on** — other specs that should exist first, functionally or structurally.
 - Specs describe *behavior and contracts* (data shapes, API routes, socket events, acceptance criteria) — not file-by-file implementation steps. Implementation details are decided at build time, guided by `CLAUDE.md`'s conventions.

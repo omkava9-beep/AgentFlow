@@ -72,6 +72,8 @@ export function StatusBadge({ status }) {
     success: 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300',
     failed: 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300',
     skipped: 'bg-slate-100 text-slate-400 line-through dark:bg-slate-800 dark:text-slate-500',
+    // Distinct from `failed` on purpose - a cancelled run isn't a broken one.
+    cancelled: 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300',
   };
   return (
     <span className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${styles[status] || styles.pending}`}>

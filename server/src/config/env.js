@@ -18,6 +18,8 @@ export const env = {
   defaultToolFailureRate: Number(process.env.DEFAULT_TOOL_FAILURE_RATE ?? 0.1),
   queueConcurrency: Number(process.env.QUEUE_CONCURRENCY) || 4,
   queueMaxAttempts: Number(process.env.QUEUE_MAX_ATTEMPTS) || 3,
+  queueBaseBackoffMs: Number(process.env.QUEUE_BASE_BACKOFF_MS) || 500,
+  runTimeoutMs: Number(process.env.RUN_TIMEOUT_MS) || 2 * 60 * 1000,
 };
 
 if (env.agentProvider === 'anthropic' && !env.anthropicApiKey) {

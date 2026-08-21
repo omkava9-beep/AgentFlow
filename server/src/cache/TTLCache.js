@@ -17,6 +17,10 @@ export class TTLCache {
   set(key, value, ttlMs = this.defaultTtlMs) {
     this.store.set(key, { value, expiresAt: Date.now() + ttlMs });
   }
+
+  clear() {
+    this.store.clear();
+  }
 }
 
 export function toolCacheKey(toolType, input) {

@@ -1,7 +1,7 @@
 import Run from '../models/Run.js';
 import { findOwned } from './workflowController.js';
 import { HttpError } from '../middleware/errorHandler.js';
-import { executeRun } from '../engine/executeRun.js';
+import { executeRun, requestCancel } from '../engine/executeRun.js';
 
 export async function createRun(req, res, next) {
   try {
@@ -58,6 +58,34 @@ export async function getRunById(req, res, next) {
       throw new HttpError(404, 'Run not found');
     }
     res.json(run);
+  } catch (err) {
+    next(err);
+  }
+}
+
+const TERMINAL_STATUSES = ['success', 'failed', 'cancelled'];
+
+export async function cancelRun(req, res, next) {
+  try {
+    const run = await Run.findById(req.params.id);
+    if (!run || run.ownerId.toString() !== req.userId) {
+      throw new HttpError(404, 'Run not found');
+    }
+    if (TERMINAL_STATUSES.includes(run.status)) {
+      throw new HttpError(409, `Run has already finished (${run.status})`);
+    }
+
+    // If the run is executing here, the engine finalizes it cooperatively. If it
+    // isn't (the process restarted mid-run, leaving it stuck at 'running'), close
+    // it out directly so it can't block the workflow's next run forever.
+    if (!requestCancel(req.params.id)) {
+      run.status = 'cancelled';
+      run.cancelReason = 'user';
+      run.finishedAt = new Date();
+      await run.save();
+    }
+
+    res.status(202).json({ status: 'cancelled' });
   } catch (err) {
     next(err);
   }

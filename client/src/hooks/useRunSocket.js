@@ -5,6 +5,7 @@ import { getRun } from '../api/runs';
 export function useRunSocket(runId) {
   const [run, setRun] = useState(null);
   const [logs, setLogs] = useState([]);
+  const [queueStats, setQueueStats] = useState(null);
   const socketRef = useRef(null);
 
   useEffect(() => {
@@ -35,9 +36,21 @@ export function useRunSocket(runId) {
         const nodeResults = prev.nodeResults.map((r) => (r.nodeId === payload.nodeId ? { ...r, ...payload } : r));
         return { ...prev, nodeResults };
       });
-      if (payload.logs?.length) {
-        setLogs((prev) => [...prev, ...payload.logs.map((line) => ({ nodeId: payload.nodeId, line }))]);
-      }
+    });
+
+    // Log lines arrive one at a time on their own event. Appending from
+    // `node:update` instead would double-count them, since that event carries the
+    // node's full accumulated `logs` array every time it fires.
+    socket.on('node:log', (payload) => {
+      setLogs((prev) => [...prev, { nodeId: payload.nodeId, line: payload.line }]);
+    });
+
+    socket.on('queue:stats', setQueueStats);
+
+    socket.on('run:cancelled', (payload) => {
+      setRun((prev) =>
+        prev ? { ...prev, status: payload.status, cancelReason: payload.cancelReason, finishedAt: payload.finishedAt } : prev,
+      );
     });
 
     socket.on('run:completed', (payload) => {
@@ -51,5 +64,5 @@ export function useRunSocket(runId) {
     };
   }, [runId]);
 
-  return { run, logs };
+  return { run, logs, queueStats };
 }

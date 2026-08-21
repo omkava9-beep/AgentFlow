@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import Workflow from '../models/Workflow.js';
 import { HttpError } from '../middleware/errorHandler.js';
+import { findCycle } from '../engine/topologicalOrder.js';
 
 export async function list(req, res, next) {
   try {
@@ -54,6 +55,15 @@ export async function update(req, res, next) {
   try {
     const workflow = await findOwned(req.params.id, req.userId);
     const { name, nodes, edges } = req.body;
+
+    // The client store prevents cycles as you draw them, but that guard doesn't
+    // exist for a direct API call or a cloned template - so enforce it here too.
+    const nextNodes = nodes !== undefined ? nodes : workflow.nodes;
+    const nextEdges = edges !== undefined ? edges : workflow.edges;
+    if ((nodes !== undefined || edges !== undefined) && findCycle(nextNodes, nextEdges)) {
+      throw new HttpError(400, 'Workflow graph contains a cycle');
+    }
+
     if (name !== undefined) workflow.name = name;
     if (nodes !== undefined) workflow.nodes = nodes;
     if (edges !== undefined) workflow.edges = edges;

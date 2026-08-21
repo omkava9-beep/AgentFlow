@@ -62,4 +62,6 @@ If the client doesn't start on port 5173 (something else is holding it), update 
 ## Where to look first
 
 - Check `PRODUCT.md` for overall feature scope and priority (MVP vs stretch) before implementing something new — it's the source of truth for product decisions.
+- Check `PHASE_2_SCOPE.md` for the current phase's scope, build order, and an audit of which
+  Milestone 3 features are already part-built in the tree — several are, so don't treat them as greenfield.
 - Check `spec/README.md` and the matching numbered file in `spec/` for the detailed contract (data model, API routes, socket events, UI behavior, acceptance criteria) of the specific feature you're implementing, before writing code for it.

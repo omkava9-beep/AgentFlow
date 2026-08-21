@@ -6,6 +6,8 @@ const nodeResultSchema = new mongoose.Schema({
   output: mongoose.Schema.Types.Mixed,
   logs: { type: [String], default: [] },
   cached: { type: Boolean, default: false },
+  attempts: { type: Number, default: 1 },
+  handoffTarget: { type: String, default: null },
   startedAt: Date,
   finishedAt: Date,
   durationMs: Number,
@@ -14,7 +16,8 @@ const nodeResultSchema = new mongoose.Schema({
 const runSchema = new mongoose.Schema({
   workflowId: { type: mongoose.Schema.Types.ObjectId, ref: 'Workflow', required: true, index: true },
   ownerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
-  status: { type: String, enum: ['pending', 'running', 'success', 'failed'], default: 'pending' },
+  status: { type: String, enum: ['pending', 'running', 'success', 'failed', 'cancelled'], default: 'pending' },
+  cancelReason: { type: String, enum: ['user', 'timeout', null], default: null },
   startedAt: Date,
   finishedAt: Date,
   nodeResults: { type: [nodeResultSchema], default: [] },
