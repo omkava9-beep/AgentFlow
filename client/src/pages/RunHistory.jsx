@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { listRuns } from '../api/workflows';
 import { getWorkflow } from '../api/workflows';
 import { Card, StatusBadge } from '../components/ui';
+import TriggerBadge from '../components/TriggerBadge';
 import { apiErrorMessage } from '../api/client';
 
 export default function RunHistory() {
@@ -52,6 +53,7 @@ export default function RunHistory() {
             >
               <div className="flex items-center gap-3">
                 <StatusBadge status={r.status} />
+                <TriggerBadge trigger={r.trigger} />
                 <span className="text-sm text-slate-600 dark:text-slate-300">
                   {r.startedAt ? new Date(r.startedAt).toLocaleString() : 'Not started'}
                 </span>

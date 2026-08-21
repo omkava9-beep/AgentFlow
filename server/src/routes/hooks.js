@@ -1,12 +1,10 @@
 import { Router } from 'express';
+import { receiveWebhook } from '../controllers/triggerController.js';
 
-// Coming soon: webhook triggers (spec/13-webhook-trigger.md). Kept as a real,
-// mounted router (returning 404) so the route shape already exists for the
-// frontend's "Coming Soon" trigger panel to point at.
+// Intentionally outside requireAuth (spec/13): external callers have no JWT, so
+// the token in the path is the credential.
 const router = Router();
 
-router.post('/:token', (req, res) => {
-  res.status(404).json({ error: 'Webhook triggers are coming soon' });
-});
+router.post('/:token', receiveWebhook);
 
 export default router;

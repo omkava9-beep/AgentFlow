@@ -1,9 +1,7 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import ThemeToggle from './ThemeToggle';
-import ComingSoonBadge from './ComingSoonBadge';
 import { Wordmark } from './Logo';
 import { useAuthStore } from '../store/authStore';
-import { COMING_SOON_FEATURES } from '../comingSoon';
 
 const navLinkClass = ({ isActive }) =>
   `rounded-lg px-3 py-2 text-sm font-medium transition ${
@@ -11,9 +9,6 @@ const navLinkClass = ({ isActive }) =>
       ? 'bg-gradient-to-br from-brand-500 to-purple-600 text-white shadow-sm shadow-brand-500/30'
       : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
   }`;
-
-const disabledNavClass =
-  'flex cursor-not-allowed items-center rounded-lg px-3 py-2 text-sm font-medium text-slate-400 dark:text-slate-600';
 
 export default function Layout() {
   const { user, logout } = useAuthStore();
@@ -32,12 +27,8 @@ export default function Layout() {
             <Wordmark className="text-lg" />
             <nav className="flex items-center gap-1">
               <NavLink to="/dashboard" className={navLinkClass}>Dashboard</NavLink>
-              <span title="Coming soon" className={disabledNavClass}>
-                Analytics {COMING_SOON_FEATURES.analytics && <ComingSoonBadge />}
-              </span>
-              <span title="Coming soon" className={disabledNavClass}>
-                Templates {COMING_SOON_FEATURES.templates && <ComingSoonBadge />}
-              </span>
+              <NavLink to="/analytics" className={navLinkClass}>Analytics</NavLink>
+              <NavLink to="/templates" className={navLinkClass}>Templates</NavLink>
             </nav>
           </div>
           <div className="flex items-center gap-3">

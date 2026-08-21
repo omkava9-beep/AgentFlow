@@ -1,10 +1,10 @@
 import { Router } from 'express';
+import { getShared } from '../controllers/shareController.js';
 
-// Coming soon: read-only share links (spec/18-rbac.md).
+// Intentionally outside requireAuth (spec/18): the point of a share link is that
+// the recipient isn't logged in.
 const router = Router();
 
-router.get('/:shareToken', (req, res) => {
-  res.status(404).json({ error: 'Shared read-only links are coming soon' });
-});
+router.get('/:shareToken', getShared);
 
 export default router;

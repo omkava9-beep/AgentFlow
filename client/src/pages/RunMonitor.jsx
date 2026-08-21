@@ -6,9 +6,18 @@ import { cancelRun } from '../api/runs';
 import { apiErrorMessage } from '../api/client';
 import RunGraphView from '../components/RunGraphView';
 import QueueIndicator from '../components/QueueIndicator';
+import TriggerBadge from '../components/TriggerBadge';
 import { StatusBadge, Button } from '../components/ui';
 
 const ACTIVE_STATUSES = ['pending', 'running'];
+
+/** Simulated failures are expected, not bugs - phrase them as such visually. */
+function logLineClass(line) {
+  if (line.includes('[simulated failure]')) return 'text-amber-600 dark:text-amber-400';
+  if (line.includes('retrying in')) return 'text-amber-700/80 dark:text-amber-500/80';
+  if (line.startsWith('[condition]') || line.startsWith('[handoff]')) return 'text-brand-600 dark:text-brand-400';
+  return 'text-slate-500 dark:text-slate-400';
+}
 
 export default function RunMonitor() {
   const { runId } = useParams();
@@ -49,6 +58,7 @@ export default function RunMonitor() {
             </Link>
           )}
           <StatusBadge status={run.status} />
+          <TriggerBadge trigger={run.trigger} />
           {run.cancelReason === 'timeout' && (
             <span className="text-xs text-amber-600 dark:text-amber-400">timed out</span>
           )}
@@ -88,6 +98,14 @@ export default function RunMonitor() {
                         attempt {r.attempts}
                       </span>
                     )}
+                    {r.handoffTarget && (
+                      <span
+                        title="Branch chosen by this handoff agent"
+                        className="rounded bg-brand-100 px-1.5 py-0.5 text-[10px] font-medium text-brand-700 dark:bg-brand-950 dark:text-brand-300"
+                      >
+                        ⇄ {r.handoffTarget}
+                      </span>
+                    )}
                     {r.cached && (
                       <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 dark:bg-blue-950 dark:text-blue-300">
                         cached
@@ -108,14 +126,7 @@ export default function RunMonitor() {
           <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Logs</h3>
           <div className="space-y-1 font-mono text-[11px]">
             {logs.map((l, i) => (
-              <div
-                key={i}
-                className={
-                  l.line.includes('[simulated failure]')
-                    ? 'text-red-500'
-                    : 'text-slate-500 dark:text-slate-400'
-                }
-              >
+              <div key={i} className={logLineClass(l.line)}>
                 [{l.nodeId}] {l.line}
               </div>
             ))}

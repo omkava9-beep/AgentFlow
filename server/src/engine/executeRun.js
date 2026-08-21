@@ -46,7 +46,7 @@ async function updateNodeResult(runId, nodeId, patch) {
   emit(runId, 'node:update', { nodeId, ...patch });
 }
 
-async function executeAgentOrTool(node, input) {
+async function executeAgentOrTool(node, input, context) {
   if (node.type === 'agent') {
     return getAgentProvider().run(node.data.config, input);
   }
@@ -58,19 +58,23 @@ async function executeAgentOrTool(node, input) {
     // A config error, not flakiness - retrying it three times is pure waste.
     if (!handler) throw new PermanentFailure(`Unknown tool type: ${toolType}`);
 
-    // Deliberate cache exception: a node with failure injection dialed up must
-    // actually be allowed to fail. Serving it from cache would bypass both the
-    // injected failure and the retry path the feature exists to demonstrate.
+    // Two deliberate cache exceptions:
+    //  - a node with failure injection dialed up must actually be allowed to
+    //    fail, and a cache hit would bypass both the injected failure and the
+    //    retry path the feature exists to demonstrate;
+    //  - side-effecting tools opt out entirely (handler.cacheable === false),
+    //    because caching a "send" would mean the second one silently doesn't
+    //    happen.
     const failureRate = Number(config.mockOverrides?.failureRate) || 0;
-    const cacheable = failureRate <= 0;
-    const key = toolCacheKey(toolType, input);
+    const cacheable = handler.cacheable !== false && failureRate <= 0;
+    const key = toolCacheKey(toolType, config.toolConfig, input);
 
     if (cacheable) {
       const cached = toolCache.get(key);
       if (cached !== undefined) return { ...cached, cached: true };
     }
 
-    const result = await handler.run(config, input);
+    const result = await handler.run(config, input, context);
     if (cacheable) toolCache.set(key, result);
     return result;
   }
@@ -78,7 +82,12 @@ async function executeAgentOrTool(node, input) {
   throw new PermanentFailure(`Node type ${node.type} has no executable behavior`);
 }
 
-export async function executeRun(runId, workflow) {
+/**
+ * `timeoutMs` overrides the env-wide run deadline for this run only - the
+ * deadline is otherwise process-global, which makes it impossible to exercise
+ * the timeout path without also starving every other run in the process.
+ */
+export async function executeRun(runId, workflow, { timeoutMs = env.runTimeoutMs, input: runInput = null } = {}) {
   const nodes = workflow.nodes || [];
   const edges = (workflow.edges || []).filter((e) => e.source && e.target);
   const nodesById = new Map(nodes.map((n) => [n.id, n]));
@@ -106,7 +115,10 @@ export async function executeRun(runId, workflow) {
     if (control.cancelled) return;
     control.cancelled = true;
     control.reason = 'timeout';
-  }, env.runTimeoutMs);
+  }, timeoutMs);
+
+  // Handed to tool handlers so a side-effecting tool can attribute its writes.
+  const toolContext = { runId, workflowId: workflow._id, ownerId: workflow.ownerId };
 
   const outputs = new Map();
   const resolved = new Map(); // nodeId -> 'success' | 'failed' | 'skipped'
@@ -174,8 +186,10 @@ export async function executeRun(runId, workflow) {
 
     try {
       if (node.type === 'start') {
-        outputs.set(nodeId, null);
-        await finish({ status: 'success' });
+        // Whatever the trigger supplied (a webhook/event payload) becomes the
+        // graph's initial input; null for a manual or scheduled run.
+        outputs.set(nodeId, runInput);
+        await finish({ status: 'success', output: runInput });
         return { status: 'success' };
       }
 
@@ -202,7 +216,7 @@ export async function executeRun(runId, workflow) {
       const { result, attempts } = await queue.enqueue(
         {
           payload: null,
-          run: () => executeAgentOrTool(node, input),
+          run: () => executeAgentOrTool(node, input, toolContext),
           onRetry: ({ attempt, maxAttempts, error, backoff }) =>
             pushLog(`${error} (attempt ${attempt}/${maxAttempts}), retrying in ${backoff}ms...`),
         },

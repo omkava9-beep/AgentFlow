@@ -5,6 +5,7 @@ import { connectDB } from './config/db.js';
 import { createApp } from './app.js';
 import { registerSocketHandlers } from './sockets/index.js';
 import { setIo } from './sockets/ioInstance.js';
+import { bootstrapSchedules } from './scheduler/index.js';
 
 async function main() {
   await connectDB();
@@ -14,6 +15,9 @@ async function main() {
   const io = new Server(server, { cors: { origin: env.clientOrigin } });
   setIo(io);
   registerSocketHandlers(io);
+
+  // In-memory cron jobs don't survive a restart, so re-register from MongoDB.
+  await bootstrapSchedules();
 
   server.listen(env.port, () => {
     console.log(`Server listening on http://localhost:${env.port} (AGENT_PROVIDER=${env.agentProvider})`);

@@ -35,10 +35,16 @@ shareToken: string | null   // null = not shared
 
 `GET /api/shared/:shareToken` is intentionally outside the auth middleware, same pattern as the webhook endpoint in `13`.
 
+**The shared payload is a whitelist, not the workflow document with a few fields deleted.** A read-only viewer must never receive `webhook.token` — that token is a capability to *start runs*, so leaking it would quietly turn a view link into an execute link. `schedule` and `eventTrigger` are withheld for the same reason, `ownerId` and `shareToken` because neither is the viewer's business, and run `nodeResults` because per-node outputs can carry data the design itself doesn't reveal. What a viewer gets is: name, nodes, edges, timestamps, and a summary list of recent runs (status, trigger, timings).
+
+The share URL is built from `CLIENT_ORIGIN`, not `PUBLIC_BASE_URL`: `/shared/:token` is a page in the React app, whereas `PUBLIC_BASE_URL` addresses the API — using the latter hands out links to an origin that serves no such page.
+
 ## UI Behavior
 
 - Workflow Builder has a "Share" action generating/copying the read-only URL, with a toggle to disable sharing (invalidates the token).
-- `/shared/:shareToken` renders a stripped-down, non-editable version of the Builder canvas plus a read-only Run History list — no Node Configuration Panel, no Save/Run buttons.
+- `/shared/:shareToken` renders a stripped-down, non-editable canvas plus a read-only Run History list — no Node Configuration Panel, no Save/Run buttons, and no app nav or Logout either: the visitor isn't signed in, so a signed-in shell would be nonsense.
+- The read-only canvas suppresses connection handles. React Flow still tags handles `connectable` even with `nodesConnectable={false}`, and a view that can't honour a connection shouldn't offer the affordance.
+- The page fetches with a bare axios call rather than the shared `apiClient`: that instance attaches the stored JWT and, on a 401, logs the user out and redirects to `/login` — which would bounce an anonymous visitor off a link that is supposed to work for them.
 
 ## Edge Cases & Error Handling
 
@@ -50,3 +56,8 @@ shareToken: string | null   // null = not shared
 - [ ] A generated share link opens the workflow read-only in an incognito/logged-out browser.
 - [ ] Disabling sharing immediately breaks the old link (404).
 - [ ] The shared view has no path to editing or running the workflow.
+- [ ] The shared payload contains no webhook token, schedule, event subscription, `ownerId`, or per-node run outputs.
+- [ ] An unknown or revoked token renders a "link not found" page rather than redirecting to `/login`.
+- [ ] Another user can neither share nor revoke sharing on a workflow they don't own.
+
+`npm run check:share` (in `server/`) covers these against a running server.

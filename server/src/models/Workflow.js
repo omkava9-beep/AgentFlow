@@ -28,7 +28,15 @@ const workflowSchema = new mongoose.Schema({
     token: { type: String, default: null },
     enabled: { type: Boolean, default: false },
   },
+  eventTrigger: {
+    eventName: { type: String, default: null },
+    enabled: { type: Boolean, default: false },
+  },
   shareToken: { type: String, default: null },
 }, { timestamps: true });
+
+workflowSchema.index({ 'eventTrigger.eventName': 1, 'eventTrigger.enabled': 1 });
+workflowSchema.index({ 'webhook.token': 1 });
+workflowSchema.index({ shareToken: 1 });
 
 export default mongoose.model('Workflow', workflowSchema);

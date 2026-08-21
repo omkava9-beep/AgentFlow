@@ -18,6 +18,9 @@ const runSchema = new mongoose.Schema({
   ownerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
   status: { type: String, enum: ['pending', 'running', 'success', 'failed', 'cancelled'], default: 'pending' },
   cancelReason: { type: String, enum: ['user', 'timeout', null], default: null },
+  trigger: { type: String, enum: ['manual', 'schedule', 'webhook', 'event'], default: 'manual' },
+  // Payload the trigger supplied, handed to the Start node as its output.
+  input: { type: mongoose.Schema.Types.Mixed, default: null },
   startedAt: Date,
   finishedAt: Date,
   nodeResults: { type: [nodeResultSchema], default: [] },

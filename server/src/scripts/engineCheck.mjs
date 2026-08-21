@@ -4,10 +4,11 @@
  *   npm run check:engine
  *
  * Uses a throwaway database (your MONGODB_URI with an `-enginecheck` suffix) so
- * it can never touch dev data, and drops it on the way out. Override the run
- * deadline and pool size to exercise the timeout and concurrency paths:
+ * it can never touch dev data, and drops it on the way out. Deadline-sensitive
+ * checks pass their own per-run `timeoutMs`, so no env juggling is needed; vary
+ * the pool size to confirm the concurrency bound is real:
  *
- *   QUEUE_CONCURRENCY=2 RUN_TIMEOUT_MS=300 npm run check:engine
+ *   QUEUE_CONCURRENCY=2 npm run check:engine
  */
 import mongoose from 'mongoose';
 import { env } from '../config/env.js';
@@ -31,14 +32,14 @@ const node = (id, type, config = {}) => ({ id, type, position: { x: 0, y: 0 }, d
 const edge = (source, target, extra = {}) => ({ id: `e-${source}-${target}-${extra.sourceHandle || extra.label || ''}`, source, target, ...extra });
 const tool = (id, toolType, over = {}) => node(id, 'tool', { label: id, toolType, mockOverrides: { failureRate: 0, latencyMs: [60, 90], ...over } });
 
-async function run(workflow) {
+async function run(workflow, options) {
   toolCache.clear();
   const doc = await Run.create({ workflowId: WF, ownerId: OWNER, status: 'pending' });
   const id = doc._id.toString();
   let peakActive = 0;
   const onStats = (s) => { peakActive = Math.max(peakActive, s.active); };
   queue.on('stats', onStats);
-  const finished = await executeRun(id, workflow);
+  const finished = await executeRun(id, workflow, options);
   queue.off('stats', onStats);
   const byId = Object.fromEntries(finished.nodeResults.map((r) => [r.nodeId, r]));
   return { runDoc: finished, byId, peakActive, id };
@@ -126,7 +127,7 @@ console.log('\nF. cancellation mid-run');
   toolCache.clear();
   const doc = await Run.create({ workflowId: WF, ownerId: OWNER, status: 'pending' });
   const id = doc._id.toString();
-  const p = executeRun(id, wf);
+  const p = executeRun(id, wf, { timeoutMs: 10_000 });
   await new Promise((r) => setTimeout(r, 250));
   const accepted = requestCancel(id);
   const finished = await p;
@@ -153,19 +154,64 @@ console.log('\nG. cyclic graph fails loudly instead of hanging');
 }
 
 // -------------------------------------------------------------------- H: timeout
-console.log(`\nH. run timeout (runTimeoutMs=${env.runTimeoutMs})`);
-if (env.runTimeoutMs > 2000) {
-  console.log('  - skipped: rerun with RUN_TIMEOUT_MS=300 to exercise the deadline');
-} else {
+console.log('\nH. run timeout (per-run deadline of 300ms)');
+{
   const wf = {
     nodes: [node('s', 'start'), tool('slow', 'fake-weather', { latencyMs: [500, 550] }), node('e', 'end')],
     edges: [edge('s', 'slow'), edge('slow', 'e')],
   };
-  const { runDoc, byId } = await run(wf);
+  const { runDoc, byId } = await run(wf, { timeoutMs: 300 });
   check("status = 'failed' (NOT success)", runDoc.status === 'failed', runDoc.status);
   check("cancelReason = 'timeout'", runDoc.cancelReason === 'timeout', String(runDoc.cancelReason));
   check('no node left pending', runDoc.nodeResults.every((r) => r.status !== 'pending'), runDoc.nodeResults.map((r) => `${r.nodeId}:${r.status}`).join(' '));
   check('unreached node skipped', byId.e.status === 'skipped', byId.e.status);
+}
+
+// ------------------------------------------------------------- J: agent handoff
+console.log('\nJ. handoff agent routes to exactly one of 3 candidates');
+{
+  const CANDIDATES = ['alpha', 'beta', 'gamma'];
+  const wf = {
+    nodes: [
+      node('s', 'start'),
+      node('router', 'agent', { label: 'Router', systemPrompt: 'route it', isHandoff: true, candidates: CANDIDATES }),
+      ...CANDIDATES.map((c) => node(c, 'agent', { label: c, systemPrompt: c })),
+      node('join', 'end'),
+    ],
+    edges: [
+      edge('s', 'router'),
+      ...CANDIDATES.map((c) => edge('router', c, { label: c })),
+      ...CANDIDATES.map((c) => edge(c, 'join')),
+    ],
+  };
+  const { runDoc, byId } = await run(wf);
+  const taken = CANDIDATES.filter((c) => byId[c].status === 'success');
+  const skipped = CANDIDATES.filter((c) => byId[c].status === 'skipped');
+  check(`exactly one candidate ran (${taken.join(',') || 'none'})`, taken.length === 1, `${taken.length} ran`);
+  check(`the other two skipped (${skipped.join(',')})`, skipped.length === 2);
+  check('handoffTarget persisted on the router result', byId.router.handoffTarget === taken[0], String(byId.router.handoffTarget));
+  check('routing decision logged', byId.router.logs.some((l) => l.includes('[handoff] routing to')), byId.router.logs.join(' | '));
+  check('join node still ran (fan-in past a handoff)', byId.join.status === 'success', byId.join.status);
+  check('run succeeded', runDoc.status === 'success', runDoc.status);
+}
+
+console.log('\nK. handoff target with no matching edge fails loudly');
+{
+  const wf = {
+    nodes: [
+      // The provider can only pick 'ghost', but no outgoing edge is labelled that.
+      node('s', 'start'),
+      node('router', 'agent', { label: 'Router', isHandoff: true, candidates: ['ghost'] }),
+      node('real', 'agent', { label: 'real' }),
+    ],
+    edges: [edge('s', 'router'), edge('router', 'real', { label: 'alpha' })],
+  };
+  const { runDoc, byId } = await run(wf);
+  check('router failed', byId.router.status === 'failed', byId.router.status);
+  check('named the bad target', byId.router.logs.some((l) => l.includes('unknown handoff target')), byId.router.logs.join(' | '));
+  check(`not retried (attempts=${byId.router.attempts}, permanent failure)`, byId.router.attempts === 1);
+  check('did not silently default to the only edge', byId.real.status === 'skipped', byId.real.status);
+  check('run failed', runDoc.status === 'failed', runDoc.status);
 }
 
 // ------------------------------------------------------------------ I: queue health

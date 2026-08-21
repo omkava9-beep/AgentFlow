@@ -2,6 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
 import { getRun } from '../api/runs';
 
+/** Persisted per-node logs, flattened into one chronological-ish tail. */
+function seedLogs(run) {
+  return (run?.nodeResults || []).flatMap((r) =>
+    (r.logs || []).map((line) => ({ nodeId: r.nodeId, line })),
+  );
+}
+
 export function useRunSocket(runId) {
   const [run, setRun] = useState(null);
   const [logs, setLogs] = useState([]);
@@ -11,20 +18,24 @@ export function useRunSocket(runId) {
   useEffect(() => {
     let cancelled = false;
 
-    getRun(runId).then((data) => {
-      if (!cancelled) setRun(data);
-    });
+    // Seed from the fetched run, so a *finished* run shows its logs at all - they
+    // live in nodeResults[].logs, and the live event stream is long gone by then.
+    // A resync replaces rather than appends, which is what keeps reconnects from
+    // duplicating every line.
+    const sync = () =>
+      getRun(runId).then((data) => {
+        if (cancelled) return;
+        setRun(data);
+        setLogs(seedLogs(data));
+      });
+
+    sync();
 
     const socket = io(import.meta.env.VITE_SOCKET_URL);
     socketRef.current = socket;
     socket.emit('run:subscribe', { runId });
 
-    socket.on('connect', () => {
-      // resync in case events were missed while disconnected
-      getRun(runId).then((data) => {
-        if (!cancelled) setRun(data);
-      });
-    });
+    socket.on('connect', sync);
 
     socket.on('run:started', (payload) => {
       setRun((prev) => (prev ? { ...prev, status: 'running', startedAt: payload.startedAt } : prev));
@@ -49,7 +60,9 @@ export function useRunSocket(runId) {
 
     socket.on('run:cancelled', (payload) => {
       setRun((prev) =>
-        prev ? { ...prev, status: payload.status, cancelReason: payload.cancelReason, finishedAt: payload.finishedAt } : prev,
+        prev
+          ? { ...prev, status: payload.status, cancelReason: payload.cancelReason, finishedAt: payload.finishedAt }
+          : prev,
       );
     });
 

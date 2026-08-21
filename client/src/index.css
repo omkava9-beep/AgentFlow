@@ -12,3 +12,56 @@ body {
   @apply bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100;
   font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
 }
+
+/*
+ * Chart tokens. Defined as CSS variables (not JS constants) so SVG marks follow
+ * the `dark` class on <html> with no re-render and no duplicated palette.
+ *
+ * Values come from the data-viz reference palette, validated against this app's
+ * real surfaces (white / slate-900) rather than the palette's defaults:
+ *   - series blue      4.42:1 light, 4.91:1 dark
+ *   - status good      3.35:1 light, 5.32:1 dark
+ *   - status critical  4.80:1 light, 3.72:1 dark
+ *   - status warning   1.83:1 light  <- sub-3:1 by design; relieved by the
+ *     icon + label + count on every row, plus a hairline ring on the meter fill
+ *
+ * Status hues are fixed across modes on purpose - they are a status palette, not
+ * a themed categorical one. They also fail the categorical CVD gate by
+ * construction (good vs critical is deltaE 4.1 for deutan vision), which is why
+ * every status is rendered as its own labelled row with an icon and a number:
+ * colour never carries the meaning on its own.
+ */
+:root {
+  --viz-series: #2a78d6;
+  --viz-series-soft: rgba(42, 120, 214, 0.18);
+  --viz-grid: #e1e0d9;
+  --viz-axis: #c3c2b7;
+  --viz-muted: #898781;
+  --viz-surface: #ffffff;
+  --viz-ring: rgba(11, 11, 11, 0.1);
+
+  --viz-good: #0ca30c;
+  --viz-critical: #d03b3b;
+  --viz-warning: #fab219;
+  --viz-neutral: #898781;
+}
+
+.dark {
+  --viz-series: #3987e5;
+  --viz-series-soft: rgba(57, 135, 229, 0.22);
+  --viz-grid: #2c2c2a;
+  --viz-axis: #383835;
+  --viz-muted: #898781;
+  --viz-surface: #0f172a;
+  --viz-ring: rgba(255, 255, 255, 0.12);
+}
+
+/* Read-only graph views (run monitor, shared link): handles exist so React Flow
+ * can route edges to them, but they must not look or behave interactive. */
+/* `.react-flow.rf-readonly` (0,3,0) rather than `.rf-readonly` (0,2,0): reactflow's
+ * own `.react-flow__handle.connectable` rule is also 0,2,0 and its stylesheet is
+ * bundled after this one, so a tie would go to the vendor. */
+.react-flow.rf-readonly .react-flow__handle {
+  pointer-events: none;
+  opacity: 0;
+}

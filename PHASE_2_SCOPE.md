@@ -33,6 +33,10 @@ So the backend data model for `12`, `13`, and `18` is done, and `16` is mostly d
 
 `19` is the load-bearing one. The current engine walks the topological order **strictly sequentially**, awaiting each node's queue job before starting the next — which means `QUEUE_CONCURRENCY` is effectively 1 and the hand-built job queue, the centrepiece of the product brief, never actually demonstrates bounded concurrency. Fixing that is the single highest-value change in phase 2.
 
+> **Phase 2 is complete.** All nine steps are done and every "Coming Soon" badge is gone —
+> `comingSoon.js` and `ComingSoonBadge.jsx` have been deleted rather than left as an
+> all-`false` config.
+
 ## Progress
 
 | Step | Spec | Status |
@@ -43,9 +47,9 @@ So the backend data model for `12`, `13`, and `18` is done, and `16` is mostly d
 | 4 | `16-agent-handoff` | **Done** — 6 engine + 18 store + 14 browser checks |
 | 5 | `12` / `13` / event trigger | **Done** — 28 API + 20 browser + 11 cron checks |
 | 6 | `21-extended-tool-catalog` | **Done** — 32 handler + 15 browser + 8 validator checks |
-| 7 | `15-workflow-templates` | Not started |
-| 8 | `14-analytics-dashboard` | Not started |
-| 9 | `18-rbac` | Not started |
+| 7 | `15-workflow-templates` | **Done** — 27 API + 17 browser checks |
+| 8 | `14-analytics-dashboard` | **Done** — 29 API + 15 browser checks + screenshot review |
+| 9 | `18-rbac` | **Done** — 27 API + 22 browser checks |
 
 ## Build order
 
@@ -69,17 +73,20 @@ Phase 2's acceptance criteria are runnable rather than prose:
 |---|---|
 | `cd server && npm run check:engine` | spec `19`, `16`, `17` — 44 checks against a throwaway database |
 | `cd server && npm run check:triggers` | spec `12`, `13`, `21`'s event dispatch — 28 checks against a running server |
+| `cd server && npm run check:templates` | spec `15` — 27 checks against a running server (needs `seed:templates` first) |
+| `cd server && npm run check:analytics` | spec `14` — 29 checks; needs a running server on the same `MONGODB_URI` |
+| `cd server && npm run check:share` | spec `18` — 27 checks against a running server |
 | `cd client && npm run check:logic` | store, graph validator, cron helper — 86 checks, no browser needed |
 
 UI behavior is verified by driving the real app in headless Chrome; those scripts live outside the repo since they need two servers running.
 
-## Retiring the Coming Soon scaffolding
+## Retiring the Coming Soon scaffolding — done
 
-`client/src/comingSoon.js` and `client/src/comingSoonCatalog.js` were built so flipping a feature live is a one-line change. Phase 2 should:
+`client/src/comingSoon.js` and `client/src/comingSoonCatalog.js` were built so flipping a feature live was a one-line change. As of the end of phase 2:
 
-- Flip each `COMING_SOON_FEATURES` key to `false` as its spec lands, and delete the whole module once all six are false — leaving a dead all-`false` config is worse than removing it.
-- Replace `ACTION_TYPES` in `comingSoonCatalog.js` with the live `GET /api/tools` response (see `21`), so the tool list has exactly one source of truth: the server-side `ToolRegistry`.
-- Keep `TRIGGER_TYPES` as a static catalog — triggers are a fixed, small set that the server doesn't enumerate.
+- `comingSoon.js` and `ComingSoonBadge.jsx` are **deleted**. Every flag reached `false`, and a dead all-`false` config is worse than no config.
+- `ACTION_TYPES` is **gone** from `comingSoonCatalog.js`; the tool list comes from `GET /api/tools`, so the server-side `ToolRegistry` is the single source of truth (see `21`).
+- `TRIGGER_TYPES` **stays** as a static catalog with every entry `live: true` — triggers are a fixed, small set the server doesn't enumerate.
 
 ## Non-goals for phase 2
 

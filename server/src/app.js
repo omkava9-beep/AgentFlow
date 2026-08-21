@@ -8,6 +8,9 @@ import runRoutes from './routes/runs.js';
 import toolRoutes from './routes/tools.js';
 import hookRoutes from './routes/hooks.js';
 import sharedRoutes from './routes/shared.js';
+import eventRoutes from './routes/events.js';
+import templateRoutes from './routes/templates.js';
+import analyticsRoutes from './routes/analytics.js';
 
 export function createApp() {
   const app = express();
@@ -22,6 +25,9 @@ export function createApp() {
   app.use('/api/runs', runRoutes);
   app.use('/api/tools', toolRoutes);
   app.use('/api/hooks', hookRoutes);
+  app.use('/api/templates', templateRoutes);
+  app.use('/api/analytics', analyticsRoutes);
+  app.use('/api/events', eventRoutes);
   app.use('/api/shared', sharedRoutes);
 
   app.use(notFoundHandler);

@@ -23,8 +23,13 @@ export class TTLCache {
   }
 }
 
-export function toolCacheKey(toolType, input) {
-  return `${toolType}:${JSON.stringify(input ?? null)}`;
+/**
+ * The tool's own config is part of the key, not just its input. Two `send-email`
+ * nodes with different recipients and the same upstream input would otherwise
+ * collide and the second would be served the first one's result.
+ */
+export function toolCacheKey(toolType, toolConfig, input) {
+  return `${toolType}:${JSON.stringify(toolConfig ?? null)}:${JSON.stringify(input ?? null)}`;
 }
 
 export const toolCache = new TTLCache({ defaultTtlMs: 60_000 });

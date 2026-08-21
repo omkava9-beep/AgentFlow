@@ -20,6 +20,9 @@ export const env = {
   queueMaxAttempts: Number(process.env.QUEUE_MAX_ATTEMPTS) || 3,
   queueBaseBackoffMs: Number(process.env.QUEUE_BASE_BACKOFF_MS) || 500,
   runTimeoutMs: Number(process.env.RUN_TIMEOUT_MS) || 2 * 60 * 1000,
+  // Used to build copy-pasteable webhook URLs; the server can't know how it's
+  // reached from outside, so it has to be told.
+  publicBaseUrl: (process.env.PUBLIC_BASE_URL || `http://localhost:${Number(process.env.PORT) || 4000}`).replace(/\/+$/, ''),
 };
 
 if (env.agentProvider === 'anthropic' && !env.anthropicApiKey) {

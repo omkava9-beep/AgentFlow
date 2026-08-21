@@ -14,6 +14,14 @@ export default function BaseNode({ type, data, showTarget = true, showSource = t
       <div className="flex items-center gap-2 text-sm font-medium text-slate-800 dark:text-slate-100">
         <span>{style.icon}</span>
         <span className="truncate">{data.config?.label || type}</span>
+        {data.config?.isHandoff && (
+          <span
+            title="Handoff agent — its output picks which branch runs"
+            className="shrink-0 rounded bg-brand-600 px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white"
+          >
+            ⇄ handoff
+          </span>
+        )}
         {cached && <span title="Served from cache" className="text-xs">⚡</span>}
       </div>
       {data.config?.toolType && (

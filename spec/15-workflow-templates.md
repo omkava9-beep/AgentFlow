@@ -34,6 +34,10 @@ Reusable saved workflow shapes a user can clone into a new, independent workflow
 }
 ```
 
+## Non-goals (continued)
+
+- **Deleting a template.** Not in the API below, so the gallery is add-only for now. Worth adding later; called out here so its absence reads as scope, not oversight.
+
 ## API
 
 | Method | Path | Body | Response |
@@ -45,11 +49,14 @@ Reusable saved workflow shapes a user can clone into a new, independent workflow
 ## UI Behavior
 
 - Dashboard has a "New from template" option alongside "New Workflow," opening a template gallery (cards with name/description, maybe a small graph thumbnail).
-- Workflow Builder has a "Save as template" action.
+- Workflow Builder has a "Save as template" action, **disabled while the graph is dirty** — a template snapshots the last *saved* version, so offering it on unsaved edits would quietly capture something other than what's on screen.
+- Templates get their own page at `/templates` (the nav item phase 1 left disabled), with built-ins and the user's own templates in separate sections. The Dashboard's "New from template" links there rather than duplicating the gallery.
 
 ## Edge Cases & Error Handling
 
 - Cloning a template whose node config references a tool type that's since been removed from the registry (`05`) — surface the same "unknown tool type" warning `03` already defines, don't crash.
+- Cloning also re-checks for cycles. `POST /:id/use` creates a `Workflow` directly, bypassing the `PUT` route's guard from `19`, so a template stored before that validation existed could otherwise reintroduce one.
+- A template owned by another user 404s on both read and use; built-ins (`ownerId: null`) are usable by everyone. Snapshots are deep-copied on both save and clone, so a template and its clones never share nested config objects.
 
 ## Acceptance Criteria
 

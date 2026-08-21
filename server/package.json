@@ -7,7 +7,11 @@
     "dev": "nodemon src/index.js",
     "start": "node src/index.js",
     "seed:templates": "node src/scripts/seedTemplates.js",
-    "check:engine": "node src/scripts/engineCheck.mjs"
+    "check:engine": "node src/scripts/engineCheck.mjs",
+    "check:triggers": "node src/scripts/triggerCheck.mjs",
+    "check:templates": "node src/scripts/templateCheck.mjs",
+    "check:analytics": "node src/scripts/analyticsCheck.mjs",
+    "check:share": "node src/scripts/shareCheck.mjs"
   },
   "keywords": [],
   "author": "",

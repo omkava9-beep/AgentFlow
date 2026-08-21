@@ -17,8 +17,11 @@ export class MockAgentProvider {
     const latency = 300 + Math.random() * 700;
     await delay(latency);
 
+    // Tagged like the tool handlers' failures so the UI reads it as intentional
+    // rather than as a bug. Agent nodes get no configurable dial (spec/17) - this
+    // small fixed chance just keeps agent retries exercised too.
     if (Math.random() < 0.05) {
-      throw new Error(`Mock agent "${agentConfig.label}" failed to produce a response`);
+      throw new Error(`[simulated failure] mock agent "${agentConfig.label}" failed to produce a response`);
     }
 
     const inputText = typeof input === 'string' ? input : JSON.stringify(input ?? {});
@@ -29,8 +32,11 @@ export class MockAgentProvider {
       const lower = inputText.toLowerCase();
       const matched = candidates.find((c) => lower.includes(c.toLowerCase()));
       const handoffTarget = matched || candidates[Math.floor(Math.random() * candidates.length)] || null;
-      logs.push(`[mock-agent] handoff decision -> ${handoffTarget}`);
-      return { output: { handoffTarget, reason: `routed based on keyword match in input` }, logs, handoffTarget };
+      // Say which it was: claiming a keyword match on a random pick makes the
+      // run log lie about how the decision was reached.
+      const reason = matched ? `input mentioned "${matched}"` : 'no candidate matched the input - picked one at random';
+      logs.push(`[mock-agent] handoff decision -> ${handoffTarget} (${reason})`);
+      return { output: { handoffTarget, reason }, logs, handoffTarget };
     }
 
     const output = {

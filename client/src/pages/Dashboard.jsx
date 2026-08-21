@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { listWorkflows, createWorkflow, deleteWorkflow } from '../api/workflows';
 import { apiErrorMessage } from '../api/client';
 import { Card, Button, ErrorText } from '../components/ui';
-import ComingSoonBadge from '../components/ComingSoonBadge';
 import WorkflowCard from '../components/WorkflowCard';
 
 export default function Dashboard() {
@@ -58,9 +57,12 @@ export default function Dashboard() {
           <p className="text-sm text-slate-500 dark:text-slate-400">Build, run, and monitor agent workflows.</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="secondary" disabled title="Coming soon">
-            New from template <ComingSoonBadge />
-          </Button>
+          <Link
+            to="/templates"
+            className="rounded-lg border border-slate-200 bg-white/60 px-4 py-2 text-sm font-medium text-slate-700 backdrop-blur-sm transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-200 dark:hover:bg-slate-800"
+          >
+            New from template
+          </Link>
           <Button onClick={handleCreate} disabled={creating}>
             {creating ? 'Creating...' : '+ New Workflow'}
           </Button>

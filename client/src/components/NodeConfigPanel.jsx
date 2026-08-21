@@ -2,19 +2,25 @@ import { useEffect, useState } from 'react';
 import { useWorkflowStore } from '../store/workflowStore';
 import { listTools } from '../api/tools';
 import { TextField, TextArea, Select, Button } from './ui';
-import ComingSoonBadge from './ComingSoonBadge';
-import { COMING_SOON_FEATURES } from '../comingSoon';
-import { ACTION_TYPES } from '../comingSoonCatalog';
+import MockBehaviorFields from './MockBehaviorFields';
+import HandoffCandidates from './HandoffCandidates';
+import ToolConfigFields from './ToolConfigFields';
 
 export default function NodeConfigPanel() {
   const { nodes, selectedNodeId, selectNode, updateNodeConfig } = useWorkflowStore();
   const node = nodes.find((n) => n.id === selectedNodeId);
   const [tools, setTools] = useState([]);
+  const [toolDefaults, setToolDefaults] = useState(null);
   const [exprError, setExprError] = useState('');
 
   useEffect(() => {
     if (node?.type === 'tool') {
-      listTools().then(setTools).catch(() => setTools([]));
+      listTools()
+        .then(({ tools: list, defaults }) => {
+          setTools(list);
+          setToolDefaults(defaults);
+        })
+        .catch(() => setTools([]));
     }
   }, [node?.type]);
 
@@ -22,6 +28,16 @@ export default function NodeConfigPanel() {
 
   function set(patch) {
     updateNodeConfig(node.id, patch);
+  }
+
+  const selectedTool = tools.find((t) => t.type === node?.data?.config?.toolType) || null;
+  const unknownToolType =
+    node?.type === 'tool' && Boolean(node.data.config.toolType) && tools.length > 0 && !selectedTool;
+
+  function changeToolType(toolType) {
+    // Clear the previous type's settings rather than leaving orphaned keys from a
+    // schema that no longer applies.
+    set({ toolType, toolConfig: {} });
   }
 
   function validateExpression(expr) {
@@ -61,10 +77,23 @@ export default function NodeConfigPanel() {
               onChange={(e) => set({ systemPrompt: e.target.value })}
               placeholder="Describe this agent's role and behavior..."
             />
-            <label className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
-              <input type="checkbox" disabled />
-              Agent handoff (dynamic delegation) <ComingSoonBadge />
+            <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+              <input
+                type="checkbox"
+                checked={Boolean(node.data.config.isHandoff)}
+                onChange={(e) => set({ isHandoff: e.target.checked })}
+                className="accent-brand-500"
+              />
+              Agent handoff (dynamic delegation)
             </label>
+            {node.data.config.isHandoff && (
+              <>
+                <p className="text-xs text-slate-400">
+                  This agent's output picks which outgoing branch runs; the rest are skipped.
+                </p>
+                <HandoffCandidates nodeId={node.id} />
+              </>
+            )}
           </>
         )}
 
@@ -73,7 +102,7 @@ export default function NodeConfigPanel() {
             <Select
               label="Tool type"
               value={node.data.config.toolType || ''}
-              onChange={(e) => set({ toolType: e.target.value })}
+              onChange={(e) => changeToolType(e.target.value)}
             >
               <option value="">Select an action...</option>
               {tools.map((t) => (
@@ -81,19 +110,29 @@ export default function NodeConfigPanel() {
                   {t.label}
                 </option>
               ))}
-              {ACTION_TYPES.filter((a) => !a.live).map((a) => (
-                <option key={a.type} value="" disabled>
-                  {a.label} (coming soon)
-                </option>
-              ))}
+              {/* A stored type the registry no longer has stays selectable, so
+                  opening the node can't quietly wipe the user's config. */}
+              {unknownToolType && (
+                <option value={node.data.config.toolType}>{node.data.config.toolType} (unknown)</option>
+              )}
             </Select>
-            <div>
-              <label className="mb-1 flex items-center text-sm font-medium text-slate-700 dark:text-slate-300">
-                Failure rate override {COMING_SOON_FEATURES && <ComingSoonBadge />}
-              </label>
-              <input type="range" min="0" max="100" disabled className="w-full opacity-50" />
-              <p className="mt-1 text-xs text-slate-400">Uses the server's default simulated failure rate for now.</p>
-            </div>
+            {unknownToolType && (
+              <p className="text-xs text-amber-600 dark:text-amber-400">
+                Unknown tool type "{node.data.config.toolType}" — it is no longer in the registry. Pick a
+                replacement, or leave it and this node will fail at run time.
+              </p>
+            )}
+            {selectedTool?.description && <p className="text-xs text-slate-400">{selectedTool.description}</p>}
+            <ToolConfigFields
+              schema={selectedTool?.configSchema}
+              values={node.data.config.toolConfig || {}}
+              onChange={(toolConfig) => set({ toolConfig })}
+            />
+            <MockBehaviorFields
+              overrides={node.data.config.mockOverrides || {}}
+              defaults={toolDefaults}
+              onChange={(mockOverrides) => set({ mockOverrides })}
+            />
           </>
         )}
 
