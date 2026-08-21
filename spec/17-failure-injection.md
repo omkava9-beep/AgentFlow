@@ -27,6 +27,8 @@ Lets a user deliberately configure a Tool node's simulated failure rate so retry
 
 - Node Configuration Panel: a slider/number input (0–100%) for a Tool node's failure rate, defaulting to the global default if unset.
 - Run Monitor log lines for a simulated failure are phrased distinctly, e.g. `[simulated failure] fake-weather call failed (attempt 1/3), retrying in 500ms...`.
+- Both override fields are *overrides*, not values: unset means "use the server default", and the panel shows what that default actually is (`GET /api/tools` returns it) so an empty control never reads as `0`.
+- The log pane must seed itself from the run's persisted `nodeResults[].logs`, not only from the live socket stream. Otherwise this spec's third acceptance criterion is unmeetable for a finished run: its logs are in the database and its live events are long gone, so the pane renders empty.
 
 ## Edge Cases & Error Handling
 
@@ -37,3 +39,5 @@ Lets a user deliberately configure a Tool node's simulated failure rate so retry
 - [ ] Setting a Tool node's failure rate to 100% reliably produces a failed run after exhausting retries.
 - [ ] Setting it to 0% reliably produces success (no flaky failures leaking in from the global default).
 - [ ] Logs clearly distinguish simulated failures from other log lines.
+- [ ] A finished run reopened from Run History shows its logs, including the retry lines.
+- [ ] An unset failure rate displays the server default rather than `0`.

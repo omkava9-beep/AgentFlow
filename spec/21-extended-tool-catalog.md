@@ -26,11 +26,16 @@ configSchema: [
 
 Supported `type` values: `text`, `textarea`, `number`, `select` (with `options`), `boolean`. Deliberately small — this is a form renderer, not a schema language.
 
-`GET /api/tools` returns `{ type, label, description, configSchema }`, and the panel renders fields generically from it. Values live under `node.data.config.toolConfig`, keeping them clear of the reserved `label` / `toolType` / `mockOverrides` keys.
+`GET /api/tools` returns `{ tools: [{ type, label, description, configSchema }], defaults: { failureRate, maxAttempts } }`, and the panel renders fields generically from it. (`defaults` was added by `17` so the panel can show the effective server-side values behind an unset override.) Values live under `node.data.config.toolConfig`, keeping them clear of the reserved `label` / `toolType` / `mockOverrides` keys.
 
 ### 2. Four new mocked tool handlers
 
 All four go through the existing `withMockBehavior()` wrapper, so they inherit artificial latency, `17`'s failure injection, and `07`'s retry/backoff for free — per `CLAUDE.md`, mocked node behavior must simulate latency, occasional failure, and a plausible templated output.
+
+Two cache consequences fall out of adding per-tool config, and both are corrections to `08`:
+
+- **The cache key must include the tool's config**, not just its input. Two `send-email` nodes with different recipients and the same upstream input would otherwise collide, and the second would be served the first's result.
+- **Side-effecting tools opt out of caching entirely** via `cacheable: false` (`send-email`, `slack-message`, `http-request`, `database-write`). Caching an action means the second "send" silently doesn't happen — which is a bug, not a saving. The three read-like tools stay cacheable.
 
 | Tool | Config fields | Mock output |
 |---|---|---|
@@ -75,8 +80,10 @@ eventTrigger: { eventName: string | null, enabled: boolean }
 
 **MockRecord** (new collection, written only by `database-write`):
 ```
-{ _id, ownerId, runId, collection: string, document: Mixed, createdAt }
+{ _id, ownerId, runId, collectionName: string, document: Mixed, createdAt }
 ```
+
+The path is `collectionName`, not `collection`: `collection` is a reserved Mongoose schema pathname that shadows `Document#collection`, and Mongoose warns it "may break some functionality". The tool's user-facing config field and its output both still read `collection` — only the stored path differs.
 
 **Node config** for tool nodes settles into:
 ```
@@ -87,7 +94,7 @@ eventTrigger: { eventName: string | null, enabled: boolean }
 
 | Method | Path | Body | Response |
 |---|---|---|---|
-| GET | `/api/tools` | — | `[{ type, label, description, configSchema }]` (extends the existing route) |
+| GET | `/api/tools` | — | `{ tools: [{ type, label, description, configSchema }], defaults }` (extends the existing route) |
 | PUT | `/api/workflows/:id/event-trigger` | `{ eventName, enabled }` | updated trigger |
 | DELETE | `/api/workflows/:id/event-trigger` | — | `204` |
 | POST | `/api/events/:eventName` | optional JSON payload | `202 { triggered: [runId, ...] }` |
@@ -104,6 +111,7 @@ eventTrigger: { eventName: string | null, enabled: boolean }
 
 - **Unknown `toolType` in a saved workflow** (registry changed, or a template cloned per `15`) → the panel shows the raw stored value with an "unknown tool type" warning and preserves it rather than silently resetting it to empty, which would destroy the user's config. The engine already throws `Unknown tool type: X` at run time; `20`'s validation panel surfaces it before then.
 - **`event` name collides across two of the user's workflows** → intended behavior: both run. That is the entire point of event fan-out, not a conflict to resolve.
+- **Event names are a single global namespace.** `POST /api/events/:eventName` is unauthenticated and matches every enabled subscription regardless of owner, so two users picking `order.created` would fire each other's workflows. That is acceptable at this project's single-demo-user scope (`PRODUCT.md`), and it is the deliberate difference from a webhook's per-workflow token — but it is a real limitation, not an oversight. A multi-user deployment would need the event namespaced per account (a publish token, or `/api/events/:userToken/:eventName`). Noted in the dispatch handler too.
 - **`POST /api/events/:eventName` matching zero workflows** → `202 { triggered: [] }`, not a 404. The caller is a publisher; whether anyone subscribed is not its concern.
 - **A subscribed workflow already has a run in progress** → that workflow is skipped (matching `createRun`'s existing 409 guard) but others still fire; the response reports only the runs actually started.
 - **`database-write` with malformed JSON in `document`** → node fails with a clear parse error. Not retried into oblivion: a malformed document will never parse, so this failure should bypass retry rather than burn all attempts. Distinguish permanent failures from `SimulatedToolFailure` in the queue.
@@ -112,7 +120,7 @@ eventTrigger: { eventName: string | null, enabled: boolean }
 ## Acceptance Criteria
 
 - [ ] Selecting each of the seven tool types renders that tool's own fields, driven entirely by `GET /api/tools` with no per-type branching in the panel.
-- [ ] Adding an eighth tool to `TOOL_HANDLERS` makes it appear in the dropdown with working config fields and zero client-side changes.
+- [ ] Adding an eighth tool to `TOOL_HANDLERS` makes it appear in the dropdown with working config fields and zero client-side changes — including its description, `select` options, defaults, and required-field validation.
 - [ ] `send-email`, `slack-message`, and `http-request` produce plausible outputs that reflect both their config and their upstream input.
 - [ ] `database-write` inserts a real `MockRecord` document, verifiable in MongoDB, tagged with the `runId` that wrote it.
 - [ ] `database-write` with invalid JSON fails the node immediately without consuming all retry attempts.

@@ -31,7 +31,10 @@ webhook: { token: string, enabled: boolean } | null
 | Method | Path | Body | Response |
 |---|---|---|---|
 | POST | `/api/workflows/:id/webhook/regenerate` | — (authed) | `{ token, url }` |
+| PUT | `/api/workflows/:id/webhook` | `{ enabled }` | updated webhook |
 | POST | `/api/hooks/:token` | optional JSON payload | `202 { runId }` |
+
+The `PUT` isn't in this spec's original table but the UI's enable/disable toggle needs it — regenerate alone can only ever turn a webhook *on*. Regenerating also enables, since handing back a fresh URL that then has to be switched on separately is a pointless extra step.
 
 `/api/hooks/:token` is intentionally outside normal auth middleware — it looks up the workflow by token instead of by `req.userId`.
 

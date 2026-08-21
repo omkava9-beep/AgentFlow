@@ -30,8 +30,11 @@ Handoff node config (in `node.data.config`, alongside the regular Agent shape):
 
 ## UI Behavior
 
-- Node Configuration Panel (`03`) shows a "Handoff candidates" list editor when a node is marked as a handoff agent, keeping edge labels in sync with candidate names.
-- Run Monitor (`09`) highlights the taken handoff edge distinctly (similar to how a Condition's taken branch could be visually emphasized).
+- Node Configuration Panel (`03`) shows a "Handoff candidates" list editor when a node is marked as a handoff agent.
+- Sync is one-directional and deliberately partial: **renaming** a candidate rewrites any outgoing edge already labelled with the old name (it's the same branch being renamed, so letting them drift would just manufacture a warning), but **adding or removing** a candidate does not touch edges. That drift is real, and `20`'s validation panel reports it rather than having a config edit silently rewire the graph. The editor marks each candidate green/amber for whether an edge currently uses it.
+- Turning the handoff flag off preserves `candidates`, so toggling it back is lossless.
+- Run Monitor (`09`) highlights the taken handoff edge distinctly — animated and accented, with the ruled-out edges dashed and faded. Condition nodes get the identical treatment, since both resolve to exactly one outgoing edge. Without it a routing decision is invisible on the graph: the untaken nodes just go grey, and you can't tell a routing choice from an upstream failure.
+- The node's result carries a `⇄ target` chip so the chosen branch is readable without parsing logs.
 
 ## Edge Cases & Error Handling
 
@@ -42,3 +45,6 @@ Handoff node config (in `node.data.config`, alongside the regular Agent shape):
 - [ ] A Handoff node with 3 candidate agents routes execution to exactly one of them based on (mocked) output, skipping the other two.
 - [ ] An invalid/unmatched handoff target fails the node clearly rather than silently defaulting.
 - [ ] Works identically in shape whether `AGENT_PROVIDER` is `mock` or `anthropic` — only how `handoffTarget` gets decided differs.
+- [ ] Renaming a candidate renames its matching edge label; adding or removing one leaves edges alone and surfaces a validation warning instead.
+
+`npm run check:engine` (in `server/`) covers the routing and invalid-target criteria.

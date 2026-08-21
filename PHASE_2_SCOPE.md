@@ -33,6 +33,20 @@ So the backend data model for `12`, `13`, and `18` is done, and `16` is mostly d
 
 `19` is the load-bearing one. The current engine walks the topological order **strictly sequentially**, awaiting each node's queue job before starting the next — which means `QUEUE_CONCURRENCY` is effectively 1 and the hand-built job queue, the centrepiece of the product brief, never actually demonstrates bounded concurrency. Fixing that is the single highest-value change in phase 2.
 
+## Progress
+
+| Step | Spec | Status |
+|---|---|---|
+| 1 | `19-engine-parallelism-and-control` | **Done** — `npm run check:engine` (now 44 checks incl. `16`) |
+| 2 | `17-failure-injection` | **Done** — verified over HTTP + cache-free handler check |
+| 3 | `20-builder-ux` | **Done** — store/validator checks (now in `check:logic`) + 16 browser checks |
+| 4 | `16-agent-handoff` | **Done** — 6 engine + 18 store + 14 browser checks |
+| 5 | `12` / `13` / event trigger | **Done** — 28 API + 20 browser + 11 cron checks |
+| 6 | `21-extended-tool-catalog` | **Done** — 32 handler + 15 browser + 8 validator checks |
+| 7 | `15-workflow-templates` | Not started |
+| 8 | `14-analytics-dashboard` | Not started |
+| 9 | `18-rbac` | Not started |
+
 ## Build order
 
 Each step is safe to demo on its own; ordering is by dependency, not by spec number.
@@ -46,6 +60,18 @@ Each step is safe to demo on its own; ordering is by dependency, not by spec num
 7. **`15` — templates.** Includes writing the missing `seedTemplates.js`.
 8. **`14` — analytics.** Last, because it is the most rewarding to demo once there is a real backlog of runs to aggregate over.
 9. **`18` — share links.** Independent of everything else; can slot in anywhere, but it is the least interesting to demo.
+
+## Check scripts
+
+Phase 2's acceptance criteria are runnable rather than prose:
+
+| Command | Covers |
+|---|---|
+| `cd server && npm run check:engine` | spec `19`, `16`, `17` — 44 checks against a throwaway database |
+| `cd server && npm run check:triggers` | spec `12`, `13`, `21`'s event dispatch — 28 checks against a running server |
+| `cd client && npm run check:logic` | store, graph validator, cron helper — 86 checks, no browser needed |
+
+UI behavior is verified by driving the real app in headless Chrome; those scripts live outside the repo since they need two servers running.
 
 ## Retiring the Coming Soon scaffolding
 

@@ -65,6 +65,8 @@ A long or deliberately-failing run needs a stop button — currently the only wa
 
 Timeout is re-expressed as an internal cancellation with `cancelReason: 'timeout'`, producing `status: 'failed'` (a timeout is a failure, not a user decision) and `skipped` for unreached nodes.
 
+The deadline is env-configurable (`RUN_TIMEOUT_MS`) and overridable per run. A hardcoded constant is neither demoable nor testable, and a purely process-global one can't be shortened for one run without starving every other run sharing the process.
+
 ### 7. Queue bug fixes
 
 `InProcessQueue` has two defects that only stay invisible because concurrency is never exercised:

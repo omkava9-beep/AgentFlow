@@ -65,6 +65,8 @@ The error/warning split is the useful part: phase 1 blocks *saving* on a missing
 
 `dirty` already blocks the Run button. Extend it to warn on navigating away from the Builder (React Router blocker + `beforeunload`), because losing an unsaved graph to a stray back-button press is the most expensive mistake the current UI allows.
 
+`useBlocker` only works under a **data router**, so `<BrowserRouter>` becomes `createBrowserRouter` + `RouterProvider`. The route tree stays JSX via `createRoutesFromElements` — this is a wiring change in `main.jsx`/`App.jsx`, not a rewrite. `beforeunload` alone would cover reload and tab-close but not in-app navigation, which is the case that actually loses work.
+
 ## Non-goals
 
 - Real-time collaborative editing / presence. Single-user, per `PRODUCT.md`.
@@ -111,6 +113,6 @@ selectedEdgeId: string | null
 - [ ] An edge's label can be renamed after creation and the change survives save/reload.
 - [ ] A `true`/`false` condition edge cannot be renamed to something the engine won't match.
 - [ ] A graph with an unconfigured tool node saves successfully but refuses to run, naming that node in the validation panel.
-- [ ] Clicking a validation entry selects and reveals the offending node on the canvas.
+- [ ] Clicking a validation entry reveals the offending node — opens its inspector *and* highlights it on the canvas.
 - [ ] Navigating away with unsaved changes prompts for confirmation; navigating away after save does not.
 - [ ] Typing `Backspace` in the workflow-name field deletes a character, not a node.

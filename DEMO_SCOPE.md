@@ -1,5 +1,8 @@
 # First Presentation — Demo Scope (2-week target)
 
+> Historical record of what presentation 1 covered. The "Coming Soon" items below are
+> being built out in phase 2 — see [`PHASE_2_SCOPE.md`](PHASE_2_SCOPE.md) for current status.
+
 ## Live / fully working for the demo
 
 Everything in Milestones 1–2 — the full core loop: register/login → build a workflow on the canvas → configure nodes → save → run it → watch it execute live → review it in history.
