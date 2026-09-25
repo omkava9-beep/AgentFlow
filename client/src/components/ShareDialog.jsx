@@ -52,10 +52,10 @@ export default function ShareDialog({ workflowId, initialToken, onTokenChange, o
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-lg rounded-xl border border-slate-200 bg-white p-5 shadow-xl dark:border-slate-800 dark:bg-slate-900">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-400">Share read-only link</h3>
-        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-surface-sunken/40 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-lg rounded-xl border border-default bg-surface p-5 shadow-xl">
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-subtle">Share read-only link</h3>
+        <p className="mt-1 text-xs text-muted">
           Anyone with the link can view this workflow's design and recent runs without signing in. They cannot
           edit it, run it, or see its webhook and schedule settings.
         </p>
@@ -63,7 +63,7 @@ export default function ShareDialog({ workflowId, initialToken, onTokenChange, o
         <div className="mt-4 space-y-3">
           {url ? (
             <>
-              <code className="block break-all rounded bg-slate-100 p-2 text-xs text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+              <code className="block break-all rounded bg-bg-subtle p-2 text-xs text-fg">
                 {url}
               </code>
               <div className="flex flex-wrap gap-2">
@@ -74,7 +74,7 @@ export default function ShareDialog({ workflowId, initialToken, onTokenChange, o
             </>
           ) : (
             <>
-              <p className="text-sm text-slate-600 dark:text-slate-300">Sharing is off for this workflow.</p>
+              <p className="text-sm text-muted">Sharing is off for this workflow.</p>
               <Button onClick={generate} disabled={busy}>{busy ? 'Creating...' : 'Create share link'}</Button>
             </>
           )}

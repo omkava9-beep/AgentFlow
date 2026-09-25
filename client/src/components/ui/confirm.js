@@ -25,3 +25,18 @@ export function confirm(options) {
   });
 }
 
+
+/**
+ * A promise-based replacement for `window.prompt`. Resolves to the entered
+ * string, or `null` when cancelled. `readOnly` + `copy: true` turns it into a
+ * "here's a link, copy it" dialog.
+ *
+ *   const name = await prompt({ title: 'Rename', defaultValue: 'x', confirmLabel: 'Save' });
+ */
+export function prompt(options) {
+  const opts = typeof options === 'string' ? { title: options } : options;
+  return new Promise((resolve) => {
+    useConfirmStore.getState().request?.resolve(opts.kind === 'prompt' ? null : false);
+    useConfirmStore.getState().open({ ...opts, kind: 'prompt', resolve });
+  });
+}

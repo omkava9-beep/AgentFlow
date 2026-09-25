@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Checkbox } from '../ui/Form';
 import { diffVersions, publishWorkflow } from '../../api/workflows';
 import { apiErrorMessage } from '../../api/client';
 import { useToastStore } from '../../store/toastStore';
@@ -46,20 +47,20 @@ export default function PublishDialog({ workflowId, publishedVersion, errors: cl
   const blocked = errors.length > 0 || (warnings.length > 0 && !ack);
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-lg rounded-xl border border-slate-200 bg-white p-5 shadow-xl dark:border-slate-800 dark:bg-slate-900">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-400">Publish</h3>
-        <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-surface-sunken/40 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-lg rounded-xl border border-default bg-surface p-5 shadow-xl">
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-subtle">Publish</h3>
+        <p className="mt-1 text-sm text-muted">
           {publishedVersion
             ? <>Publishing makes this draft <strong>v{publishedVersion + 1}</strong>. Schedules, webhooks, events and API calls switch to it immediately.</>
             : <>This will be the first version. Until then, schedules, webhooks, events and API calls don't run this workflow.</>}
         </p>
 
         {publishedVersion && (
-          <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+          <p className="mt-3 rounded-lg bg-bg-subtle px-3 py-2 text-xs text-muted">
             Draft vs live v{publishedVersion}: {summary ?? 'comparing…'}{' '}
             {onViewDiff && (
-              <button type="button" className="text-brand-600 hover:underline dark:text-brand-400" onClick={() => { onClose(); onViewDiff(); }}>
+              <button type="button" className="text-accent hover:underline" onClick={() => { onClose(); onViewDiff(); }}>
                 View diff
               </button>
             )}
@@ -67,17 +68,17 @@ export default function PublishDialog({ workflowId, publishedVersion, errors: cl
         )}
 
         {errors.length > 0 && (
-          <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-950 dark:text-red-300">
+          <div className="mt-3 rounded-lg bg-danger-subtle px-3 py-2 text-xs text-danger-subtle-fg">
             <p className="font-semibold">Fix these before publishing:</p>
             <ul className="mt-1 list-disc pl-4">{errors.map((e) => <li key={e.id}>{e.message}</li>)}</ul>
           </div>
         )}
         {warnings.length > 0 && (
-          <div className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+          <div className="mt-3 rounded-lg bg-warning-subtle px-3 py-2 text-xs text-warning-subtle-fg">
             <p className="font-semibold">{warnings.length} warning{warnings.length === 1 ? '' : 's'}:</p>
             <ul className="mt-1 list-disc pl-4">{warnings.map((w) => <li key={w.id}>{w.message}</li>)}</ul>
             <label className="mt-2 flex items-center gap-2 font-medium">
-              <input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} />
+              <Checkbox checked={ack} onChange={(e) => setAck(e.target.checked)} />
               I understand — publish anyway
             </label>
           </div>

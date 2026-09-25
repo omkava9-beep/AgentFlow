@@ -2,12 +2,12 @@
 export default function ChartCard({ title, subtitle, action, children, className = '' }) {
   return (
     <section
-      className={`rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 ${className}`}
+      className={`rounded-card border border-default bg-surface p-4 ${className}`}
     >
       <div className="mb-3 flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{title}</h2>
-          {subtitle && <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{subtitle}</p>}
+          <h2 className="text-sm font-semibold text-fg">{title}</h2>
+          {subtitle && <p className="mt-0.5 text-xs text-muted">{subtitle}</p>}
         </div>
         {action}
       </div>

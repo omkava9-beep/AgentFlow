@@ -5,10 +5,10 @@
 export default function VersionChip({ publishedVersion, hasUnpublishedChanges, onClick }) {
   const never = !publishedVersion;
   const tone = never
-    ? 'border-slate-200 bg-white/80 text-slate-500 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-400'
+    ? 'border-default bg-surface/80 text-muted   '
     : hasUnpublishedChanges
-      ? 'border-amber-300 bg-amber-50/90 text-amber-800 dark:border-amber-800 dark:bg-amber-950/80 dark:text-amber-300'
-      : 'border-emerald-200 bg-emerald-50/90 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/80 dark:text-emerald-300';
+      ? 'border-warning/30 bg-warning-subtle/90 text-warning-subtle-fg   '
+      : 'border-success/30 bg-success-subtle/90 text-success-subtle-fg   ';
   return (
     <button
       type="button"

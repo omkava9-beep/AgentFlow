@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Button } from './ui';
+import { Check, X } from 'lucide-react';
+import { Button, Input, Textarea } from './ui';
 
 /**
  * Approve / Reject with an optional comment. `onDecide(decision, comment)`
@@ -31,23 +32,26 @@ export default function ApprovalDecision({ onDecide, compact = false }) {
     }
   }
 
+  const buttons = (
+    <div className="flex items-center gap-2">
+      <Button size={compact ? 'sm' : 'md'} icon={Check} loading={busy === 'approve'} disabled={Boolean(busy)} onClick={() => decide('approve')}>
+        Approve
+      </Button>
+      <Button size={compact ? 'sm' : 'md'} variant="danger-ghost" icon={X} loading={busy === 'reject'} disabled={Boolean(busy)} onClick={() => decide('reject')}>
+        Reject
+      </Button>
+    </div>
+  );
+
   return (
-    <div className={`flex ${compact ? 'items-center gap-2' : 'flex-col gap-2'}`}>
-      <input
-        value={comment}
-        onChange={(e) => setComment(e.target.value)}
-        placeholder="Comment (optional)"
-        className="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-2 py-1 text-sm dark:border-slate-700 dark:bg-slate-900"
-      />
-      <div className="flex items-center gap-2">
-        <Button className="!bg-green-600 !px-3 !py-1 text-sm hover:!bg-green-700" disabled={Boolean(busy)} onClick={() => decide('approve')}>
-          {busy === 'approve' ? 'Approving…' : 'Approve'}
-        </Button>
-        <Button variant="secondary" className="!px-3 !py-1 text-sm !text-red-600" disabled={Boolean(busy)} onClick={() => decide('reject')}>
-          {busy === 'reject' ? 'Rejecting…' : 'Reject'}
-        </Button>
-      </div>
-      {message && <p className="text-xs text-slate-500 dark:text-slate-400">{message}</p>}
+    <div className={compact ? 'flex flex-wrap items-center gap-2' : 'flex flex-col gap-3'}>
+      {compact ? (
+        <Input size="sm" value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Comment (optional)" aria-label="Comment" className="w-56 min-w-0 flex-1" />
+      ) : (
+        <Textarea rows={2} value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Add a comment for the audit trail (optional)" aria-label="Comment" />
+      )}
+      {buttons}
+      {message && <p className="w-full text-xs text-muted">{message}</p>}
     </div>
   );
 }

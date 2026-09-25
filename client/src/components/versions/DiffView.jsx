@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
+import Select from '../ui/Select';
+import { Checkbox } from '../ui/Form';
 import ReactFlow, { Background, Controls } from 'reactflow';
 import { diffVersions, getVersion, listVersions } from '../../api/workflows';
 import { apiErrorMessage } from '../../api/client';
@@ -101,31 +103,33 @@ export default function DiffView({ workflowId, from, to, onChangeRange, onClose 
   };
 
   return (
-    <div className="absolute inset-0 z-20 flex flex-col bg-white dark:bg-slate-950">
-      <div className="flex flex-wrap items-center gap-3 border-b border-slate-200 px-4 py-2 text-xs dark:border-slate-800">
-        <span className="font-semibold text-slate-700 dark:text-slate-200">{viewOnly ? `Viewing v${from} (read-only)` : 'Compare'}</span>
+    <div className="absolute inset-0 z-20 flex flex-col bg-surface">
+      <div className="flex flex-wrap items-center gap-3 border-b border-default px-4 py-2 text-xs">
+        <span className="font-semibold text-fg">{viewOnly ? `Viewing v${from} (read-only)` : 'Compare'}</span>
         {!viewOnly && (
           <>
-            <select value={from} onChange={pick('from')} className="rounded border border-slate-300 bg-white px-2 py-1 dark:border-slate-700 dark:bg-slate-900">
+            <Select size="sm" className="w-40" aria-label="Compare from" value={from} onChange={pick('from')}>
               {options.filter((o) => o.value !== 'draft').map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
+            </Select>
             <span>↔</span>
-            <select value={to} onChange={pick('to')} className="rounded border border-slate-300 bg-white px-2 py-1 dark:border-slate-700 dark:bg-slate-900">
+            <Select size="sm" className="w-40" aria-label="Compare to" value={to} onChange={pick('to')}>
               {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
+            </Select>
             <Legend color={ADDED} text="added" />
             <Legend color={REMOVED} text="removed" dashed />
             <Legend color={CHANGED} text="changed" />
-            <label className="flex items-center gap-1 text-slate-600 dark:text-slate-300">
-              <input type="checkbox" checked={showLayout} onChange={(e) => setShowLayout(e.target.checked)} /> Show layout changes
-              {data?.diff?.nodes?.moved?.length ? ` (${data.diff.nodes.moved.length})` : ''}
-            </label>
-            {data?.diff?.nameChanged && <span className="text-amber-600">renamed: “{data.from.name}” → “{data.to.name}”</span>}
+            <Checkbox
+              size="sm"
+              label={`Show layout changes${data?.diff?.nodes?.moved?.length ? ` (${data.diff.nodes.moved.length})` : ''}`}
+              checked={showLayout}
+              onChange={(e) => setShowLayout(e.target.checked)}
+            />
+            {data?.diff?.nameChanged && <span className="text-warning">renamed: “{data.from.name}” → “{data.to.name}”</span>}
           </>
         )}
-        <button type="button" onClick={onClose} className="ml-auto rounded-lg border border-slate-300 px-3 py-1 font-medium dark:border-slate-700">Back to draft</button>
+        <button type="button" onClick={onClose} className="ml-auto rounded-lg border border-default px-3 py-1 font-medium">Back to draft</button>
       </div>
-      {error && <p className="p-4 text-sm text-red-500">{error}</p>}
+      {error && <p className="p-4 text-sm text-danger">{error}</p>}
       <div className="relative flex-1">
         {data && (
           <ReactFlow
@@ -144,16 +148,16 @@ export default function DiffView({ workflowId, from, to, onChangeRange, onClose 
           </ReactFlow>
         )}
         {inspect && (
-          <div className="absolute right-3 top-3 z-10 w-80 rounded-xl border border-amber-200 bg-white p-3 text-xs shadow-lg dark:border-amber-900 dark:bg-slate-900">
+          <div className="absolute right-3 top-3 z-10 w-80 rounded-xl border border-warning/30 bg-surface p-3 text-xs shadow-lg">
             <div className="mb-2 flex items-center justify-between">
               <span className="font-semibold">“{inspect.label}” changed</span>
-              <button type="button" onClick={() => setInspect(null)} className="text-slate-400">✕</button>
+              <button type="button" onClick={() => setInspect(null)} className="text-subtle">✕</button>
             </div>
             {inspect.rows.map((r) => (
               <div key={r.path} className="mb-2">
-                <p className="font-mono text-[11px] text-slate-500">{r.path}</p>
-                <p className="whitespace-pre-wrap break-words rounded bg-red-50 px-2 py-1 text-red-700 dark:bg-red-950 dark:text-red-300">− {show(r.before)}</p>
-                <p className="mt-0.5 whitespace-pre-wrap break-words rounded bg-emerald-50 px-2 py-1 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">+ {show(r.after)}</p>
+                <p className="font-mono text-[11px] text-muted">{r.path}</p>
+                <p className="whitespace-pre-wrap break-words rounded bg-danger-subtle px-2 py-1 text-danger-subtle-fg">− {show(r.before)}</p>
+                <p className="mt-0.5 whitespace-pre-wrap break-words rounded bg-success-subtle px-2 py-1 text-success-subtle-fg">+ {show(r.after)}</p>
               </div>
             ))}
           </div>
@@ -165,7 +169,7 @@ export default function DiffView({ workflowId, from, to, onChangeRange, onClose 
 
 function Legend({ color, text, dashed = false }) {
   return (
-    <span className="flex items-center gap-1 text-slate-600 dark:text-slate-300">
+    <span className="flex items-center gap-1 text-muted">
       <span className="inline-block h-3 w-3 rounded" style={{ border: `2px ${dashed ? 'dashed' : 'solid'} ${color}` }} /> {text}
     </span>
   );

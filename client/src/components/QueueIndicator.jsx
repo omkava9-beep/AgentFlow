@@ -16,8 +16,8 @@ export default function QueueIndicator({ stats }) {
   const atCap = active >= cap && queued > 0;
 
   return (
-    <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-      <span className="font-medium uppercase tracking-wide text-slate-400" title="This workspace's jobs in the shared worker pool">
+    <div className="flex items-center gap-2 text-xs text-muted">
+      <span className="font-medium uppercase tracking-wide text-subtle" title="This workspace's jobs in the shared worker pool">
         Queue
       </span>
       <span className="flex items-center gap-1">
@@ -26,7 +26,7 @@ export default function QueueIndicator({ stats }) {
             key={i}
             title={filled ? 'slot busy (this workspace)' : 'slot free'}
             className={`h-2.5 w-2.5 rounded-sm ${
-              filled ? 'bg-brand-500' : 'bg-slate-200 dark:bg-slate-700'
+              filled ? 'bg-accent' : 'bg-surface-sunken '
             }`}
           />
         ))}
@@ -35,12 +35,12 @@ export default function QueueIndicator({ stats }) {
         {active} running · {queued} queued · plan limit {cap}
       </span>
       {atCap && !poolSaturated && (
-        <span className="rounded bg-amber-100 px-1.5 py-0.5 font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-300" title="Queued jobs are waiting for this workspace's plan limit">
+        <span className="rounded bg-warning-subtle px-1.5 py-0.5 font-medium text-warning-subtle-fg" title="Queued jobs are waiting for this workspace's plan limit">
           At plan limit
         </span>
       )}
       {poolSaturated && (
-        <span className="rounded bg-slate-200 px-1.5 py-0.5 font-medium text-slate-700 dark:bg-slate-700 dark:text-slate-200" title="Every slot in the shared pool is busy">
+        <span className="rounded bg-surface-sunken px-1.5 py-0.5 font-medium text-fg" title="Every slot in the shared pool is busy">
           Server busy
         </span>
       )}

@@ -20,10 +20,10 @@ export default function ThreadListPanel({ threads, onOpen, onRepin, onClose }) {
   return (
     <div
       data-testid="thread-list"
-      className="pointer-events-auto absolute right-4 top-3 z-30 flex max-h-[85%] w-80 flex-col rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900"
+      className="pointer-events-auto absolute right-4 top-3 z-30 flex max-h-[85%] w-80 flex-col rounded-xl border border-default bg-surface shadow-xl"
       onMouseDown={(e) => e.stopPropagation()}
     >
-      <div className="flex items-center gap-1 border-b border-slate-100 px-2 py-1.5 dark:border-slate-800">
+      <div className="flex items-center gap-1 border-b border-default px-2 py-1.5">
         {TABS.map((t) => {
           const n = threads.filter(t.test).length;
           return (
@@ -31,29 +31,29 @@ export default function ThreadListPanel({ threads, onOpen, onRepin, onClose }) {
               key={t.id}
               type="button"
               onClick={() => setTab(t.id)}
-              className={`rounded-md px-2 py-1 text-xs font-medium ${tab === t.id ? 'bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+              className={`rounded-md px-2 py-1 text-xs font-medium ${tab === t.id ? 'bg-accent-subtle text-accent-subtle-fg  ' : 'text-muted hover:bg-bg-subtle '}`}
             >
               {t.label}{n ? ` ${n}` : ''}
             </button>
           );
         })}
-        <button type="button" onClick={onClose} aria-label="Close" className="ml-auto rounded-md px-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"><X className="h-4 w-4" aria-hidden="true" /></button>
+        <button type="button" onClick={onClose} aria-label="Close" className="ml-auto rounded-md px-1.5 text-subtle hover:bg-bg-subtle"><X className="h-4 w-4" aria-hidden="true" /></button>
       </div>
-      <div className="flex-1 divide-y divide-slate-100 overflow-y-auto dark:divide-slate-800">
-        {shown.length === 0 && <p className="px-3 py-6 text-center text-xs text-slate-400">No {current.label.toLowerCase()} threads.</p>}
+      <div className="flex-1 divide-y divide-default overflow-y-auto">
+        {shown.length === 0 && <p className="px-3 py-6 text-center text-xs text-subtle">No {current.label.toLowerCase()} threads.</p>}
         {shown.map((t) => (
           <div key={t.id} className="px-3 py-2">
             <button type="button" onClick={() => onOpen(t)} className="block w-full text-left">
-              <span className="flex items-center gap-2 text-[11px] text-slate-400">
-                <span className="font-medium text-slate-600 dark:text-slate-300">{t.comments[0]?.author?.name}</span>
+              <span className="flex items-center gap-2 text-[11px] text-subtle">
+                <span className="font-medium text-muted">{t.comments[0]?.author?.name}</span>
                 <span>{formatRelativeTime(t.updatedAt || t.createdAt)}</span>
-                {t.anchor.detached && <span className="rounded bg-amber-100 px-1 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">node deleted</span>}
+                {t.anchor.detached && <span className="rounded bg-warning-subtle px-1 text-warning-subtle-fg">node deleted</span>}
                 {t.replyCount > 0 && <span className="ml-auto">{t.replyCount} repl{t.replyCount === 1 ? 'y' : 'ies'}</span>}
               </span>
-              <span className="line-clamp-2 block text-sm text-slate-700 dark:text-slate-200">{snippet(t.comments[0]) || '(deleted)'}</span>
+              <span className="line-clamp-2 block text-sm text-fg">{snippet(t.comments[0]) || '(deleted)'}</span>
             </button>
             {t.anchor.detached && (
-              <button type="button" onClick={() => onRepin(t)} className="mt-1 text-xs font-medium text-brand-600 hover:underline dark:text-brand-400">
+              <button type="button" onClick={() => onRepin(t)} className="mt-1 text-xs font-medium text-accent hover:underline">
                 Pin to canvas…
               </button>
             )}

@@ -252,7 +252,7 @@ export default function CommandPalette() {
     <>
       {open && (
         <div
-          className="fixed inset-0 z-[65] flex animate-fade-in items-start justify-center bg-zinc-950/50 p-4 pt-[12vh]"
+          className="fixed inset-0 z-[65] flex animate-fade-in items-start justify-center bg-surface-sunken/50 p-4 pt-[12vh]"
           onMouseDown={(e) => { if (e.target === e.currentTarget) closePalette(); }}
         >
           <div
@@ -325,7 +325,16 @@ const SHORTCUTS = [
   ['⇧⌘Z / ⌘Y', 'Redo'],
   ['⌘C / ⌘V', 'Copy / paste selected nodes'],
   ['⌘D', 'Duplicate selection'],
+  ['⌘X', 'Cut selected nodes'],
+  ['⌘A', 'Select all nodes'],
   ['Delete / Backspace', 'Delete selection'],
+  ['Right-click', 'Node, connection or canvas menu'],
+  ['⌘/ · double-click canvas', 'Add a node'],
+  ['F2', 'Rename the selected node'],
+  ['Enter', 'Open the selected node’s settings'],
+  ['⇧D', 'Disable / enable selected nodes'],
+  ['⇧1 / ⇧0', 'Fit view / zoom to 100%'],
+  ['Shift + drag', 'Box-select nodes'],
   ['C', 'Comment mode on the canvas'],
   ['Esc', 'Close dialogs and menus'],
 ];
@@ -338,10 +347,10 @@ function ShortcutSheet({ onClose }) {
   }, [onClose]);
   return (
     <div
-      className="fixed inset-0 z-[65] flex animate-fade-in items-center justify-center bg-zinc-950/50 p-4"
+      className="fixed inset-0 z-[65] flex animate-fade-in items-center justify-center bg-surface-sunken/50 p-4"
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div role="dialog" aria-modal="true" aria-label="Keyboard shortcuts" data-testid="shortcut-sheet" className="w-full max-w-md animate-pop-in rounded-dialog border border-default bg-surface-raised p-5 shadow-popover">
+      <div role="dialog" aria-modal="true" aria-label="Keyboard shortcuts" data-testid="shortcut-sheet" className="max-h-[85vh] w-full max-w-md overflow-y-auto animate-pop-in rounded-dialog border border-default bg-surface-raised p-5 shadow-popover">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-base font-semibold text-fg">Keyboard shortcuts</h2>
           <button type="button" onClick={onClose} aria-label="Close" className="rounded p-1 text-subtle hover:bg-bg-subtle hover:text-fg"><X className="h-4 w-4" aria-hidden="true" /></button>

@@ -1,14 +1,16 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { TriangleAlert } from 'lucide-react';
 import { updateWorkspace, deleteWorkspace } from '../../api/workspaces';
 import { apiErrorMessage } from '../../api/client';
 import { useWorkspaceStore, workspacePath } from '../../store/workspaceStore';
 import { useToastStore } from '../../store/toastStore';
 import { useCan } from '../../hooks/useCan';
-import { confirm } from '../../components/ui/confirm';
-import { Card, Button, TextField, ErrorText } from '../../components/ui';
+import { Button, Field, Input, Switch, confirm } from '../../components/ui/index';
+import SettingsCard from './SettingsCard';
 
 const API_BASE = String(import.meta.env.VITE_API_URL || '').replace(/\/+$/, '');
+const APP_ORIGIN = typeof window !== 'undefined' ? window.location.origin : '';
 
 export default function GeneralTab() {
   const current = useWorkspaceStore((s) => s.current);
@@ -19,6 +21,7 @@ export default function GeneralTab() {
   const [slug, setSlug] = useState(current?.slug || '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [sharingBusy, setSharingBusy] = useState(false);
   const [sharingError, setSharingError] = useState('');
 
   if (!current) return null;
@@ -36,7 +39,7 @@ export default function GeneralTab() {
   }
 
   async function handleSave(e) {
-    e.preventDefault();
+    e?.preventDefault();
     setBusy(true);
     setError('');
     try {
@@ -54,9 +57,9 @@ export default function GeneralTab() {
     }
   }
 
-  async function toggleSharing() {
+  async function toggleSharing(next) {
     if (
-      publicSharing &&
+      !next &&
       !(await confirm({
         title: 'Turn off public sharing?',
         body: 'This revokes every existing share link in this workspace. Turning it back on later does not restore them.',
@@ -66,66 +69,74 @@ export default function GeneralTab() {
     )
       return;
     setSharingError('');
+    setSharingBusy(true);
     try {
-      applyUpdated(await updateWorkspace(current.id, { settings: { publicSharing: !publicSharing } }));
+      applyUpdated(await updateWorkspace(current.id, { settings: { publicSharing: next } }));
     } catch (err) {
       setSharingError(apiErrorMessage(err, 'Failed to update sharing'));
+    } finally {
+      setSharingBusy(false);
     }
   }
 
   return (
-    <div className="max-w-2xl space-y-6">
-      <Card className="p-5">
-        <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-400">Workspace</h2>
-        <form onSubmit={handleSave} className="space-y-4">
-          <TextField label="Name" value={name} onChange={(e) => setName(e.target.value)} disabled={!canUpdate} required />
-          <div>
-            <TextField
-              label="URL slug"
-              value={slug}
-              onChange={(e) => setSlug(e.target.value.toLowerCase())}
-              disabled={!canUpdate}
-              required
-            />
-            <p className="mt-1 text-xs text-slate-400">
-              Lowercase letters, numbers and hyphens. Used in links like <code>/w/{slug || '…'}/dashboard</code>.
-            </p>
-            {slugChanged && (
-              <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
-                Changing the slug changes every URL for this workspace, including event URLs like{' '}
-                <code className="break-all">{`${API_BASE}/w/${current.slug}/events/…`}</code>. Old links and integrations
-                using the old slug will stop working.
-              </p>
-            )}
-          </div>
-          <ErrorText>{error}</ErrorText>
-          {canUpdate && (
-            <Button type="submit" disabled={busy || !dirty || !name.trim() || !slug.trim()}>
-              {busy ? 'Saving...' : 'Save changes'}
-            </Button>
+    <div className="max-w-3xl space-y-6">
+      <form onSubmit={handleSave}>
+        <SettingsCard
+          title="Workspace"
+          description="The name everyone sees, and the slug in this workspace's URLs."
+          footer={canUpdate && (
+            <>
+              {dirty && <span className="mr-auto text-xs text-subtle">Unsaved changes</span>}
+              <Button type="submit" loading={busy} disabled={!dirty || !name.trim() || !slug.trim()}>Save changes</Button>
+            </>
           )}
-        </form>
-      </Card>
+        >
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Name" required htmlFor="ws-name">
+              <Input id="ws-name" value={name} onChange={(e) => setName(e.target.value)} disabled={!canUpdate} />
+            </Field>
+            <Field label="URL slug" required htmlFor="ws-slug" help="Lowercase letters, numbers and hyphens.">
+              <div className="flex">
+                <span className="inline-flex h-8 items-center rounded-l-control border border-r-0 border-default bg-bg-subtle px-2.5 font-mono text-xs text-subtle">
+                  /w/
+                </span>
+                <Input
+                  id="ws-slug"
+                  value={slug}
+                  onChange={(e) => setSlug(e.target.value.toLowerCase())}
+                  disabled={!canUpdate}
+                  className="rounded-l-none font-mono"
+                />
+              </div>
+            </Field>
+          </div>
+          {slugChanged && (
+            <div className="mt-4 flex items-start gap-2.5 rounded-card border border-warning/30 bg-warning-subtle px-3.5 py-2.5 text-sm text-warning-subtle-fg">
+              <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+              <p>
+                Changing the slug changes every URL for this workspace — links like{' '}
+                <code className="font-mono text-xs">{`${APP_ORIGIN}/w/${current.slug}/…`}</code> and event URLs like{' '}
+                <code className="break-all font-mono text-xs">{`${API_BASE}/w/${current.slug}/events/…`}</code>. Old links and
+                integrations using the old slug will stop working.
+              </p>
+            </div>
+          )}
+          {error && <p className="mt-3 text-sm text-danger" role="alert">{error}</p>}
+        </SettingsCard>
+      </form>
 
-      <Card className="p-5">
-        <h2 className="mb-1 text-sm font-semibold uppercase tracking-wide text-slate-400">Public sharing</h2>
-        <p className="mb-3 text-sm text-slate-500 dark:text-slate-400">
-          Lets editors create read-only share links for workflows. Turning it off revokes every existing link at once.
-        </p>
-        <label className="flex items-center gap-3 text-sm text-slate-700 dark:text-slate-300">
-          <input
-            type="checkbox"
-            checked={publicSharing}
-            onChange={toggleSharing}
-            disabled={!canUpdate}
-            className="h-4 w-4 accent-brand-500"
-          />
-          {publicSharing ? 'Share links allowed' : 'Share links disabled'}
-        </label>
-        <div className="mt-2">
-          <ErrorText>{sharingError}</ErrorText>
-        </div>
-      </Card>
+      <SettingsCard title="Public sharing" description="Read-only share links let people outside the workspace view a workflow.">
+        <Switch
+          checked={publicSharing}
+          onChange={toggleSharing}
+          disabled={!canUpdate || sharingBusy}
+          label={publicSharing ? 'Share links allowed' : 'Share links disabled'}
+          description="Turning this off revokes every existing link at once."
+          data-testid="public-sharing-switch"
+        />
+        {sharingError && <p className="mt-3 text-sm text-danger" role="alert">{sharingError}</p>}
+      </SettingsCard>
 
       {canDelete && <DangerZone workspace={current} />}
     </div>
@@ -140,15 +151,14 @@ function DangerZone({ workspace }) {
 
   if (workspace.personal) {
     return (
-      <Card className="border-red-200 p-5 dark:border-red-900/60">
-        <h2 className="mb-1 text-sm font-semibold uppercase tracking-wide text-red-500">Danger zone</h2>
-        <p className="text-sm text-slate-500 dark:text-slate-400">Your personal workspace can't be deleted.</p>
-      </Card>
+      <SettingsCard danger title="Danger zone">
+        <p className="text-sm text-muted">Your personal workspace can&rsquo;t be deleted.</p>
+      </SettingsCard>
     );
   }
 
   async function handleDelete(e) {
-    e.preventDefault();
+    e?.preventDefault();
     setBusy(true);
     setError('');
     try {
@@ -166,23 +176,18 @@ function DangerZone({ workspace }) {
   }
 
   return (
-    <Card className="border-red-200 p-5 dark:border-red-900/60">
-      <h2 className="mb-1 text-sm font-semibold uppercase tracking-wide text-red-500">Danger zone</h2>
-      <p className="mb-3 text-sm text-slate-500 dark:text-slate-400">
-        Deleting this workspace stops its schedules and permanently removes its workflows, runs, templates and members.
-        This can't be undone.
-      </p>
-      <form onSubmit={handleDelete} className="space-y-3">
-        <TextField
-          label={`Type “${workspace.name}” to confirm`}
-          value={confirmName}
-          onChange={(e) => setConfirmName(e.target.value)}
-        />
-        <ErrorText>{error}</ErrorText>
-        <Button type="submit" variant="danger" disabled={busy || confirmName !== workspace.name}>
-          {busy ? 'Deleting...' : 'Delete workspace'}
-        </Button>
-      </form>
-    </Card>
+    <form onSubmit={handleDelete}>
+      <SettingsCard
+        danger
+        title="Danger zone"
+        description="Deleting this workspace stops its schedules and permanently removes its workflows, runs, templates, connections and members. This can't be undone."
+        footer={<Button type="submit" variant="danger" loading={busy} disabled={confirmName !== workspace.name}>Delete workspace</Button>}
+      >
+        <Field label={<>Type <span className="font-mono">{workspace.name}</span> to confirm</>} htmlFor="ws-delete-confirm">
+          <Input id="ws-delete-confirm" value={confirmName} onChange={(e) => setConfirmName(e.target.value)} autoComplete="off" className="max-w-sm" />
+        </Field>
+        {error && <p className="mt-3 text-sm text-danger" role="alert">{error}</p>}
+      </SettingsCard>
+    </form>
   );
 }

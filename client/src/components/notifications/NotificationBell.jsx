@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useNotificationStore } from '../../store/notificationStore';
 import { useAuthStore } from '../../store/authStore';
 import NotificationRow from './NotificationRow';
+import Tooltip from '../ui/Tooltip';
 import { Bell, BellOff } from 'lucide-react';
 
 /**
@@ -47,10 +48,10 @@ export default function NotificationBell() {
 
   return (
     <div ref={ref} className="relative">
+      <Tooltip content="Notifications" side="bottom">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        title="Notifications"
         aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ''}`}
         data-testid="notification-bell"
         className="relative inline-flex h-8 w-8 items-center justify-center rounded-control text-muted transition-colors hover:bg-bg-subtle hover:text-fg"
@@ -59,12 +60,13 @@ export default function NotificationBell() {
         {unreadCount > 0 && (
           <span
             data-testid="notification-badge"
-            className="absolute -right-0.5 -top-0.5 min-w-[1rem] rounded-full bg-danger px-1 text-center text-[9px] font-semibold leading-4 text-white ring-2 ring-surface dark:text-zinc-950"
+            className="absolute -right-0.5 -top-0.5 min-w-[1rem] rounded-full bg-danger px-1 text-center text-[9px] font-semibold leading-4 text-white ring-2 ring-surface"
           >
             {badge}
           </span>
         )}
       </button>
+      </Tooltip>
       {open && (
         <div className="absolute right-0 top-full z-40 mt-1.5 w-96 animate-pop-in overflow-hidden rounded-card border border-default bg-surface-raised shadow-popover">
           <div className="flex items-center justify-between border-b border-default px-3 py-2.5">

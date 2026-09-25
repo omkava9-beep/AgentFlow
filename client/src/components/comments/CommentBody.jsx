@@ -2,11 +2,11 @@ import { mentionParts } from '../../utils/mentions';
 
 /** A comment's text with `{{@id}}` tokens rendered as @Name chips. */
 export default function CommentBody({ comment }) {
-  if (comment.deleted) return <p className="text-sm italic text-slate-400">Comment deleted</p>;
+  if (comment.deleted) return <p className="text-sm italic text-subtle">Comment deleted</p>;
   return (
-    <p className="whitespace-pre-wrap break-words text-sm text-slate-700 dark:text-slate-200">
+    <p className="whitespace-pre-wrap break-words text-sm text-fg">
       {mentionParts(comment.body, comment.mentions).map((part, i) => (part.mention ? (
-        <span key={i} className="rounded bg-brand-100 px-1 font-medium text-brand-700 dark:bg-brand-500/20 dark:text-brand-300">
+        <span key={i} className="rounded bg-accent-subtle px-1 font-medium text-accent-subtle-fg">
           @{part.mention.name}
         </span>
       ) : (
@@ -20,6 +20,6 @@ export default function CommentBody({ comment }) {
 function linkify(text) {
   const parts = text.split(/(https?:\/\/[^\s]+)/g);
   return parts.map((p, i) => (/^https?:\/\//.test(p)
-    ? <a key={i} href={p} target="_blank" rel="noreferrer noopener" className="text-brand-600 underline dark:text-brand-400">{p}</a>
+    ? <a key={i} href={p} target="_blank" rel="noreferrer noopener" className="text-accent underline">{p}</a>
     : p));
 }

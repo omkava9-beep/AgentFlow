@@ -29,6 +29,29 @@ function presentWorkflow(workflow, req) {
   return doc;
 }
 
+/** Tool-node integrations in breadth-first order from the Start node(s), de-duplicated. */
+function integrationsInFlowOrder(nodes, edges) {
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  const out = [];
+  const seen = new Set();
+  const queue = nodes.filter((n) => n.type === 'start').map((n) => n.id);
+  const visited = new Set(queue);
+  while (queue.length) {
+    const id = queue.shift();
+    const node = byId.get(id);
+    if (node?.type === 'tool' && node.integration && !seen.has(node.integration)) {
+      seen.add(node.integration);
+      out.push(node.integration);
+    }
+    for (const e of edges) {
+      if (e.source === id && !visited.has(e.target)) { visited.add(e.target); queue.push(e.target); }
+    }
+  }
+  // Tools not reachable from Start still count, after the reachable ones.
+  for (const n of nodes) if (n.type === 'tool' && n.integration && !seen.has(n.integration)) { seen.add(n.integration); out.push(n.integration); }
+  return out;
+}
+
 export async function list(req, res, next) {
   try {
     const workspaceOid = new mongoose.Types.ObjectId(req.workspaceId);
@@ -51,6 +74,9 @@ export async function list(req, res, next) {
           // integrations, and which automatic triggers are switched on.
           nodeTypes: { $setUnion: ['$nodes.type', []] },
           integrations: { $setUnion: ['$nodes.data.config.integration', []] },
+          // Just enough graph to order tools by where they sit in the flow.
+          graphNodes: { $map: { input: '$nodes', as: 'n', in: { id: '$$n.id', type: '$$n.type', integration: '$$n.data.config.integration' } } },
+          graphEdges: { $map: { input: '$edges', as: 'e', in: { source: '$$e.source', target: '$$e.target' } } },
           schedule: { enabled: '$schedule.enabled', cronExpression: '$schedule.cronExpression' },
           webhookEnabled: { $ifNull: ['$webhook.enabled', false] },
           eventTrigger: { enabled: '$eventTrigger.enabled', eventName: '$eventTrigger.eventName' },
@@ -114,6 +140,9 @@ export async function list(req, res, next) {
         hasUnpublishedChanges: w.hasUnpublishedChanges,
         nodeTypes: (w.nodeTypes || []).filter(Boolean),
         integrations: (w.integrations || []).filter(Boolean),
+        // Tool integrations in flow order (breadth-first from Start), so the
+        // dashboard can lead each row with what the workflow actually does first.
+        integrationsInOrder: integrationsInFlowOrder(w.graphNodes || [], w.graphEdges || []),
         triggers,
         lastRun: last ? { id: String(last.id), status: last.status, trigger: last.trigger, isDraft: Boolean(last.isDraft), startedAt: last.startedAt || last.createdAt, finishedAt: last.finishedAt || null } : null,
         stats7d: {

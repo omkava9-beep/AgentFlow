@@ -8,7 +8,8 @@ import ToolConfigFields from './ToolConfigFields';
 import McpConnectionFields from './McpConnectionFields';
 import { mcpPayload, mcpFormError } from '../utils/mcpConnection';
 import McpToolList from './McpToolList';
-import { Button, TextField, ErrorText } from './ui';
+import { CircleAlert, CircleCheck, FlaskConical, PlugZap, Radio, ShieldCheck } from 'lucide-react';
+import { Button, Dialog, Field, Input, Segmented, CopyButton } from './ui/index';
 
 /**
  * Create/edit form for one connection (spec/25). Used from the Connections page
@@ -42,6 +43,7 @@ export default function ConnectionDialog({ integration, connection = null, onClo
     return initial;
   });
   const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
   const [error, setError] = useState('');
   const [testResult, setTestResult] = useState(null);
   const [inboundUrl, setInboundUrl] = useState(connection?.inboundUrl || null);
@@ -106,125 +108,129 @@ export default function ConnectionDialog({ integration, connection = null, onClo
     }
   }
 
+  const modeHelp = !hasLiveActions
+    ? `${integration?.name} has no live actions — it always runs in the sandbox.`
+    : liveEnabled === false
+      ? 'Live calls are disabled on this server, so this connection runs in the sandbox for now.'
+      : mode === 'live'
+        ? 'Nodes using this connection call the real service.'
+        : 'Nodes using this connection run in the sandbox — nothing is sent anywhere.';
+  const disabled = saving || !name.trim() || Boolean(formError);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
-      <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl border border-slate-200 bg-white p-5 shadow-xl dark:border-slate-800 dark:bg-slate-900">
-        <div className="mb-4 flex items-center gap-2">
-          <IntegrationLogo id={integration?.id} name={integration?.name} size="lg" />
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-            {connection ? `Edit ${connection.name}` : `New ${integration?.name} connection`}
-          </h2>
-        </div>
+    <Dialog
+      open
+      onClose={onClose}
+      dismissable={!saving}
+      size="md"
+      testId="connection-dialog"
+      title={connection ? `Edit ${connection.name}` : `New ${integration?.name} connection`}
+      description={integration?.description}
+      icon={() => <IntegrationLogo id={integration?.id} name={integration?.name} size="sm" />}
+      footer={(
+        <>
+          <Button variant="ghost" onClick={onClose} disabled={saving} className="mr-auto">
+            {testResult ? 'Close' : 'Cancel'}
+          </Button>
+          <Button variant="secondary" icon={PlugZap} disabled={disabled} loading={saving && testing} onClick={() => { setTesting(true); save(true); }}>
+            Save &amp; test
+          </Button>
+          <Button disabled={disabled} loading={saving && !testing} onClick={() => { setTesting(false); save(false); }}>
+            Save
+          </Button>
+        </>
+      )}
+    >
+      <div className="space-y-5">
+        <Field label="Name" htmlFor="connection-name">
+          <Input id="connection-name" value={name} onChange={(e) => setName(e.target.value)} />
+        </Field>
 
-        <div className="space-y-4">
-          <TextField label="Name" value={name} onChange={(e) => setName(e.target.value)} />
-
+        <Field label="Mode" help={modeHelp}>
           <div>
-            <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Mode</span>
-            <div className="inline-flex rounded-lg border border-slate-200 p-0.5 dark:border-slate-700">
-              {['live', 'sandbox'].map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  disabled={m === 'live' && liveBlocked}
-                  onClick={() => setMode(m)}
-                  className={`rounded-md px-3 py-1 text-sm capitalize transition disabled:cursor-not-allowed disabled:opacity-40 ${
-                    mode === m
-                      ? 'bg-brand-600 text-white'
-                      : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
-                  }`}
-                >
-                  {m}
-                </button>
-              ))}
-            </div>
-            <p className="mt-1 text-xs text-slate-400">
-              {!hasLiveActions
-                ? `${integration?.name} has no live actions — it always runs in the sandbox.`
-                : liveEnabled === false
-                  ? 'Live calls are disabled on this server.'
-                  : mode === 'live'
-                    ? 'Nodes using this connection call the real service.'
-                    : 'Nodes using this connection run in the sandbox — nothing is sent.'}
-            </p>
+            <Segmented
+              aria-label="Mode"
+              size="md"
+              value={mode}
+              onChange={setMode}
+              items={[
+                { value: 'live', label: 'Live', icon: Radio, disabled: liveBlocked },
+                { value: 'sandbox', label: 'Sandbox', icon: FlaskConical },
+              ]}
+            />
           </div>
+        </Field>
 
-          {isMcp ? (
-            <McpConnectionFields
-              values={values}
-              onChange={setValues}
-              hint={connection?.credentialHints?.authHeader}
-              onClear={connection ? (key) => setValues((v) => ({ ...v, [key]: null })) : undefined}
-              isEdit={Boolean(connection)}
-            />
-          ) : fields.length > 0 ? (
-            <ToolConfigFields
-              title="Credentials"
-              schema={fields}
-              values={values}
-              hints={connection?.credentialHints || {}}
-              onChange={setValues}
-              onClear={connection ? (key) => setValues((v) => ({ ...v, [key]: null })) : undefined}
-              showTemplateNote={false}
-            />
-          ) : (
-            <p className="text-xs text-slate-400">This integration needs no credentials.</p>
-          )}
+        {isMcp ? (
+          <McpConnectionFields
+            values={values}
+            onChange={setValues}
+            hint={connection?.credentialHints?.authHeader}
+            onClear={connection ? (key) => setValues((v) => ({ ...v, [key]: null })) : undefined}
+            isEdit={Boolean(connection)}
+          />
+        ) : fields.length > 0 ? (
+          <ToolConfigFields
+            title="Credentials"
+            schema={fields}
+            values={values}
+            hints={connection?.credentialHints || {}}
+            onChange={setValues}
+            onClear={connection ? (key) => setValues((v) => ({ ...v, [key]: null })) : undefined}
+            showTemplateNote={false}
+          />
+        ) : (
+          <p className="flex items-center gap-2 rounded-card border border-default bg-bg-subtle px-3 py-2 text-sm text-muted">
+            <ShieldCheck className="h-4 w-4 text-subtle" aria-hidden="true" />
+            This integration needs no credentials.
+          </p>
+        )}
 
-          {connection && (integration?.hasInbound || inboundUrl) && (
-            <div className="space-y-1">
-              <span className="block text-sm font-medium text-slate-700 dark:text-slate-300">Inbound webhook URL</span>
-              {inboundUrl ? (
-                <div className="flex gap-2">
-                  <input
-                    readOnly
-                    value={inboundUrl}
-                    className="w-full rounded-lg border border-slate-300 bg-slate-50 px-2 py-1.5 font-mono text-xs dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
-                    onFocus={(e) => e.target.select()}
-                  />
-                  <Button variant="secondary" className="!px-2 !py-1 text-xs" onClick={() => navigator.clipboard?.writeText(inboundUrl)}>
-                    Copy
-                  </Button>
-                </div>
-              ) : null}
-              <button type="button" onClick={generateInbound} className="text-xs text-brand-600 hover:underline dark:text-brand-400">
-                {inboundUrl ? 'Regenerate (the old URL stops working)' : 'Generate inbound URL'}
-              </button>
-              <p className="text-xs text-slate-400">Paste this into {integration?.name} so its events trigger your workflows.</p>
-            </div>
-          )}
+        {connection && (integration?.hasInbound || inboundUrl) && (
+          <Field
+            label="Inbound webhook URL"
+            help={`Paste this into ${integration?.name} so its events trigger your workflows.`}
+            trailing={(
+              <Button variant="link" size="sm" onClick={generateInbound}>
+                {inboundUrl ? 'Regenerate' : 'Generate URL'}
+              </Button>
+            )}
+          >
+            {inboundUrl ? (
+              <div className="flex gap-2">
+                <Input readOnly value={inboundUrl} className="font-mono text-xs" onFocus={(e) => e.target.select()} aria-label="Inbound webhook URL" />
+                <CopyButton value={inboundUrl} label="Copy" />
+              </div>
+            ) : (
+              <p className="text-sm text-subtle">No inbound URL yet.</p>
+            )}
+          </Field>
+        )}
 
-          {testResult && (
-            <p
-              className={`rounded-lg px-3 py-2 text-xs ${
-                testResult.status === 'ok'
-                  ? 'bg-green-50 text-green-700 dark:bg-green-950/60 dark:text-green-300'
-                  : 'bg-red-50 text-red-700 dark:bg-red-950/60 dark:text-red-300'
-              }`}
-            >
-              {testResult.status === 'ok' ? '✓ Connection works' : `✗ ${testResult.lastError || 'Test failed'}`}
+        {testResult && (
+          <div
+            role="status"
+            className={`flex items-start gap-2 rounded-card border px-3 py-2 text-sm ${
+              testResult.status === 'ok'
+                ? 'border-success/25 bg-success-subtle text-success-subtle-fg'
+                : 'border-danger/25 bg-danger-subtle text-danger-subtle-fg'
+            }`}
+          >
+            {testResult.status === 'ok'
+              ? <CircleCheck className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+              : <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />}
+            <span>
+              {testResult.status === 'ok' ? 'Connection works' : testResult.lastError || 'Test failed'}
               {testResult.detail ? ` — ${testResult.detail}` : ''}
-            </p>
-          )}
-          {isMcp && savedConnection?.id && (!testResult || testResult.status === 'ok') && (
-            <McpToolList key={`${savedConnection.id}:${saveCount}`} connectionId={savedConnection.id} />
-          )}
-          {isMcp && formError && <p className="text-xs text-slate-400">{formError}</p>}
-          <ErrorText>{error}</ErrorText>
-
-          <div className="flex justify-end gap-2">
-            <Button variant="secondary" onClick={onClose}>
-              {testResult ? 'Close' : 'Cancel'}
-            </Button>
-            <Button variant="secondary" disabled={saving || !name.trim() || Boolean(formError)} onClick={() => save(true)}>
-              Save &amp; test
-            </Button>
-            <Button disabled={saving || !name.trim() || Boolean(formError)} onClick={() => save(false)}>
-              {saving ? 'Saving...' : 'Save'}
-            </Button>
+            </span>
           </div>
-        </div>
+        )}
+        {isMcp && savedConnection?.id && (!testResult || testResult.status === 'ok') && (
+          <McpToolList key={`${savedConnection.id}:${saveCount}`} connectionId={savedConnection.id} />
+        )}
+        {isMcp && formError && <p className="text-xs text-subtle">{formError}</p>}
+        {error && <p className="text-sm text-danger" role="alert">{error}</p>}
       </div>
-    </div>
+    </Dialog>
   );
 }

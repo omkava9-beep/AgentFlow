@@ -63,19 +63,19 @@ export default function InvitePage() {
 
   let body;
   if (state === 'loading') {
-    body = <p className="text-sm text-slate-500 dark:text-slate-400">Loading invite...</p>;
+    body = <div className="space-y-2"><div className="h-4 w-1/3 animate-pulse rounded bg-bg-subtle" /><div className="h-6 w-2/3 animate-pulse rounded bg-bg-subtle" /><div className="h-4 w-1/2 animate-pulse rounded bg-bg-subtle" /></div>;
   } else if (state === 'invalid' || state === 'expired') {
     body = (
       <>
-        <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+        <h1 className="text-lg font-semibold text-fg">
           {state === 'expired' ? 'This invite has expired' : 'This invite is no longer valid'}
         </h1>
-        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+        <p className="mt-2 text-sm text-muted">
           {state === 'expired'
             ? 'Invites last 7 days. Ask whoever invited you to send a new one.'
             : 'It may have been revoked, replaced by a newer link, or already used.'}
         </p>
-        <Link to="/" className="mt-4 inline-block text-sm text-brand-600 hover:underline dark:text-brand-400">
+        <Link to="/" className="mt-4 inline-block text-sm font-medium text-accent hover:underline">
           Go to AgentFlow
         </Link>
       </>
@@ -83,12 +83,12 @@ export default function InvitePage() {
   } else {
     body = (
       <>
-        <p className="text-sm text-slate-500 dark:text-slate-400">You've been invited</p>
-        <h1 className="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-100">
+        <p className="text-xs font-medium uppercase tracking-wider text-subtle">You've been invited</p>
+        <h1 className="mt-1.5 text-lg font-semibold text-fg">
           {invite.invitedByName ? `${invite.invitedByName} invited you to ` : 'Join '}
-          <span className="text-brand-600 dark:text-brand-400">{invite.workspaceName}</span>
+          <span className="text-accent">{invite.workspaceName}</span>
         </h1>
-        <p className="mt-2 flex items-center justify-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+        <p className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted">
           as <RoleBadge role={invite.role} /> · for {invite.email}
         </p>
 

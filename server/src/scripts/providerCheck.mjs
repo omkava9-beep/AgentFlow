@@ -157,7 +157,7 @@ console.log('\nD2. OpenRouter settings');
   const orp = new OpenAIAgentProvider({ name: 'openrouter', apiKey: 'test', requestOptions: openrouterRequestOptions, client: st.client });
   await orp.step(agentCfg(), { input: 'x', tools, history: [] });
   const req = st.requests[0];
-  check(`defaults to the free router (${openrouterRequestOptions.model})`, req.model === 'openrouter/free');
+  check(`sends the configured model (${openrouterRequestOptions.model})`, req.model === openrouterRequestOptions.model);
   check('sends max_tokens (not max_completion_tokens) for the gateway', req.max_tokens === openrouterRequestOptions.maxCompletionTokens && !('max_completion_tokens' in req));
   check('omits the OpenAI-only parallel_tool_calls', !('parallel_tool_calls' in req));
   check('still sends tools as type function', req.tools?.[0]?.type === 'function');
@@ -168,6 +168,9 @@ console.log('\nD2. OpenRouter settings');
   const boot = (extra) => spawnSync(process.execPath, ['-e', "import('./src/config/agentProvider.js').then((m)=>{const p=m.getAgentProvider();console.log('BOOT_OK', p.name, p.baseURL, p.requestOptions.model, JSON.stringify(p.defaultHeaders))})"], {
     cwd: fileURLToPath(new URL('../..', import.meta.url)), env: { ...process.env, ...extra }, encoding: 'utf8',
   });
+  // The default when OPENROUTER_MODEL isn't set (server/.env may pick another model).
+  const dflt = boot({ AGENT_PROVIDER: 'openrouter', OPENROUTER_API_KEY: 'k', OPENROUTER_MODEL: '' });
+  check('defaults to the free router (openrouter/free) when OPENROUTER_MODEL is unset', dflt.status === 0 && /BOOT_OK openrouter \S+ openrouter\/free/.test(dflt.stdout), (dflt.stdout + dflt.stderr).trim().slice(0, 160));
   const noKey = boot({ AGENT_PROVIDER: 'openrouter', OPENROUTER_API_KEY: '' });
   check('AGENT_PROVIDER=openrouter without OPENROUTER_API_KEY refuses to boot', noKey.status !== 0 && /requires OPENROUTER_API_KEY/.test(noKey.stderr));
   const ok = boot({ AGENT_PROVIDER: 'openrouter', OPENROUTER_API_KEY: 'k', OPENROUTER_MODEL: 'qwen/qwen3.8-27b:free', OPENROUTER_APP_URL: 'http://localhost:5173' });

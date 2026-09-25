@@ -1,8 +1,9 @@
-import { useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import ReactFlow, { Background, Controls, useNodesState, useEdgesState } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { nodeTypes } from './nodes';
 import { ERROR_COLOR } from './nodes/nodeStyles';
+import { frameOnInit } from '../utils/frameGraph';
 
 const TAKEN_EDGE = { stroke: '#6366f1', strokeWidth: 3 };
 const PRUNED_EDGE = { stroke: '#94a3b8', strokeWidth: 1, strokeDasharray: '4 4', opacity: 0.45 };
@@ -60,6 +61,9 @@ export default function RunGraphView({ workflow, nodeResults }) {
             waiting: result?.waiting,
             progress: result?.progress || null,
             childCount: result?.childRunIds?.length || 0,
+            // A node switched off in the builder: shown as "disabled · passed through".
+            skipReason: result?.skipReason || null,
+            durationMs: result?.durationMs,
           },
         };
       }),
@@ -84,6 +88,9 @@ export default function RunGraphView({ workflow, nodeResults }) {
     [workflow, nodesById, resultsByNodeId]
   );
 
+  const box = useRef(null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const frame = useCallback(frameOnInit(() => box.current, { minZoom: 0.7 }), []);
   const [nodes, setNodes] = useNodesState(decoratedNodes);
   const [edges, setEdges] = useEdgesState(decoratedEdges);
 
@@ -91,6 +98,7 @@ export default function RunGraphView({ workflow, nodeResults }) {
   useEffect(() => setEdges(decoratedEdges), [decoratedEdges, setEdges]);
 
   return (
+    <div ref={box} className="h-full w-full">
     <ReactFlow
       nodes={nodes}
       edges={edges}
@@ -102,12 +110,14 @@ export default function RunGraphView({ workflow, nodeResults }) {
       // React Flow still marks handles `connectable`, so neutralise them here
       // rather than leave a connection affordance the view can't honour.
       className="rf-readonly"
-      fitView
-      fitViewOptions={{ padding: 0.2, minZoom: 0.6, maxZoom: 1 }}
+      // Legible first frame (small graphs centred, big ones start at the
+      // trigger and pan) rather than fitView's shrink-to-thumbnail.
+      onInit={frame}
       minZoom={0.25}
     >
       <Background />
       <Controls showInteractive={false} />
     </ReactFlow>
+    </div>
   );
 }

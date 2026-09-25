@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Undo2, Redo2, CopyPlus, ClipboardPaste, MoreHorizontal, Share2, LayoutTemplate, History, GitCommitVertical, Rocket, X } from 'lucide-react';
+import { Undo2, Redo2, CopyPlus, ClipboardPaste, MoreHorizontal, Share2, LayoutTemplate, History, GitCommitVertical, Rocket, X, Zap } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router-dom';
-import ReactFlow, { Background, Controls, MiniMap } from 'reactflow';
+import ReactFlow, { Background, BackgroundVariant, Controls, MiniMap } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { useWorkflowStore } from '../store/workflowStore';
 import { getWorkflow, createRun } from '../api/workflows';
@@ -44,9 +44,24 @@ import RunSplitButton from '../components/versions/RunSplitButton';
 import PublishDialog from '../components/versions/PublishDialog';
 import VersionsDrawer from '../components/versions/VersionsDrawer';
 import DiffView from '../components/versions/DiffView';
+import { ContextMenu, ContextMenuTrigger } from '../components/ui/ContextMenu';
+import CanvasContextMenu from '../components/canvas/CanvasContextMenu';
+import CanvasChrome from '../components/canvas/CanvasChrome';
+import { useCanvasActions } from '../components/canvas/useCanvasActions';
+import { useCanvasUi } from '../components/canvas/canvasUiStore';
+import { useBreadcrumb } from '../store/breadcrumbStore';
+import { useLatestRun } from '../components/canvas/useLatestRun';
 
 const ERROR_EDGE_STYLE = { stroke: '#ef4444', strokeWidth: 1.5, strokeDasharray: '6 4' };
-const SELECTED_EDGE_STYLE = { stroke: '#6366f1', strokeWidth: 3 };
+const SELECTED_EDGE_STYLE = { stroke: '#6366f1', strokeWidth: 2.5 };
+// Edge labels as small pills (colours come from the React Flow theme in index.css).
+const EDGE_LABEL = {
+  labelStyle: { fontSize: 12, fontWeight: 600 },
+  labelBgStyle: { stroke: 'rgb(var(--border-strong))', strokeWidth: 1 },
+  labelBgPadding: [8, 4],
+  labelBgBorderRadius: 6,
+};
+const PROBLEM_RANK = { error: 3, warning: 2, info: 1 };
 
 const formatResetAt = (iso) => {
   const d = new Date(iso);
@@ -75,6 +90,29 @@ export default function Builder() {
   const canvasRef = useRef(null);
   const flowRef = useRef(null);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
+  const canvas = useCanvasActions({ flowRef, canvasRef, canEdit: useCan('workflow:edit') });
+  const snapToGrid = useCanvasUi((s) => s.snapToGrid);
+  const minimapPref = useCanvasUi((s) => s.minimapPref);
+  const runOverlay = useCanvasUi((s) => s.showRunOverlay);
+  const latestRun = useCanvasUi((s) => s.latestRun);
+  useLatestRun(id);
+  // Automatic until toggled: only graphs big enough to get lost in get a minimap.
+  const showMinimap = minimapPref ?? store.nodes.length > 8;
+  // Open at a readable zoom (spec: nodes legible at the default view). React
+  // Flow's fitView would shrink a wide graph until its text is ~9px; instead
+  // fit only between 90% and 100%, and if it's still too big, start from the
+  // left where runs begin and let the user pan. Once per workflow, after the
+  // nodes have been measured.
+  const fittedFor = useRef(null);
+  useEffect(() => {
+    if (loading || fittedFor.current === id || !flowRef.current || !store.nodes.length) return;
+    if (!store.nodes.every((n) => n.width)) return;
+    fittedFor.current = id;
+    canvas.actions.readableFit();
+  });
+  // Open by default so a workflow's triggers are readable at a glance; closing it
+  // is remembered per browser.
+  // Closed on load so the canvas gets the room; opened from the rail's ⚡ or ⋯ → Triggers.
   const [triggersOpen, setTriggersOpen] = useState(false);
   const userId = useAuthStore((s) => s.user?.id);
   // Viewers get the canvas read-only (spec/23). The server enforces every one
@@ -85,6 +123,7 @@ export default function Builder() {
   const canTemplate = useCan('templates:create');
   const canTriggers = useCan('triggers:manage');
   const canPublish = useCan('workflow:publish');
+  const canCommentCanvas = useCan('comments:write');
   // spec/30: draft vs published.
   const versionState = useVersionState(id);
   const [publishOpen, setPublishOpen] = useState(false);
@@ -94,6 +133,7 @@ export default function Builder() {
 
   const workspaceName = useWorkspaceStore((s) => s.current?.name);
   useDocumentTitle(name ? `${name}${workspaceName ? ` · ${workspaceName}` : ''}` : null);
+  useBreadcrumb(name);
   useCanvasShortcuts({ enabled: canEdit });
   useEffect(() => {
     if (!canEdit) return undefined;
@@ -191,6 +231,27 @@ export default function Builder() {
     () => validateGraph({ nodes, edges, integrations, connections, workflows, currentWorkflowId: id }),
     [nodes, edges, integrations, connections, workflows, id],
   );
+  // Per-node problems for the nodes' validation dots and the inspector.
+  useEffect(() => {
+    const byNode = {};
+    const add = (list, level) => {
+      for (const p of list) {
+        if (!p.nodeId) continue;
+        const entry = (byNode[p.nodeId] ||= { level: null, messages: [], items: [] });
+        entry.items.push({ ...p, level });
+        // Info never gets a dot; it's listed in the inspector only.
+        if (level !== 'info') {
+          entry.messages.push(p.message);
+          if (!entry.level || PROBLEM_RANK[level] > PROBLEM_RANK[entry.level]) entry.level = level;
+        }
+      }
+    };
+    add(errors, 'error');
+    add(warnings, 'warning');
+    add(info, 'info');
+    const dots = Object.fromEntries(Object.entries(byNode).map(([k, v]) => [k, v.level ? v : { ...v, level: null }]));
+    useCanvasUi.getState().setProblems(dots);
+  }, [errors, warnings, info]);
 
   // Others' selections show as a ring in their color (spec/28 §4).
   const decoratedNodes = useMemo(() => {
@@ -198,21 +259,35 @@ export default function Builder() {
     for (const peer of others) {
       for (const nodeId of peer.selection?.nodeIds || []) if (!ringFor.has(nodeId)) ringFor.set(nodeId, peer.color);
     }
-    if (!ringFor.size) return nodes;
-    return nodes.map((n) =>
-      ringFor.has(n.id) ? { ...n, style: { ...n.style, outline: `3px solid ${ringFor.get(n.id)}`, outlineOffset: 2, borderRadius: 12 } } : n,
-    );
-  }, [nodes, others]);
+    // The latest run drawn over the canvas (the "last run" toggle).
+    const results = runOverlay && latestRun ? new Map((latestRun.nodeResults || []).map((r) => [r.nodeId, r])) : null;
+    if (!ringFor.size && !results) return nodes;
+    return nodes.map((n) => {
+      let out = n;
+      const r = results?.get(n.id);
+      if (r && r.status !== 'pending') {
+        out = { ...out, data: { ...out.data, runStatus: r.status, skipReason: r.skipReason, durationMs: r.durationMs, cached: r.cached, runMode: r.mode, waiting: r.waiting } };
+      }
+      if (ringFor.has(n.id)) out = { ...out, style: { ...out.style, outline: `3px solid ${ringFor.get(n.id)}`, outlineOffset: 2, borderRadius: 12 } };
+      return out;
+    });
+  }, [nodes, others, runOverlay, latestRun]);
 
   const decoratedEdges = useMemo(
-    () => edges.map((e) => {
-      if (e.id === selectedEdgeId) return { ...e, style: SELECTED_EDGE_STYLE };
-      // spec/31 §7: error branches read as red and dashed in the editor too, not
-      // only in the run monitor.
-      if (e.sourceHandle === 'error') return { ...e, style: ERROR_EDGE_STYLE };
-      return e;
-    }),
-    [edges, selectedEdgeId],
+    () => {
+      const running = runOverlay && latestRun?.status === 'running'
+        ? new Set((latestRun.nodeResults || []).filter((r) => r.status === 'running').map((r) => r.nodeId))
+        : null;
+      return edges.map((e) => {
+        const base = { ...e, type: 'smoothstep', ...EDGE_LABEL, ...(running?.has(e.target) && { animated: true }) };
+        if (e.id === selectedEdgeId) return { ...base, style: SELECTED_EDGE_STYLE };
+        // spec/31 §7: error branches read as red and dashed in the editor too, not
+        // only in the run monitor.
+        if (e.sourceHandle === 'error') return { ...base, style: ERROR_EDGE_STYLE };
+        return base;
+      });
+    },
+    [edges, selectedEdgeId, runOverlay, latestRun],
   );
 
   // New nodes land in the middle of what you're looking at (nudged so a burst
@@ -223,7 +298,11 @@ export default function Builder() {
     let at = position;
     if (!at && flow && box) {
       const center = flow.project({ x: box.width / 2, y: box.height / 2 });
-      at = { x: center.x - 116 + (Math.random() - 0.5) * 60, y: center.y - 30 + (Math.random() - 0.5) * 60 };
+      at = { x: center.x - 116, y: center.y - 30 };
+      // Step down until the spot is clear, so a new node never lands on top of
+      // an existing one (and can't be grabbed by mistake).
+      const taken = (p) => nodes.some((n) => Math.abs(n.position.x - p.x) < 200 && Math.abs(n.position.y - p.y) < 70);
+      for (let i = 0; i < 12 && taken(at); i += 1) at = { x: at.x, y: at.y + 90 };
     }
     store.addNode(type, at || { x: 100 + Math.random() * 300, y: 100 + Math.random() * 300 });
   }
@@ -365,6 +444,7 @@ export default function Builder() {
             )}
             <MenuLink to={wp(`/workflows/${id}/runs`)}><History /> History</MenuLink>
             <MenuButton onClick={() => setVersionsOpen(true)}><GitCommitVertical /> Versions</MenuButton>
+            <MenuButton onClick={() => setTriggersOpen((v) => !v)}><Zap /> {triggersOpen ? 'Hide triggers' : 'Triggers'}</MenuButton>
             {canEdit && (
               // The icon group is hidden below xl; its actions live here instead.
               <div className="xl:hidden">
@@ -410,7 +490,18 @@ export default function Builder() {
           </div>
         )}
 
-        <div ref={canvasRef} className="relative min-w-0 flex-1" onMouseMove={onMouseMove} onDragOver={onCanvasDragOver} onDrop={onCanvasDrop}>
+        <ContextMenu modal={false}>
+        <ContextMenuTrigger asChild>
+        <div
+          ref={canvasRef}
+          data-testid="builder-canvas"
+          className="relative min-w-0 flex-1"
+          onMouseMove={onMouseMove}
+          onDragOver={onCanvasDragOver}
+          onDrop={onCanvasDrop}
+          onContextMenu={canvas.onWrapperContextMenu}
+          onDoubleClick={canvas.onWrapperDoubleClick}
+        >
           <ReactFlow
             nodes={decoratedNodes}
             edges={decoratedEdges}
@@ -429,6 +520,20 @@ export default function Builder() {
               store.selectNode(null);
               store.selectEdge(null);
             }}
+            // Right-click menus (components/canvas/CanvasContextMenu).
+            onNodeContextMenu={canvas.onNodeContextMenu}
+            onEdgeContextMenu={canvas.onEdgeContextMenu}
+            onPaneContextMenu={canvas.onPaneContextMenu}
+            onSelectionContextMenu={canvas.onSelectionContextMenu}
+            // Drop a connection on empty canvas → pick the node to create there.
+            onConnectStart={canEdit ? canvas.onConnectStart : undefined}
+            onConnectEnd={canEdit ? canvas.onConnectEnd : undefined}
+            onNodeDoubleClick={(_, node) => canvas.actions.openSettings(node.id)}
+            zoomOnDoubleClick={false}
+            snapToGrid={snapToGrid}
+            snapGrid={[20, 20]}
+            selectionKeyCode="Shift"
+            multiSelectionKeyCode={['Meta', 'Control']}
             onInit={(instance) => {
               flowRef.current = instance;
               const vp = instance.getViewport();
@@ -442,18 +547,28 @@ export default function Builder() {
             nodeTypes={nodeTypes}
             // Deletion goes through the store so it lands in the undo stack.
             deleteKeyCode={null}
-            fitView
-            // Fit, but never shrink a graph past readable (pan instead), and don't
-            // blow a two-node graph up to poster size either.
-            fitViewOptions={{ padding: 0.2, minZoom: 0.7, maxZoom: 1 }}
+            // The first view is set by readableFit (above); this is for the
+            // explicit "fit" button and ⇧1, which really fit everything.
+            fitViewOptions={{ padding: 0.15, minZoom: 0.4, maxZoom: 1 }}
             minZoom={0.25}
             maxZoom={2}
           >
-            <Background />
+            <Background variant={BackgroundVariant.Dots} gap={20} size={1.2} />
             {/* Top-left: the bottom-left corner belongs to the validation pill. */}
-            <Controls position="top-left" />
-            <MiniMap pannable zoomable position="bottom-right" />
+            <Controls position="top-left" showInteractive={canEdit} />
+            {/* Bottom-right, above the view toggles (CanvasChrome); off for small graphs. */}
+            {showMinimap && (
+              <MiniMap pannable zoomable position="bottom-right" style={{ bottom: 44, width: 180, height: 120 }} />
+            )}
           </ReactFlow>
+
+          <CanvasChrome
+            canEdit={canEdit}
+            empty={!nodes.length}
+            onPick={canvas.pickAdd}
+            onAddStart={() => handleAddNode('start')}
+            showMinimap={showMinimap}
+          />
 
           <RemoteCursors viewport={viewport} width={canvasSize.width} height={canvasSize.height} />
           <CommentsLayer
@@ -487,16 +602,24 @@ export default function Builder() {
             />
           )}
         </div>
+        </ContextMenuTrigger>
+        <CanvasContextMenu
+          target={canvas.target}
+          actions={canvas.actions}
+          perms={{ canEdit, canComment: canCommentCanvas }}
+          state={canvas.menuState}
+        />
+        </ContextMenu>
 
         {/* A crashing config panel shows its own error card; the canvas keeps working (spec/36 §6). */}
         {selectedNodeId && (
           <CanvasErrorBoundary resetKey={selectedNodeId}>
-            <NodeConfigPanel readOnly={!canEdit} />
+            <NodeConfigPanel readOnly={!canEdit} actions={canvas.actions} />
           </CanvasErrorBoundary>
         )}
         {selectedEdgeId && (
           <CanvasErrorBoundary resetKey={selectedEdgeId}>
-            <EdgeInspector readOnly={!canEdit} />
+            <EdgeInspector readOnly={!canEdit} onInsert={(edgeId) => canvas.actions.insertOnEdge(edgeId)} />
           </CanvasErrorBoundary>
         )}
       </div>
@@ -532,7 +655,7 @@ export default function Builder() {
 function BuilderSkeleton() {
   return (
     <div role="status" aria-label="Loading workflow" className="flex h-[calc(100vh-var(--topbar-h))] flex-col">
-      <div className="flex h-12 items-center gap-2 border-b border-slate-200/80 px-3 dark:border-slate-800/80">
+      <div className="flex h-12 items-center gap-2 border-b border-default px-3">
         <Skeleton className="h-7 w-36" />
         <Skeleton className="h-6 w-24 rounded-full" />
         <div className="flex-1" />
@@ -540,7 +663,7 @@ function BuilderSkeleton() {
         <Skeleton className="h-8 w-20" />
       </div>
       <div className="flex flex-1">
-        <div className="w-64 space-y-2 border-r border-slate-200 p-4 dark:border-slate-800">
+        <div className="w-64 space-y-2 border-r border-default p-4">
           {Array.from({ length: 8 }, (_, i) => <Skeleton key={i} className="h-8 w-full" />)}
         </div>
         <div className="flex flex-1 items-center justify-center gap-10">

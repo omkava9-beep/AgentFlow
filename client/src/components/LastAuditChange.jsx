@@ -30,9 +30,9 @@ export default function LastAuditChange({ action, refreshKey }) {
 
   if (!allowed || !latest) return null;
   return (
-    <p className="text-xs text-slate-500 dark:text-slate-400">
+    <p className="text-xs text-subtle">
       Last change: {latest.summary} · {formatRelativeTime(latest.createdAt)}{' '}
-      <Link to={`${wp('/settings/audit')}?action=${encodeURIComponent(action)}`} className="font-medium text-brand-600 hover:underline dark:text-brand-400">
+      <Link to={`${wp('/settings/audit')}?action=${encodeURIComponent(action)}`} className="font-medium text-accent hover:underline">
         View log
       </Link>
     </p>

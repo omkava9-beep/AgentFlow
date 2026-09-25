@@ -21,8 +21,9 @@
  * publishes the companion first, then wires the real workflow id in.
  */
 
-const COL = 260;
-const ROW = 150;
+// Columns leave ~80px between 248px-wide canvas nodes so edges and labels have room.
+const COL = 330;
+const ROW = 140;
 
 export const TEMPLATE_CATEGORIES = [
   'Revenue & billing',

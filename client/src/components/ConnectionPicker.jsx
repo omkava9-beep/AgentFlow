@@ -64,17 +64,17 @@ export default function ConnectionPicker({ integration, value, onChange, readOnl
       </Select>
 
       {dangling && (
-        <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+        <p className="mt-1 text-xs text-warning">
           The selected connection no longer exists — this node will fail until you pick another.
         </p>
       )}
       {selected?.status === 'error' && (
-        <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+        <p className="mt-1 text-xs text-warning">
           Last test failed{selected.lastError ? `: ${selected.lastError}` : ''}.
         </p>
       )}
       {credentialed && !mine.length && !canManage && !readOnly && (
-        <p className="mt-1 text-xs text-slate-400">Ask an admin to add a {integration.name} connection.</p>
+        <p className="mt-1 text-xs text-subtle">Ask an admin to add a {integration.name} connection.</p>
       )}
 
       {dialog && (

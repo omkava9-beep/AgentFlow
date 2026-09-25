@@ -1,4 +1,5 @@
 import { TextField, TextArea, Select } from './ui';
+import { Switch } from './ui/Form';
 import { jsonParamError } from '../utils/integrationCatalog';
 import { jsonFieldError } from '../utils/mcpSchema';
 
@@ -31,12 +32,12 @@ export default function ToolConfigFields({
   };
 
   return (
-    <div className="space-y-3 rounded-lg border border-slate-200 p-3 dark:border-slate-800">
-      {title && <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{title}</p>}
+    <div className="space-y-3 rounded-lg border border-default p-3">
+      {title && <p className="text-xs font-semibold uppercase tracking-wide text-subtle">{title}</p>}
 
       {schema.map((field) => {
         const label = field.required ? `${field.label} *` : field.label;
-        const help = field.description ? <p className="mt-1 text-xs text-slate-400">{field.description}</p> : null;
+        const help = field.description ? <p className="mt-1 text-xs text-subtle">{field.description}</p> : null;
 
         if (field.secret) {
           const hint = hints[field.key];
@@ -58,7 +59,7 @@ export default function ToolConfigFields({
                 <button
                   type="button"
                   onClick={() => (cleared ? set(field.key, '') : onClear(field.key))}
-                  className="mt-1 text-xs text-brand-600 hover:underline dark:text-brand-400"
+                  className="mt-1 text-xs text-accent hover:underline"
                 >
                   {cleared ? 'Keep the stored value' : 'Clear stored value'}
                 </button>
@@ -85,7 +86,7 @@ export default function ToolConfigFields({
                 className={field.type === 'json' ? 'font-mono text-xs' : ''}
                 onChange={(e) => set(field.key, e.target.value)}
               />
-              {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
+              {error && <p className="mt-1 text-xs text-danger">{error}</p>}
               {help}
             </div>
           );
@@ -94,14 +95,15 @@ export default function ToolConfigFields({
         if (field.type === 'select') {
           return (
             <div key={field.key}>
-              <Select label={label} value={valueOf(field)} onChange={(e) => set(field.key, e.target.value)}>
-                {!field.required && field.default === undefined && <option value="">—</option>}
-                {(field.options || []).map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label ?? option.value}
-                  </option>
-                ))}
-              </Select>
+              <Select
+                label={label}
+                value={valueOf(field)}
+                onChange={(e) => set(field.key, e.target.value)}
+                options={[
+                  ...(!field.required && field.default === undefined ? [{ value: '', label: 'None' }] : []),
+                  ...(field.options || []).map((option) => ({ value: option.value, label: option.label ?? String(option.value), description: option.description })),
+                ]}
+              />
               {help}
             </div>
           );
@@ -109,15 +111,13 @@ export default function ToolConfigFields({
 
         if (field.type === 'boolean') {
           return (
-            <label key={field.key} className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
-              <input
-                type="checkbox"
-                checked={Boolean(values[field.key] ?? field.default)}
-                onChange={(e) => set(field.key, e.target.checked)}
-                className="accent-brand-500"
-              />
-              {label}
-            </label>
+            <Switch
+              key={field.key}
+              label={label}
+              description={field.help}
+              checked={Boolean(values[field.key] ?? field.default)}
+              onChange={(v) => set(field.key, v)}
+            />
           );
         }
 
@@ -136,7 +136,7 @@ export default function ToolConfigFields({
       })}
 
       {showTemplateNote && (
-        <p className="text-xs text-slate-400">
+        <p className="text-xs text-subtle">
           Text fields support <code>{'{{input.field}}'}</code> placeholders from the upstream node.
         </p>
       )}

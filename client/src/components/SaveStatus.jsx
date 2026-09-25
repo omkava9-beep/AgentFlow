@@ -29,22 +29,24 @@ export default function SaveStatus() {
     tone = 'ok';
   }
 
+  // Quiet when everything's saved (text only); coloured only when it needs attention.
   const styles = {
-    ok: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-300',
-    busy: 'border-slate-200 bg-white text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300',
-    warn: 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950/60 dark:text-amber-300',
-    error: 'border-red-200 bg-red-50 text-red-600 dark:border-red-900 dark:bg-red-950/60 dark:text-red-300',
+    ok: 'border-transparent text-subtle',
+    busy: 'border-transparent text-subtle',
+    warn: 'border-warning/30 bg-warning-subtle text-warning-subtle-fg',
+    error: 'border-danger/30 bg-danger-subtle text-danger-subtle-fg',
   };
-  const dot = { ok: 'bg-emerald-500', busy: 'animate-pulse bg-brand-500', warn: 'bg-amber-500', error: 'bg-red-500' };
+  const dot = { ok: 'bg-success', busy: 'animate-pulse bg-accent', warn: 'bg-warning', error: 'bg-danger' };
 
   return (
     <span
       data-testid="save-status"
       role="status"
-      className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium shadow-sm ${styles[tone]}`}
+      title={text}
+      className={`inline-flex h-7 min-w-0 max-w-[16rem] items-center gap-1.5 whitespace-nowrap rounded-full border px-2 text-xs font-medium ${styles[tone]}`}
     >
-      <span className={`h-2 w-2 rounded-full ${dot[tone]}`} />
-      {text}
+      <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dot[tone]}`} aria-hidden="true" />
+      <span className="truncate">{text}</span>
     </span>
   );
 }

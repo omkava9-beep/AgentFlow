@@ -18,19 +18,19 @@ import { confirm } from './ui/confirm';
 function Section({ title, active, readOnly = false, children }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+    <div className="rounded-lg border border-default bg-surface">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between px-2.5 py-2 text-left text-xs font-medium text-slate-700 dark:text-slate-200"
+        className="flex w-full items-center justify-between px-2.5 py-2 text-left text-xs font-medium text-fg"
       >
         <span className="flex items-center gap-1.5">
-          <span className={`h-1.5 w-1.5 rounded-full ${active ? 'bg-green-500' : 'bg-slate-300 dark:bg-slate-600'}`} />
+          <span className={`h-1.5 w-1.5 rounded-full ${active ? 'bg-success' : 'bg-surface-sunken '}`} />
           {title}
         </span>
-        <span className="text-slate-400">{open ? '▾' : '▸'}</span>
+        <span className="text-subtle">{open ? '▾' : '▸'}</span>
       </button>
       {open && (
-        <fieldset disabled={readOnly} className="space-y-2 border-t border-slate-100 px-2.5 py-2 dark:border-slate-800">
+        <fieldset disabled={readOnly} className="space-y-2 border-t border-default px-2.5 py-2">
           {children}
         </fieldset>
       )}
@@ -43,9 +43,9 @@ function Section({ title, active, readOnly = false, children }) {
 const API_BASE = String(import.meta.env.VITE_API_URL || '').replace(/\/+$/, '');
 
 const inputClass =
-  'w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-900 focus:border-brand-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100';
+  'w-full rounded border border-default bg-surface px-2 py-1 text-xs text-fg focus:border-accent focus:outline-none   ';
 const btnClass =
-  'rounded border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-40 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800';
+  'rounded border border-default px-2 py-1 text-xs font-medium text-fg hover:bg-bg-subtle disabled:opacity-40   ';
 
 /**
  * Events are addressed per workspace and need an API key (spec/24): a global,
@@ -56,12 +56,12 @@ function EventCurl({ eventName }) {
   const wp = useWorkspacePath();
   return (
     <>
-      <code className="block whitespace-pre-wrap break-all rounded bg-slate-100 p-1.5 text-[10px] text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+      <code className="block whitespace-pre-wrap break-all rounded bg-bg-subtle p-1.5 text-[10px] text-fg">
         {`curl -X POST ${API_BASE}/w/${slug}/events/${eventName} \\\n  -H "Authorization: Bearer <YOUR_API_KEY>" \\\n  -H "Content-Type: application/json" -d '{}'`}
       </code>
-      <p className="text-[11px] text-slate-400">
+      <p className="text-[11px] text-subtle">
         Needs a key with the <span className="font-mono">events:publish</span> scope —{' '}
-        <Link to={wp('/settings/api-keys')} className="font-medium text-brand-600 hover:underline dark:text-brand-400">
+        <Link to={wp('/settings/api-keys')} className="font-medium text-accent hover:underline">
           manage API keys
         </Link>
         . Renaming the workspace URL changes this address.
@@ -146,21 +146,21 @@ export default function TriggerPanel({ workflowId, readOnly = false }) {
 
   return (
     <div className="flex flex-col gap-2">
-      <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Triggers</h3>
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-subtle">Triggers</h3>
 
-      <div className="rounded-lg border border-brand-400 bg-brand-50 px-2.5 py-2 text-xs dark:border-brand-600 dark:bg-brand-950/40">
+      <div className="rounded-lg border border-accent bg-accent-subtle px-2.5 py-2 text-xs">
         <div className="flex items-center justify-between">
-          <span className="font-medium text-slate-800 dark:text-slate-100">Manual</span>
-          <span className="rounded-full bg-brand-600 px-1.5 py-0.5 text-[9px] font-medium uppercase text-white">Active</span>
+          <span className="font-medium text-fg">Manual</span>
+          <span className="rounded-full bg-accent px-1.5 py-0.5 text-[9px] font-medium uppercase text-white">Active</span>
         </div>
-        <p className="mt-0.5 text-slate-500 dark:text-slate-400">The Run button above.</p>
+        <p className="mt-0.5 text-muted">The Run button above.</p>
       </div>
 
       <Section title="Scheduled (Cron)" active={Boolean(schedule?.enabled)} readOnly={readOnly}>
         <input value={cronDraft} onChange={(e) => setCronDraft(e.target.value)} placeholder="0 * * * *" className={inputClass} />
-        {cronDraft.trim() && !cronCheck?.valid && <p className="text-[11px] text-red-500">{cronCheck?.error}</p>}
-        {cronDescription && <p className="text-[11px] text-slate-500 dark:text-slate-400">Runs {cronDescription}.</p>}
-        {upcoming && <p className="text-[11px] text-slate-400">Next: {upcoming.toLocaleString()}</p>}
+        {cronDraft.trim() && !cronCheck?.valid && <p className="text-[11px] text-danger">{cronCheck?.error}</p>}
+        {cronDescription && <p className="text-[11px] text-muted">Runs {cronDescription}.</p>}
+        {upcoming && <p className="text-[11px] text-subtle">Next: {upcoming.toLocaleString()}</p>}
         <div className="flex gap-1.5">
           <button className={btnClass} disabled={!cronCheck?.valid} onClick={() => applySchedule(true)}>
             {schedule?.enabled ? 'Update' : 'Enable'}
@@ -171,19 +171,19 @@ export default function TriggerPanel({ workflowId, readOnly = false }) {
           {schedule?.cronExpression && <button className={btnClass} onClick={clearSchedule}>Clear</button>}
         </div>
         {schedule?.enabled && (
-          <p className="text-[11px] text-green-600 dark:text-green-400">Active: {schedule.cronExpression}</p>
+          <p className="text-[11px] text-success">Active: {schedule.cronExpression}</p>
         )}
       </Section>
 
       <Section title="Webhook" active={Boolean(webhook?.enabled && webhook?.token)} readOnly={readOnly}>
         {readOnly ? (
           // The URL is a capability to start runs, so it isn't shown to viewers.
-          <p className="text-[11px] text-slate-500 dark:text-slate-400">
+          <p className="text-[11px] text-muted">
             {webhook?.enabled && webhook?.token ? 'Webhook trigger is enabled.' : 'No webhook trigger.'}
           </p>
         ) : webhookUrl ? (
           <>
-            <code className="block break-all rounded bg-slate-100 p-1.5 text-[10px] text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+            <code className="block break-all rounded bg-bg-subtle p-1.5 text-[10px] text-fg">
               {webhookUrl}
             </code>
             <div className="flex flex-wrap gap-1.5">
@@ -191,13 +191,13 @@ export default function TriggerPanel({ workflowId, readOnly = false }) {
               <button className={btnClass} onClick={toggleWebhook}>{webhook.enabled ? 'Disable' : 'Enable'}</button>
               <button className={btnClass} onClick={generateWebhook}>Regenerate</button>
             </div>
-            <p className="text-[11px] text-slate-400">
+            <p className="text-[11px] text-subtle">
               POST here to start a run. A JSON body becomes the Start node's output.
             </p>
           </>
         ) : (
           <>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400">No webhook URL yet.</p>
+            <p className="text-[11px] text-muted">No webhook URL yet.</p>
             <button className={btnClass} onClick={generateWebhook}>Generate URL</button>
           </>
         )}
@@ -221,17 +221,17 @@ export default function TriggerPanel({ workflowId, readOnly = false }) {
         </div>
         {eventTrigger?.enabled && (
           <>
-            <p className="text-[11px] text-green-600 dark:text-green-400">Subscribed to {eventTrigger.eventName}</p>
+            <p className="text-[11px] text-success">Subscribed to {eventTrigger.eventName}</p>
             {/* A trigger nobody can work out how to fire isn't a demoable trigger. */}
             <EventCurl eventName={eventTrigger.eventName} />
           </>
         )}
-        <p className="text-[11px] text-slate-400">
+        <p className="text-[11px] text-subtle">
           One event name fans out to every workflow in this workspace subscribed to it — unlike a webhook, which targets just this one.
         </p>
       </Section>
 
-      {error && <p className="text-[11px] text-red-500">{error}</p>}
+      {error && <p className="text-[11px] text-danger">{error}</p>}
     </div>
   );
 }

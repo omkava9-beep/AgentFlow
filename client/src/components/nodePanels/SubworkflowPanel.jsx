@@ -14,16 +14,16 @@ export default function SubworkflowPanel({ config, set }) {
     <>
       <WorkflowPicker label="Workflow" value={config.workflowId} onChange={(workflowId) => set({ workflowId })} workflows={workflows} excludeId={currentId} />
       {config.workflowId && (
-        <a href={wp(`/workflows/${config.workflowId}`)} target="_blank" rel="noreferrer" className="text-xs text-brand-600 hover:underline dark:text-brand-400">
+        <a href={wp(`/workflows/${config.workflowId}`)} target="_blank" rel="noreferrer" className="text-xs text-accent hover:underline">
           Open workflow ↗
         </a>
       )}
       <div>
-        <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Input mapping (optional)</span>
+        <span className="mb-1 block text-sm font-medium text-fg">Input mapping (optional)</span>
         <MappingTable rows={mapping} onChange={(inputMapping) => set({ inputMapping })} />
-        {!mapping.length && <p className="mt-1 text-xs text-slate-400">No mapping: this node's input is passed through as the child's Start output.</p>}
+        {!mapping.length && <p className="mt-1 text-xs text-subtle">No mapping: this node's input is passed through as the child's Start output.</p>}
       </div>
-      <p className="text-xs text-slate-400">
+      <p className="text-xs text-subtle">
         Runs the chosen workflow as a child run and outputs its End result. Same workspace only; recursion stops at depth 5.
       </p>
     </>

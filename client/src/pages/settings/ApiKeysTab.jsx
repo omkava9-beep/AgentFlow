@@ -1,32 +1,25 @@
 import { useCallback, useEffect, useState } from 'react';
+import { KeyRound, MoreHorizontal, Plus, ShieldAlert, Terminal, XCircle } from 'lucide-react';
 import { listApiKeys, createApiKey, revokeApiKey, API_KEY_SCOPES } from '../../api/apiKeys';
 import { apiErrorMessage } from '../../api/client';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import { useCan } from '../../hooks/useCan';
 import { formatRelativeTime } from '../../utils/time';
-import { Button, Card, ErrorText, TextField } from '../../components/ui';
-import { confirm } from '../../components/ui/confirm';
+import {
+  Avatar, Badge, Button, Checkbox, CopyButton, DataTable, Dialog, EmptyState, Field, Input, Menu, MenuButton, confirm,
+} from '../../components/ui/index';
 import LastAuditChange from '../../components/LastAuditChange';
+import SettingsCard from './SettingsCard';
 
 const API_BASE = String(import.meta.env.VITE_API_URL || '').replace(/\/+$/, '');
 
-function creatorLabel(createdBy) {
-  if (!createdBy) return '—';
-  if (typeof createdBy === 'string') return createdBy.slice(-6);
-  return createdBy.name || createdBy.email || '—';
+function creator(createdBy) {
+  if (!createdBy) return null;
+  if (typeof createdBy === 'string') return { name: createdBy.slice(-6) };
+  return { name: createdBy.name || createdBy.email, email: createdBy.email };
 }
 
-const when = (value) => (value ? formatRelativeTime(value) : '—');
-
-function Modal({ children }) {
-  return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-5 shadow-xl dark:border-slate-800 dark:bg-slate-900">
-        {children}
-      </div>
-    </div>
-  );
-}
+const when = (value) => (value ? formatRelativeTime(value) : 'Never');
 
 function CreateKeyDialog({ workspaceId, onCreated, onClose }) {
   const [name, setName] = useState('');
@@ -34,11 +27,10 @@ function CreateKeyDialog({ workspaceId, onCreated, onClose }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
-  const toggle = (value) =>
-    setScopes((prev) => (prev.includes(value) ? prev.filter((s) => s !== value) : [...prev, value]));
+  const toggle = (value, on) => setScopes((prev) => (on ? [...new Set([...prev, value])] : prev.filter((s) => s !== value)));
 
   async function handleSubmit(e) {
-    e.preventDefault();
+    e?.preventDefault();
     setBusy(true);
     setError('');
     try {
@@ -51,83 +43,82 @@ function CreateKeyDialog({ workspaceId, onCreated, onClose }) {
   }
 
   return (
-    <Modal>
-      <form onSubmit={handleSubmit}>
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-400">Create API key</h3>
-        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-          Keys let external systems publish events and start runs in this workspace.
-        </p>
-        <div className="mt-4 space-y-3">
-          <TextField label="Name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Billing service" autoFocus required />
-          <fieldset>
-            <legend className="mb-1 text-sm font-medium text-slate-700 dark:text-slate-300">Scopes</legend>
-            <div className="space-y-1.5">
-              {API_KEY_SCOPES.map((scope) => (
-                <label key={scope.value} className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300">
-                  <input
-                    type="checkbox"
-                    className="mt-0.5"
-                    checked={scopes.includes(scope.value)}
-                    onChange={() => toggle(scope.value)}
-                  />
-                  <span>
-                    <span className="font-mono text-xs">{scope.value}</span> — {scope.label}
-                    <span className="block text-[11px] text-slate-400">{scope.hint}</span>
-                  </span>
-                </label>
-              ))}
-            </div>
-          </fieldset>
-          <ErrorText>{error}</ErrorText>
-          <div className="flex gap-2">
-            <Button type="submit" className="flex-1" disabled={busy || !name.trim() || scopes.length === 0}>
-              {busy ? 'Creating...' : 'Create key'}
-            </Button>
-            <Button type="button" variant="secondary" onClick={onClose} disabled={busy}>
-              Cancel
-            </Button>
+    <Dialog
+      open
+      onClose={onClose}
+      dismissable={!busy}
+      title="Create API key"
+      description="Keys let external systems publish events and start runs in this workspace."
+      icon={KeyRound}
+      testId="create-key-dialog"
+      footer={(
+        <>
+          <Button variant="secondary" onClick={onClose} disabled={busy}>Cancel</Button>
+          <Button type="submit" form="create-key-form" loading={busy} disabled={!name.trim() || scopes.length === 0}>Create key</Button>
+        </>
+      )}
+    >
+      <form id="create-key-form" onSubmit={handleSubmit} className="space-y-4">
+        <Field label="Name" required htmlFor="key-name" help="Something that says where it's used.">
+          <Input id="key-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Billing service" autoFocus />
+        </Field>
+        <fieldset>
+          <legend className="mb-2 text-sm font-medium text-fg">Scopes</legend>
+          <div className="divide-y divide-default rounded-card border border-default">
+            {API_KEY_SCOPES.map((scope) => (
+              <div key={scope.value} className="px-3 py-2.5">
+                <Checkbox
+                  checked={scopes.includes(scope.value)}
+                  onCheckedChange={(on) => toggle(scope.value, on)}
+                  label={<span className="flex items-center gap-2">{scope.label} <code className="font-mono text-2xs text-subtle">{scope.value}</code></span>}
+                  description={<code className="font-mono text-2xs">{scope.hint}</code>}
+                />
+              </div>
+            ))}
           </div>
-        </div>
+          {scopes.length === 0 && <p className="mt-1.5 text-xs text-danger">Pick at least one scope.</p>}
+        </fieldset>
+        {error && <p className="text-sm text-danger" role="alert">{error}</p>}
       </form>
-    </Modal>
+    </Dialog>
   );
 }
 
 /** Shown exactly once: the server stores only a hash, so this is the only copy. */
 function ShowOnceDialog({ plaintext, slug, onClose }) {
-  const [copied, setCopied] = useState(false);
-
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(plaintext);
-      setCopied(true);
-    } catch {
-      setCopied(false);
-    }
-  }
-
+  const example = `curl -X POST ${API_BASE}/w/${slug}/events/order.created \\\n  -H "Authorization: Bearer ${plaintext}" \\\n  -H "Content-Type: application/json" -d '{}'`;
   return (
-    <Modal>
-      <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-400">Your new API key</h3>
-      <p className="mt-2 text-sm font-medium text-amber-600 dark:text-amber-400">
-        Copy it now — you won't see this key again.
-      </p>
-      <code className="mt-3 block break-all rounded-lg bg-slate-100 p-3 font-mono text-xs text-slate-800 dark:bg-slate-800 dark:text-slate-200">
-        {plaintext}
-      </code>
-      <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">Example:</p>
-      <code className="mt-1 block whitespace-pre-wrap break-all rounded-lg bg-slate-100 p-2 font-mono text-[10px] text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-        {`curl -X POST ${API_BASE}/w/${slug}/events/order.created \\\n  -H "Authorization: Bearer ${plaintext}" \\\n  -H "Content-Type: application/json" -d '{}'`}
-      </code>
-      <div className="mt-4 flex gap-2">
-        <Button type="button" className="flex-1" onClick={copy}>
-          {copied ? 'Copied' : 'Copy key'}
-        </Button>
-        <Button type="button" variant="secondary" onClick={onClose}>
-          Done
-        </Button>
+    <Dialog
+      open
+      onClose={onClose}
+      title="Your new API key"
+      icon={KeyRound}
+      size="lg"
+      testId="show-once-dialog"
+      footer={(
+        <>
+          <CopyButton value={plaintext} label="Copy key" />
+          <Button onClick={onClose}>Done</Button>
+        </>
+      )}
+    >
+      <div className="space-y-4">
+        <div className="flex items-start gap-2.5 rounded-card border border-warning/30 bg-warning-subtle px-3.5 py-2.5 text-sm font-medium text-warning-subtle-fg">
+          <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          Copy it now — you won&rsquo;t see this key again.
+        </div>
+        <div className="flex items-center gap-2">
+          <code className="block min-w-0 flex-1 break-all rounded-control border border-default bg-surface-sunken p-3 font-mono text-xs text-fg">{plaintext}</code>
+          <CopyButton value={plaintext} />
+        </div>
+        <div>
+          <p className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-muted">
+            <Terminal className="h-3.5 w-3.5" aria-hidden="true" /> Example
+          </p>
+          <pre className="overflow-x-auto whitespace-pre rounded-control border border-default bg-surface-sunken p-3 font-mono text-2xs text-muted">{example}</pre>
+        </div>
       </div>
-    </Modal>
+    </Dialog>
   );
 }
 
@@ -135,28 +126,22 @@ function ShowOnceDialog({ plaintext, slug, onClose }) {
 export default function ApiKeysTab() {
   const current = useWorkspaceStore((s) => s.current);
   const allowed = useCan('apiKeys:manage');
-  const [keys, setKeys] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [keys, setKeys] = useState(null);
   const [error, setError] = useState('');
   const [creating, setCreating] = useState(false);
   const [plaintext, setPlaintext] = useState(null);
 
   const load = useCallback(() => {
     if (!current || !allowed) return;
-    setLoading(true);
     listApiKeys(current.id)
-      .then((data) => {
-        setKeys(data);
-        setError('');
-      })
-      .catch((err) => setError(apiErrorMessage(err, 'Failed to load API keys')))
-      .finally(() => setLoading(false));
+      .then((data) => { setKeys(data); setError(''); })
+      .catch((err) => { setError(apiErrorMessage(err, 'Failed to load API keys')); setKeys((k) => k || []); });
   }, [current, allowed]);
 
   useEffect(load, [load]);
 
   async function handleRevoke(key) {
-    if (!(await confirm({ title: `Revoke "${key.name}"?`, body: 'Anything using this key will stop working immediately.', confirmLabel: 'Revoke key', destructive: true }))) return;
+    if (!(await confirm({ title: `Revoke “${key.name}”?`, body: 'Anything using this key will stop working immediately.', confirmLabel: 'Revoke key', destructive: true }))) return;
     try {
       await revokeApiKey(current.id, key.id);
       load();
@@ -166,85 +151,106 @@ export default function ApiKeysTab() {
   }
 
   if (!allowed) {
-    return <p className="text-sm text-slate-500 dark:text-slate-400">Only owners and admins can manage API keys.</p>;
+    return <EmptyState icon={KeyRound} title="Owners and admins only" body="Only owners and admins can manage API keys." compact />;
   }
+
+  const columns = [
+    {
+      key: 'name',
+      header: 'Name',
+      sortable: true,
+      cell: (k) => (
+        <div className="min-w-0">
+          <div className="truncate font-medium text-fg">{k.name}</div>
+          <code className="font-mono text-2xs text-subtle">{k.prefix}…</code>
+        </div>
+      ),
+    },
+    {
+      key: 'scopes',
+      header: 'Scopes',
+      cell: (k) => (
+        <div className="flex flex-wrap gap-1">
+          {(k.scopes || []).map((s) => <Badge key={s} size="xs" className="font-mono">{s}</Badge>)}
+        </div>
+      ),
+    },
+    {
+      key: 'createdBy',
+      header: 'Created by',
+      width: 170,
+      cell: (k) => {
+        const who = creator(k.createdBy);
+        return who ? (
+          <span className="flex min-w-0 items-center gap-2">
+            <Avatar name={who.name} email={who.email} size="xs" />
+            <span className="truncate text-sm text-muted">{who.name}</span>
+          </span>
+        ) : <span className="text-subtle">—</span>;
+      },
+    },
+    {
+      key: 'lastUsedAt',
+      header: 'Last used',
+      width: 130,
+      sortable: true,
+      cell: (k) => <span className="text-sm text-subtle">{when(k.lastUsedAt)}</span>,
+    },
+    {
+      key: 'state',
+      header: 'Status',
+      width: 150,
+      cell: (k) => (k.revokedAt
+        ? <Badge tone="neutral">Revoked {formatRelativeTime(k.revokedAt)}</Badge>
+        : <Badge tone="success" dot>Active</Badge>),
+    },
+    {
+      key: 'actions',
+      header: <span className="sr-only">Actions</span>,
+      width: 52,
+      align: 'right',
+      cell: (k) => (k.revokedAt ? null : (
+        <Menu
+          align="right"
+          title={`Actions for ${k.name}`}
+          label={<MoreHorizontal className="h-4 w-4" aria-hidden="true" />}
+          buttonClassName="inline-flex h-7 w-7 items-center justify-center rounded-control text-subtle transition-colors hover:bg-bg-subtle hover:text-fg"
+        >
+          <MenuButton danger onClick={() => handleRevoke(k)}><XCircle className="h-4 w-4" /> Revoke</MenuButton>
+        </Menu>
+      )),
+    },
+  ];
 
   return (
     <div className="space-y-4">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">API keys</h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            For publishing events and starting runs from outside AgentFlow. Keys only work on this workspace.
-          </p>
-        </div>
-        <Button onClick={() => setCreating(true)}>Create key</Button>
-      </div>
-      <LastAuditChange action="apikey.*" refreshKey={keys} />
-
-      <ErrorText>{error}</ErrorText>
-
-      <Card className="overflow-hidden">
-        {loading ? (
-          <p className="p-4 text-sm text-slate-500 dark:text-slate-400">Loading...</p>
-        ) : keys.length === 0 ? (
-          <p className="p-6 text-center text-sm text-slate-500 dark:text-slate-400">No API keys yet.</p>
+      <SettingsCard
+        title="API keys"
+        description="For publishing events and starting runs from outside AgentFlow. A key only works on this workspace."
+        flush={!(keys && keys.length === 0)}
+        footer={<Button icon={Plus} onClick={() => setCreating(true)}>Create key</Button>}
+      >
+        {keys && keys.length === 0 ? (
+          <p className="flex items-center gap-2 text-sm text-subtle"><KeyRound className="h-4 w-4" aria-hidden="true" /> No API keys yet.</p>
         ) : (
-          <table className="w-full text-left text-sm">
-            <thead className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-400 dark:border-slate-800">
-              <tr>
-                <th className="px-4 py-2 font-medium">Name</th>
-                <th className="px-4 py-2 font-medium">Key</th>
-                <th className="px-4 py-2 font-medium">Scopes</th>
-                <th className="px-4 py-2 font-medium">Created by</th>
-                <th className="px-4 py-2 font-medium">Last used</th>
-                <th className="px-4 py-2" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {keys.map((key) => (
-                <tr key={key.id} className={key.revokedAt ? 'opacity-50' : ''}>
-                  <td className="px-4 py-2 font-medium text-slate-800 dark:text-slate-200">{key.name}</td>
-                  <td className="px-4 py-2 font-mono text-xs text-slate-500 dark:text-slate-400">{key.prefix}…</td>
-                  <td className="px-4 py-2">
-                    <div className="flex flex-wrap gap-1">
-                      {(key.scopes || []).map((s) => (
-                        <span key={s} className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                          {s}
-                        </span>
-                      ))}
-                    </div>
-                  </td>
-                  <td className="px-4 py-2 text-slate-500 dark:text-slate-400">{creatorLabel(key.createdBy)}</td>
-                  <td className="px-4 py-2 text-slate-500 dark:text-slate-400">{when(key.lastUsedAt)}</td>
-                  <td className="px-4 py-2 text-right">
-                    {key.revokedAt ? (
-                      <span className="text-xs text-slate-400">Revoked {when(key.revokedAt)}</span>
-                    ) : (
-                      <button
-                        onClick={() => handleRevoke(key)}
-                        className="text-xs font-medium text-red-600 hover:underline dark:text-red-400"
-                      >
-                        Revoke
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <DataTable
+            className="!rounded-none !border-0"
+            columns={columns}
+            rows={keys}
+            loading={!keys}
+            loadingRows={2}
+            rowClassName={(k) => (k.revokedAt ? 'opacity-60' : '')}
+          />
         )}
-      </Card>
+      </SettingsCard>
+      <LastAuditChange action="apikey.*" refreshKey={keys} />
+      {error && <p className="text-sm text-danger" role="alert">{error}</p>}
 
       {creating && (
         <CreateKeyDialog
           workspaceId={current.id}
           onClose={() => setCreating(false)}
-          onCreated={({ key }) => {
-            setCreating(false);
-            setPlaintext(key);
-            load();
-          }}
+          onCreated={({ key }) => { setCreating(false); setPlaintext(key); load(); }}
         />
       )}
       {plaintext && <ShowOnceDialog plaintext={plaintext} slug={current.slug} onClose={() => setPlaintext(null)} />}

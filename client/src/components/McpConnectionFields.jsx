@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { listMcpAllowlist } from '../api/mcp';
-import { TextField, Select } from './ui';
+import { Globe, Server, ShieldCheck } from 'lucide-react';
+import { Field, Input, Select } from './ui/index';
 
 /**
  * The MCP-specific part of the connection form (spec/37 §1). Remote servers take
@@ -32,94 +33,99 @@ export default function McpConnectionFields({ values, onChange, hint, onClear, i
   const cleared = values.authHeader === null;
 
   return (
-    <div className="space-y-3 rounded-lg border border-slate-200 p-3 dark:border-slate-800">
-      <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">MCP server</p>
+    <fieldset className="space-y-4 rounded-card border border-default p-4">
+      <legend className="px-1 text-2xs font-semibold uppercase tracking-wider text-subtle">MCP server</legend>
 
-      <div>
-        <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Transport</span>
-        <div className="inline-flex rounded-lg border border-slate-200 p-0.5 dark:border-slate-700">
-          {[
-            ['http', 'Remote (HTTP)'],
-            ['stdio', 'Local server'],
-          ].map(([id, label]) => (
+      <div role="radiogroup" aria-label="Transport" className="grid grid-cols-2 gap-2">
+        {[
+          ['http', 'Remote (HTTP)', 'A server reachable by URL', Globe],
+          ['stdio', 'Local server', 'One your operator allowlisted', Server],
+        ].map(([id, label, hintText, Icon]) => {
+          const active = transport === id;
+          return (
             <button
               key={id}
               type="button"
+              role="radio"
+              aria-checked={active}
               data-testid={`mcp-transport-${id}`}
               onClick={() => set({ transport: id })}
-              className={`rounded-md px-3 py-1 text-sm transition ${
-                transport === id ? 'bg-brand-600 text-white' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
+              className={`flex items-start gap-2.5 rounded-card border p-3 text-left transition-colors ${
+                active ? 'border-accent bg-accent-subtle/60 ring-1 ring-accent/30' : 'border-default hover:border-strong hover:bg-bg-subtle/60'
               }`}
             >
-              {label}
+              <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${active ? 'text-accent' : 'text-subtle'}`} aria-hidden="true" />
+              <span className="min-w-0">
+                <span className="block text-sm font-medium text-fg">{label}</span>
+                <span className="block text-xs text-subtle">{hintText}</span>
+              </span>
             </button>
-          ))}
-        </div>
+          );
+        })}
       </div>
 
       {transport === 'http' ? (
         <>
-          <TextField
-            label="Server URL *"
-            placeholder="https://mcp.example.com/mcp"
-            value={values.url || ''}
-            onChange={(e) => set({ url: e.target.value })}
-          />
-          <TextField
-            label="Auth header name"
-            placeholder="Authorization"
-            value={values.headerName || ''}
-            onChange={(e) => set({ headerName: e.target.value })}
-          />
-          <div>
-            <TextField
+          <Field label="Server URL" required htmlFor="mcp-url">
+            <Input id="mcp-url" placeholder="https://mcp.example.com/mcp" value={values.url || ''} onChange={(e) => set({ url: e.target.value })} />
+          </Field>
+          <div className="grid grid-cols-5 gap-3">
+            <Field label="Auth header name" htmlFor="mcp-header-name" className="col-span-2">
+              <Input id="mcp-header-name" placeholder="Authorization" value={values.headerName || ''} onChange={(e) => set({ headerName: e.target.value })} />
+            </Field>
+            <Field
               label="Auth header value"
-              type="password"
-              autoComplete="new-password"
-              value={cleared ? '' : values.authHeader || ''}
-              disabled={cleared}
-              placeholder={cleared ? 'Will be cleared on save' : hint ? `${hint} — leave blank to keep` : 'Bearer … (optional)'}
-              onChange={(e) => set({ authHeader: e.target.value })}
-            />
-            {hint && onClear && (
-              <button
-                type="button"
-                onClick={() => (cleared ? set({ authHeader: '' }) : onClear('authHeader'))}
-                className="mt-1 text-xs text-brand-600 hover:underline dark:text-brand-400"
-              >
-                {cleared ? 'Keep the stored value' : 'Clear stored value'}
-              </button>
-            )}
+              htmlFor="mcp-auth-header"
+              className="col-span-3"
+              trailing={hint && onClear ? (
+                <button
+                  type="button"
+                  onClick={() => (cleared ? set({ authHeader: '' }) : onClear('authHeader'))}
+                  className="text-xs font-medium text-accent hover:underline"
+                >
+                  {cleared ? 'Keep stored value' : 'Clear stored value'}
+                </button>
+              ) : null}
+            >
+              <Input
+                id="mcp-auth-header"
+                type="password"
+                autoComplete="new-password"
+                value={cleared ? '' : values.authHeader || ''}
+                disabled={cleared}
+                placeholder={cleared ? 'Will be cleared on save' : hint ? `${hint} — leave blank to keep` : 'Bearer … (optional)'}
+                onChange={(e) => set({ authHeader: e.target.value })}
+              />
+            </Field>
           </div>
-          <p className="text-xs text-slate-400">
+          <p className="flex items-start gap-1.5 text-xs text-subtle">
+            <ShieldCheck className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden="true" />
             Requests go through the same outbound guard as the HTTP tool, so private and internal addresses are refused.
           </p>
         </>
       ) : (
         <>
-          <Select
-            label="Local server *"
-            value={values.allowlistId || ''}
-            onChange={(e) => set({ allowlistId: e.target.value })}
-          >
-            <option value="">{allowlist ? 'Select a server…' : 'Loading…'}</option>
-            {(allowlist || []).map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-            {values.allowlistId && allowlist && !picked && (
-              <option value={values.allowlistId}>{values.allowlistId} (no longer on the allowlist)</option>
-            )}
-          </Select>
-          {picked?.description && <p className="text-xs text-slate-400">{picked.description}</p>}
-          {allowlistError && <p className="text-xs text-red-500">{allowlistError}</p>}
-          <p className="text-xs text-slate-400">
-            Local servers are chosen by your operator in <code>server/mcp-servers.json</code>
+          <Field label="Local server" required help={picked?.description}>
+            <Select
+              aria-label="Local server"
+              value={values.allowlistId || ''}
+              onValueChange={(v) => set({ allowlistId: v })}
+              placeholder={allowlist ? 'Select a server…' : 'Loading…'}
+              options={[
+                ...(allowlist || []).map((srv) => ({ value: srv.id, label: srv.name, description: srv.description, icon: Server })),
+                ...(values.allowlistId && allowlist && !picked
+                  ? [{ value: values.allowlistId, label: `${values.allowlistId} (no longer on the allowlist)`, disabled: true }]
+                  : []),
+              ]}
+            />
+          </Field>
+          {allowlistError && <p className="text-xs text-danger">{allowlistError}</p>}
+          <p className="text-xs text-subtle">
+            Local servers are chosen by your operator in <code className="font-mono">server/mcp-servers.json</code>
             {isEdit ? '' : ' — you can pick one, not add one'}.
           </p>
         </>
       )}
-    </div>
+    </fieldset>
   );
 }

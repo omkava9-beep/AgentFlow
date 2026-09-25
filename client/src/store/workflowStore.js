@@ -14,7 +14,9 @@ const nextId = (prefix) => `${prefix}-${Date.now()}-${idCounter++}`;
 const HISTORY_LIMIT = 50;
 /** Edits to the same field inside this window collapse into one history entry. */
 const COALESCE_MS = 500;
-const PASTE_OFFSET = 40;
+// Copies land just below-right of the original, clear of it: a 260px-wide node
+// offset by 40px on both axes would sit on top of its source.
+const PASTE_OFFSET = { x: 40, y: 110 };
 
 const DEFAULT_CONFIGS = {
   start: { label: 'Start' },
@@ -35,6 +37,18 @@ const DEFAULT_CONFIGS = {
 
 /** Condition branches are matched by handle, so their labels aren't free text. */
 export const isConditionEdge = isConditionEdgeOp;
+
+/**
+ * The handle a new node's outgoing edge uses when it's wired in for you (insert
+ * on an edge, connect-to-add): multi-output nodes start on their positive branch.
+ */
+export function defaultSourceHandle(type) {
+  if (type === 'condition') return 'true';
+  if (type === 'approval') return 'approved';
+  return null;
+}
+
+export { DEFAULT_CONFIGS };
 
 function normalizeNode(n) {
   const raw = n.data?.config || { label: n.data?.label || n.type };
@@ -422,7 +436,7 @@ export const useWorkflowStore = create((set, get) => {
       nodes.push({
         id,
         type: n.type,
-        position: { x: (n.position?.x || 0) + offset, y: (n.position?.y || 0) + offset },
+        position: { x: (n.position?.x || 0) + offset.x, y: (n.position?.y || 0) + offset.y },
         // Deep copy: a shallow one would alias arrays like `candidates`, so
         // editing the clone would silently edit the original.
         data: { config: deepCopy(n.data?.config || DEFAULT_CONFIGS[n.type] || {}) },
@@ -703,6 +717,159 @@ export const useWorkflowStore = create((set, get) => {
         selectEdges: new Set(),
         lastError: droppedStart ? 'Skipped the Start node - a workflow can only have one.' : null,
       });
+    },
+
+    // --- canvas context-menu actions (by id, not by selection) ---------------
+    // Each one is a single op or an atomic batch, so it syncs to collaborators
+    // and undoes as one step, like everything else here.
+
+    /** Selects exactly these nodes (the canvas's context menu acts on them). */
+    selectNodes: (ids) => {
+      const want = new Set(ids);
+      set((state) => ({
+        nodes: state.nodes.map((n) => (Boolean(n.selected) === want.has(n.id) ? n : { ...n, selected: want.has(n.id) })),
+        edges: state.edges.map((e) => (e.selected ? { ...e, selected: false } : e)),
+      }));
+    },
+
+    selectAll: () =>
+      set((state) => ({
+        nodes: state.nodes.map((n) => (n.selected ? n : { ...n, selected: true })),
+        edges: state.edges.map((e) => (e.selected ? e : { ...e, selected: true })),
+      })),
+
+    deleteNodes: (ids) => {
+      const present = ids.filter((id) => client.view.nodes.some((n) => n.id === id));
+      if (!present.length) return;
+      const gone = new Set(present);
+      const result = commit(one(present.map(ops.nodeDelete)));
+      if (result.ok) {
+        set((s) => ({ selectedNodeId: gone.has(s.selectedNodeId) ? null : s.selectedNodeId }));
+      }
+    },
+
+    deleteEdge: (id) => {
+      if (!client.view.edges.some((e) => e.id === id)) return;
+      const result = commit(ops.edgeDelete(id));
+      if (result.ok) set((s) => ({ selectedEdgeId: s.selectedEdgeId === id ? null : s.selectedEdgeId }));
+    },
+
+    copyNodes: (ids) => {
+      const want = new Set(ids);
+      const picked = client.view.nodes.filter((n) => want.has(n.id));
+      if (!picked.length) return;
+      set({
+        clipboard: {
+          nodes: picked.map((n) => ({ id: n.id, type: n.type, position: n.position, data: { config: deepCopy(n.data?.config || {}) } })),
+          edges: client.view.edges.filter((e) => want.has(e.source) && want.has(e.target)).map(cleanEdge),
+        },
+      });
+    },
+
+    cutNodes: (ids) => {
+      get().copyNodes(ids);
+      get().deleteNodes(ids);
+    },
+
+    duplicateNodes: (ids) => {
+      const want = new Set(ids);
+      const picked = client.view.nodes.filter((n) => want.has(n.id));
+      if (!picked.length) return;
+      get()._insert(picked, client.view.edges.filter((e) => want.has(e.source) && want.has(e.target)));
+    },
+
+    /** Paste with the clipboard's top-left corner at `position` (flow coordinates). */
+    pasteAt: (position) => {
+      const clip = get().clipboard;
+      if (!clip?.nodes?.length) return;
+      const minX = Math.min(...clip.nodes.map((n) => n.position?.x || 0));
+      const minY = Math.min(...clip.nodes.map((n) => n.position?.y || 0));
+      // _insert adds PASTE_OFFSET; subtract it so the paste lands where asked.
+      const shifted = clip.nodes.map((n) => ({
+        ...n,
+        position: { x: (n.position?.x || 0) - minX + position.x - PASTE_OFFSET.x, y: (n.position?.y || 0) - minY + position.y - PASTE_OFFSET.y },
+      }));
+      get()._insert(shifted, clip.edges);
+    },
+
+    /** Moves several nodes in one step: align, distribute, auto-layout. */
+    moveNodes: (positions) => {
+      const moves = Object.entries(positions)
+        .map(([id, p]) => ({ node: client.view.nodes.find((n) => n.id === id), p }))
+        .filter(({ node, p }) => node && p && (Math.round(node.position.x) !== Math.round(p.x) || Math.round(node.position.y) !== Math.round(p.y)))
+        .map(({ node, p }) => ops.nodeMove(node.id, { x: Math.round(p.x), y: Math.round(p.y) }));
+      if (moves.length) commit(one(moves));
+    },
+
+    /** n8n-style disable: the engine passes the node's input straight through. */
+    setNodesDisabled: (ids, disabled) => {
+      const list = ids
+        .map((id) => client.view.nodes.find((n) => n.id === id))
+        .filter((n) => n && n.type !== 'start' && n.type !== 'end' && Boolean(n.data?.config?.disabled) !== disabled)
+        .map((n) => ops.nodeUpdate(n.id, ['disabled'], disabled));
+      if (list.length) commit(one(list));
+    },
+
+    /**
+     * Adds a node and wires it in one step: after `from` (dragged out of a source
+     * handle) or before it (dragged out of a target handle). Returns the new id.
+     */
+    addNodeConnected: (type, position, from = null) => {
+      if (type === 'start' && client.view.nodes.some((n) => n.type === 'start')) {
+        set({ lastError: 'A workflow can only have one Start node.' });
+        return null;
+      }
+      const node = { id: nextId(type), type, position, data: { config: deepCopy(DEFAULT_CONFIGS[type] || { label: type }) } };
+      const list = [ops.nodeAdd(node)];
+      if (from?.nodeId && client.view.nodes.some((n) => n.id === from.nodeId)) {
+        const outgoing = from.handleType !== 'target';
+        const handle = outgoing ? from.handleId : defaultSourceHandle(type);
+        // Start has no input and End no output: don't offer an edge that can't exist.
+        const blocked = outgoing ? type === 'start' : type === 'end';
+        if (!blocked) {
+          list.push(ops.edgeAdd({
+            id: nextId('edge'),
+            source: outgoing ? from.nodeId : node.id,
+            target: outgoing ? node.id : from.nodeId,
+            ...(handle && { sourceHandle: handle }),
+            ...((handle === 'true' || handle === 'false') && { label: handle }),
+          }));
+        }
+      }
+      const result = commit(one(list), { select: new Set([node.id]), selectEdges: new Set() });
+      if (!result.ok) return null;
+      set({ selectedNodeId: node.id, selectedEdgeId: null });
+      return node.id;
+    },
+
+    /** Splits an edge: source → new node → target, keeping the source's handle and label. */
+    insertNodeOnEdge: (edgeId, type, position) => {
+      const edge = client.view.edges.find((e) => e.id === edgeId);
+      if (!edge || type === 'start' || type === 'end') return null;
+      const node = { id: nextId(type), type, position, data: { config: deepCopy(DEFAULT_CONFIGS[type] || { label: type }) } };
+      const outHandle = defaultSourceHandle(type);
+      const list = [
+        ops.edgeDelete(edge.id),
+        ops.nodeAdd(node),
+        ops.edgeAdd({
+          id: nextId('edge'),
+          source: edge.source,
+          target: node.id,
+          ...(edge.sourceHandle && { sourceHandle: edge.sourceHandle }),
+          ...(edge.label && { label: edge.label }),
+        }),
+        ops.edgeAdd({
+          id: nextId('edge'),
+          source: node.id,
+          target: edge.target,
+          ...(outHandle && { sourceHandle: outHandle }),
+          ...((outHandle === 'true' || outHandle === 'false') && { label: outHandle }),
+        }),
+      ];
+      const result = commit(one(list), { select: new Set([node.id]), selectEdges: new Set() });
+      if (!result.ok) return null;
+      set({ selectedNodeId: node.id, selectedEdgeId: null });
+      return node.id;
     },
 
     // Only one inspector at a time: picking a node closes the edge panel and vice

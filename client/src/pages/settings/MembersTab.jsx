@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { Clock, Link2, LogOut, MailPlus, MoreHorizontal, RotateCw, TriangleAlert, UserMinus, Users, XCircle } from 'lucide-react';
 import { listMembers, updateMemberRole, removeMember, getSeats } from '../../api/members';
 import { listInvitations, createInvitation, resendInvitation, revokeInvitation } from '../../api/invitations';
 import { apiErrorMessage } from '../../api/client';
@@ -7,44 +8,47 @@ import { useWorkspaceStore, workspacePath } from '../../store/workspaceStore';
 import { useAuthStore } from '../../store/authStore';
 import { useToastStore } from '../../store/toastStore';
 import { can, invitableRoles, memberActions } from '../../hooks/useCan';
-import { Card, Button, TextField, Select, ErrorText } from '../../components/ui';
+import {
+  Avatar, Badge, Button, CopyButton, DataTable, Dialog, Field, Input, Menu, MenuButton, MenuSeparator, Select, Tooltip, confirm, prompt,
+} from '../../components/ui/index';
 import RoleBadge from '../../components/RoleBadge';
 import LastAuditChange from '../../components/LastAuditChange';
-import { formatRelativeTime } from '../../utils/time';
-import { confirm } from '../../components/ui/confirm';
+import { formatRelativeTime, formatUntil } from '../../utils/time';
 import { useWorkspacePath } from '../../hooks/useWorkspacePath';
+import SettingsCard from './SettingsCard';
 
 const invId = (inv) => inv.id || inv._id;
+const toast = (msg, tone) => useToastStore.getState().push(msg, tone);
 
-function CopyButton({ text, label = 'Copy link' }) {
-  const [copied, setCopied] = useState(false);
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {
-      window.prompt('Copy this link:', text);
-    }
+const ROLE_INFO = {
+  owner: 'Full control, including billing and deleting the workspace',
+  admin: 'Manage members, connections, API keys and settings',
+  editor: 'Build, publish and run workflows',
+  viewer: 'Read-only — can comment and approve when assigned',
+};
+const roleOption = (r) => ({ value: r, label: r[0].toUpperCase() + r.slice(1), description: ROLE_INFO[r] });
+
+/** Clipboard first; if the browser blocks it, show the link in a copyable dialog. */
+async function copyOrShow(text, title) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    await prompt({ title, label: 'Link', defaultValue: text, readOnly: true, copy: true });
+    return false;
   }
-  return (
-    <Button type="button" variant="secondary" className="px-3 py-1 text-xs" onClick={copy}>
-      {copied ? 'Copied' : label}
-    </Button>
-  );
 }
 
 export default function MembersTab() {
   const current = useWorkspaceStore((s) => s.current);
   const selfId = useAuthStore((s) => s.user?.id);
   const navigate = useNavigate();
-  const [members, setMembers] = useState([]);
+  const [members, setMembers] = useState(null);
   const [invitations, setInvitations] = useState([]);
   // Only a hash of each invite token is stored, so the list can't return links.
   // A link is known only for invites created in this session; for the rest,
   // "Copy new link" resends (rotating the token) and copies the fresh one.
   const [links, setLinks] = useState({});
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [inviting, setInviting] = useState(false);
 
@@ -59,25 +63,24 @@ export default function MembersTab() {
         canInvite ? listInvitations(current.id) : Promise.resolve([]),
       ]);
       setMembers(m);
-      setInvitations(inv.filter((i) => !i.status || i.status === 'pending'));
+      setInvitations(inv.filter((i) => !i.status || i.status === 'pending' || i.status === 'expired'));
     } catch (err) {
       setError(apiErrorMessage(err, 'Failed to load members'));
-    } finally {
-      setLoading(false);
+      setMembers((prev) => prev || []);
     }
   }, [current, canInvite]);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  useEffect(() => { load(); }, [load]);
 
   if (!current) return null;
 
   async function changeRole(member, role) {
+    if (role === member.role) return;
     setError('');
     try {
       await updateMemberRole(current.id, member.userId, role);
       await load();
+      toast(`${member.name || member.email} is now ${role === 'admin' ? 'an' : 'a'} ${role}.`, 'success');
       // Changing your own role changes what this UI may show.
       if (member.userId === selfId) await useWorkspaceStore.getState().refreshWorkspaces();
     } catch (err) {
@@ -87,10 +90,11 @@ export default function MembersTab() {
 
   async function remove(member) {
     const isSelf = member.userId === selfId;
-    const prompt = isSelf
-      ? `Leave “${current.name}”? You'll lose access to its workflows and runs.`
+    const title = isSelf
+      ? `Leave “${current.name}”?`
       : `Remove ${member.name || member.email} from “${current.name}”?`;
-    if (!(await confirm({ title: prompt, confirmLabel: isSelf ? 'Leave workspace' : 'Remove member', destructive: true }))) return;
+    const body = isSelf ? "You'll lose access to its workflows and runs." : 'They lose access immediately. Their workflows and runs stay.';
+    if (!(await confirm({ title, body, confirmLabel: isSelf ? 'Leave workspace' : 'Remove member', destructive: true }))) return;
     setError('');
     try {
       await removeMember(current.id, member.userId);
@@ -99,7 +103,7 @@ export default function MembersTab() {
         store.removeWorkspace(current.id);
         const list = await store.refreshWorkspaces().catch(() => store.workspaces);
         const fallback = list.find((w) => w.personal) || list[0];
-        useToastStore.getState().push(`You left “${current.name}”.`, 'success');
+        toast(`You left “${current.name}”.`, 'success');
         navigate(fallback ? workspacePath(fallback.slug, '/dashboard') : '/');
         return;
       }
@@ -115,11 +119,8 @@ export default function MembersTab() {
       const { invitation, inviteUrl } = await resendInvitation(current.id, invId(inv));
       setLinks((l) => ({ ...l, [invId(inv)]: inviteUrl }));
       if (invitation) setInvitations((list) => list.map((i) => (invId(i) === invId(inv) ? invitation : i)));
-      try {
-        await navigator.clipboard.writeText(inviteUrl);
-        useToastStore.getState().push(`New link for ${inv.email} copied — the old one no longer works.`, 'success');
-      } catch {
-        window.prompt('Copy this link (the old one no longer works):', inviteUrl);
+      if (await copyOrShow(inviteUrl, `New invite link for ${inv.email}`)) {
+        toast(`New link for ${inv.email} copied — the old one no longer works.`, 'success');
       }
     } catch (err) {
       setError(apiErrorMessage(err, 'Failed to generate a new invite link'));
@@ -142,128 +143,165 @@ export default function MembersTab() {
     setLinks((l) => ({ ...l, [invId(invitation)]: inviteUrl }));
   }
 
+  const memberColumns = [
+    {
+      key: 'member',
+      header: 'Member',
+      sortable: true,
+      sortValue: (m) => (m.name || m.email).toLowerCase(),
+      cell: (m) => (
+        <div className="flex min-w-0 items-center gap-3">
+          <Avatar name={m.name} email={m.email} size="md" />
+          <div className="min-w-0">
+            <div className="truncate font-medium text-fg">
+              {m.name || m.email}
+              {m.userId === selfId && <span className="ml-1.5 text-xs font-normal text-subtle">(you)</span>}
+            </div>
+            {m.name && <div className="truncate text-xs text-subtle">{m.email}</div>}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'role',
+      header: 'Role',
+      width: 190,
+      sortable: true,
+      cell: (m) => {
+        const actions = memberActions(current, m, selfId);
+        return actions.canChangeRole ? (
+          <Select
+            size="sm"
+            aria-label={`Role for ${m.name || m.email}`}
+            value={m.role}
+            onValueChange={(r) => changeRole(m, r)}
+            options={[...new Set([m.role, ...actions.roles])].map(roleOption)}
+          />
+        ) : <RoleBadge role={m.role} />;
+      },
+    },
+    {
+      key: 'joinedAt',
+      header: 'Joined',
+      width: 130,
+      sortable: true,
+      cell: (m) => <span className="text-sm text-subtle">{m.joinedAt ? formatRelativeTime(m.joinedAt) : '—'}</span>,
+    },
+    {
+      key: 'actions',
+      header: <span className="sr-only">Actions</span>,
+      width: 96,
+      align: 'right',
+      cell: (m) => {
+        const actions = memberActions(current, m, selfId);
+        if (actions.canLeave) {
+          return <Button variant="ghost" size="sm" icon={LogOut} onClick={() => remove(m)}>Leave</Button>;
+        }
+        if (!actions.canRemove) return null;
+        return (
+          <Menu
+            align="right"
+            title={`Actions for ${m.name || m.email}`}
+            label={<MoreHorizontal className="h-4 w-4" aria-hidden="true" />}
+            buttonClassName="inline-flex h-7 w-7 items-center justify-center rounded-control text-subtle transition-colors hover:bg-bg-subtle hover:text-fg"
+          >
+            <MenuButton danger onClick={() => remove(m)}><UserMinus className="h-4 w-4" /> Remove from workspace</MenuButton>
+          </Menu>
+        );
+      },
+    },
+  ];
+
+  const inviteColumns = [
+    {
+      key: 'email',
+      header: 'Invited',
+      cell: (inv) => (
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-dashed border-strong text-subtle">
+            <MailPlus className="h-3.5 w-3.5" aria-hidden="true" />
+          </span>
+          <span className="truncate font-medium text-fg">{inv.email}</span>
+        </div>
+      ),
+    },
+    { key: 'role', header: 'Role', width: 190, cell: (inv) => <RoleBadge role={inv.role} /> },
+    {
+      key: 'status',
+      header: 'Status',
+      width: 220,
+      cell: (inv) => {
+        const expired = inv.status === 'expired' || (inv.expiresAt && new Date(inv.expiresAt) < new Date());
+        return expired
+          ? <Badge tone="warning" icon={TriangleAlert}>Expired — send a new link</Badge>
+          : <span className="inline-flex items-center gap-1.5 text-sm text-muted"><Clock className="h-3.5 w-3.5 text-subtle" aria-hidden="true" />{inv.expiresAt ? `Expires ${formatUntil(inv.expiresAt)}` : 'Pending'}</span>;
+      },
+    },
+    {
+      key: 'actions',
+      header: <span className="sr-only">Actions</span>,
+      width: 230,
+      align: 'right',
+      cell: (inv) => {
+        const expired = inv.status === 'expired' || (inv.expiresAt && new Date(inv.expiresAt) < new Date());
+        const link = links[invId(inv)];
+        return (
+          <div className="flex items-center justify-end gap-1.5">
+            {link && !expired && <CopyButton value={link} label="Copy link" size="xs" />}
+            <Tooltip content="Generates a fresh link and extends the expiry; the old link stops working">
+              <Button variant="secondary" size="xs" icon={RotateCw} onClick={() => copyNewLink(inv)}>Copy new link</Button>
+            </Tooltip>
+            <Menu
+              align="right"
+              title={`More for ${inv.email}`}
+              label={<MoreHorizontal className="h-4 w-4" aria-hidden="true" />}
+              buttonClassName="inline-flex h-7 w-7 items-center justify-center rounded-control text-subtle transition-colors hover:bg-bg-subtle hover:text-fg"
+            >
+              {link && <MenuButton onClick={() => copyOrShow(link, `Invite link for ${inv.email}`)}><Link2 className="h-4 w-4" /> Copy current link</MenuButton>}
+              {link && <MenuSeparator />}
+              <MenuButton danger onClick={() => revoke(inv)}><XCircle className="h-4 w-4" /> Revoke</MenuButton>
+            </Menu>
+          </div>
+        );
+      },
+    },
+  ];
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-slate-500 dark:text-slate-400">
-          {members.length} {members.length === 1 ? 'member' : 'members'}
-        </p>
-        {canInvite && <Button onClick={() => setInviting(true)}>Invite people</Button>}
-      </div>
+      <SettingsCard
+        title="Members"
+        description={members ? `${members.length} ${members.length === 1 ? 'person has' : 'people have'} access to ${current.name}.` : 'People with access to this workspace.'}
+        flush
+        footer={canInvite ? <Button icon={MailPlus} onClick={() => setInviting(true)}>Invite people</Button> : null}
+      >
+        <DataTable
+          className="!rounded-none !border-0"
+          columns={memberColumns}
+          rows={members}
+          rowKey={(m) => m.userId}
+          loading={!members}
+          loadingRows={3}
+          initialSort={{ key: 'member', dir: 'asc' }}
+        />
+      </SettingsCard>
       <LastAuditChange action="member.*" refreshKey={members} />
-
-      <ErrorText>{error}</ErrorText>
-
-      <Card className="overflow-hidden p-0">
-        {loading ? (
-          <p className="p-4 text-sm text-slate-500 dark:text-slate-400">Loading members...</p>
-        ) : (
-          <table className="w-full text-left text-sm">
-            <thead className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-400 dark:border-slate-800">
-              <tr>
-                <th className="px-4 py-2 font-medium">Member</th>
-                <th className="px-4 py-2 font-medium">Role</th>
-                <th className="px-4 py-2 font-medium">Joined</th>
-                <th className="px-4 py-2" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {members.map((m) => {
-                const actions = memberActions(current, m, selfId);
-                return (
-                  <tr key={m.userId}>
-                    <td className="px-4 py-3">
-                      <div className="font-medium text-slate-800 dark:text-slate-100">
-                        {m.name || m.email}
-                        {m.userId === selfId && <span className="ml-1 text-xs font-normal text-slate-400">(you)</span>}
-                      </div>
-                      {m.name && <div className="text-xs text-slate-500 dark:text-slate-400">{m.email}</div>}
-                    </td>
-                    <td className="px-4 py-3">
-                      {actions.canChangeRole ? (
-                        <select
-                          value={m.role}
-                          onChange={(e) => changeRole(m, e.target.value)}
-                          className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs capitalize dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                        >
-                          {[...new Set([m.role, ...actions.roles])].map((r) => (
-                            <option key={r} value={r}>
-                              {r}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <RoleBadge role={m.role} />
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-xs text-slate-500 dark:text-slate-400">
-                      {m.joinedAt ? formatRelativeTime(m.joinedAt) : '—'}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      {actions.canRemove && (
-                        <Button variant="ghost" className="px-2 py-1 text-xs text-red-600 dark:text-red-400" onClick={() => remove(m)}>
-                          Remove
-                        </Button>
-                      )}
-                      {actions.canLeave && (
-                        <Button variant="ghost" className="px-2 py-1 text-xs" onClick={() => remove(m)}>
-                          Leave
-                        </Button>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-      </Card>
+      {error && <p className="text-sm text-danger" role="alert">{error}</p>}
 
       {canInvite && (
-        <div>
-          <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Pending invites</h2>
+        <SettingsCard
+          title="Pending invites"
+          description="Invites are links, not emails — share them yourself. They expire after 7 days and only work for the invited address."
+          flush={invitations.length > 0}
+        >
           {invitations.length === 0 ? (
-            <Card className="p-4 text-sm text-slate-500 dark:text-slate-400">No pending invites.</Card>
+            <p className="flex items-center gap-2 text-sm text-subtle">
+              <Users className="h-4 w-4" aria-hidden="true" /> No pending invites.
+            </p>
           ) : (
-            <Card className="divide-y divide-slate-100 p-0 dark:divide-slate-800">
-              {invitations.map((inv) => {
-                const expired = inv.status === 'expired' || (inv.expiresAt && new Date(inv.expiresAt) < new Date());
-                const link = links[invId(inv)];
-                return (
-                  <div key={invId(inv)} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 text-sm font-medium text-slate-800 dark:text-slate-100">
-                        <span className="truncate">{inv.email}</span>
-                        <RoleBadge role={inv.role} />
-                      </div>
-                      <div className="text-xs text-slate-500 dark:text-slate-400">
-                        {expired
-                          ? 'Expired — copy a new link to re-issue it'
-                          : inv.expiresAt
-                            ? `Expires ${new Date(inv.expiresAt).toLocaleDateString()}`
-                            : 'Pending'}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {link && !expired && <CopyButton text={link} />}
-                      <Button
-                        variant="secondary"
-                        className="px-3 py-1 text-xs"
-                        onClick={() => copyNewLink(inv)}
-                        title="Generates a fresh link and extends the expiry; the old link stops working"
-                      >
-                        Copy new link
-                      </Button>
-                      <Button variant="ghost" className="px-2 py-1 text-xs text-red-600 dark:text-red-400" onClick={() => revoke(inv)}>
-                        Revoke
-                      </Button>
-                    </div>
-                  </div>
-                );
-              })}
-            </Card>
+            <DataTable className="!rounded-none !border-0" columns={inviteColumns} rows={invitations} rowKey={invId} dense />
           )}
-        </div>
+        </SettingsCard>
       )}
 
       {inviting && <InviteDialog workspace={current} onInvited={onInvited} onClose={() => setInviting(false)} />}
@@ -291,7 +329,7 @@ function InviteDialog({ workspace, onInvited, onClose }) {
   const atLimit = Boolean(seats?.atLimit);
 
   async function handleSubmit(e) {
-    e.preventDefault();
+    e?.preventDefault();
     setBusy(true);
     setError('');
     try {
@@ -306,74 +344,60 @@ function InviteDialog({ workspace, onInvited, onClose }) {
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-5 shadow-xl dark:border-slate-800 dark:bg-slate-900">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-400">Invite to {workspace.name}</h3>
-        {sent ? (
-          <div className="mt-4 space-y-3">
-            <p className="text-sm text-slate-600 dark:text-slate-300">
-              Invite created for <span className="font-medium">{sent.invitation?.email}</span>. No email is actually sent —
-              share this link with them (it also appears in their Outbox once they sign up):
-            </p>
-            <code className="block break-all rounded-lg bg-slate-100 p-2 text-xs text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-              {sent.inviteUrl}
-            </code>
-            <p className="text-xs text-slate-400">The link expires in 7 days and can only be used by that email address.</p>
-            <div className="flex gap-2">
-              <CopyButton text={sent.inviteUrl} />
-              <Button
-                type="button"
-                variant="secondary"
-                className="px-3 py-1 text-xs"
-                onClick={() => {
-                  setSent(null);
-                  setEmail('');
-                }}
-              >
-                Invite another
-              </Button>
-              <Button type="button" className="ml-auto px-3 py-1 text-xs" onClick={onClose}>
-                Done
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="mt-4 space-y-3">
-            <TextField
-              label="Email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="teammate@example.com"
-              autoFocus
-              required
-            />
-            <Select label="Role" value={role} onChange={(e) => setRole(e.target.value)} className="capitalize">
-              {roles.map((r) => (
-                <option key={r} value={r}>
-                  {r}
-                </option>
-              ))}
-            </Select>
-            {atLimit && (
-              <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:bg-amber-950/40 dark:text-amber-300" data-testid="seat-limit-note">
+    <Dialog
+      open
+      onClose={onClose}
+      dismissable={!busy}
+      title={sent ? 'Invite link ready' : `Invite to ${workspace.name}`}
+      description={sent ? undefined : 'They get a link to join with the role you pick.'}
+      icon={MailPlus}
+      size="md"
+      testId="invite-dialog"
+      footer={sent ? (
+        <>
+          <Button variant="ghost" className="mr-auto" onClick={() => { setSent(null); setEmail(''); }}>Invite another</Button>
+          <CopyButton value={sent.inviteUrl} label="Copy link" />
+          <Button onClick={onClose}>Done</Button>
+        </>
+      ) : (
+        <>
+          <Button variant="secondary" onClick={onClose} disabled={busy}>Cancel</Button>
+          <Button type="submit" form="invite-form" loading={busy} disabled={!email.trim() || atLimit}>Create invite</Button>
+        </>
+      )}
+    >
+      {sent ? (
+        <div className="space-y-3">
+          <p className="text-sm text-muted">
+            Invite created for <span className="font-medium text-fg">{sent.invitation?.email}</span>. No email is sent —
+            share this link with them. It also appears in their Outbox once they sign up.
+          </p>
+          <code className="block break-all rounded-control border border-default bg-surface-sunken p-3 font-mono text-xs text-fg">
+            {sent.inviteUrl}
+          </code>
+          <p className="text-xs text-subtle">The link expires in 7 days and only works for that email address.</p>
+        </div>
+      ) : (
+        <form id="invite-form" onSubmit={handleSubmit} className="space-y-4">
+          <Field label="Email" required htmlFor="invite-email">
+            <Input id="invite-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="teammate@example.com" autoFocus />
+          </Field>
+          <Field label="Role" htmlFor="invite-role">
+            <Select id="invite-role" aria-label="Role" value={role} onValueChange={setRole} options={roles.map(roleOption)} />
+          </Field>
+          {atLimit && (
+            <div className="flex items-start gap-2.5 rounded-card border border-warning/30 bg-warning-subtle px-3.5 py-2.5 text-sm text-warning-subtle-fg" data-testid="seat-limit-note">
+              <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+              <p>
                 The {seats.plan?.name} plan allows {seats.seatLimit} members, and all {seats.seatsUsed} seats are taken
                 (pending invites count). <Link to={wp('/settings/usage')} className="font-medium underline">Change plan</Link>{' '}
-                or revoke a pending invite to free a seat. Resending an existing invite from the list still works.
+                or revoke a pending invite to free a seat. Resending an existing invite still works.
               </p>
-            )}
-            <ErrorText>{error}</ErrorText>
-            <div className="flex gap-2">
-              <Button type="submit" className="flex-1" disabled={busy || !email.trim() || atLimit}>
-                {busy ? 'Creating...' : 'Create invite'}
-              </Button>
-              <Button type="button" variant="secondary" onClick={onClose} disabled={busy}>
-                Cancel
-              </Button>
             </div>
-          </form>
-        )}
-      </div>
-    </div>
+          )}
+          {error && <p className="text-sm text-danger" role="alert">{error}</p>}
+        </form>
+      )}
+    </Dialog>
   );
 }

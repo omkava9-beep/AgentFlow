@@ -6,9 +6,14 @@
 import { useId } from 'react';
 import ButtonBase from './ui/Button';
 import { Card as CardBase } from './ui/Card';
-import { Input, Textarea, Select as SelectBase, Field } from './ui/Form';
+import { Input, Textarea, Select as SelectBase, Field, NumberInput } from './ui/Form';
+import { DatePicker } from './ui/DatePicker';
 
 export { StatusBadge } from './ui/Badge';
+// Everything else in the kit, so `import { PageHeader } from '../components/ui'`
+// works too. The facade's own exports above/below (Button, Card, Select with a
+// label, TextField…) take precedence over the kit's same-named ones.
+export * from './ui/index';
 
 export function Card({ className = '', children, ...props }) {
   return <CardBase className={className} {...props}>{children}</CardBase>;
@@ -21,9 +26,29 @@ export function Button({ variant = 'primary', size = 'md', ...props }) {
 export function TextField({ label, help, error, className = '', id, ...props }) {
   const autoId = useId();
   const inputId = id || autoId;
-  const input = <Input id={inputId} className={className} invalid={Boolean(error)} {...props} />;
+  let input;
+  if (props.type === 'number') {
+    // Legacy call sites: route to the stepper (prefer <NumberField> in new code).
+    const { type: _type, ...rest } = props;
+    return <NumberField label={label} help={help} error={error} className={className} id={inputId} {...rest} />;
+  } else if (props.type === 'date') {
+    // Calendar popover instead of the native date input; value stays 'yyyy-MM-dd'.
+    const { onChange, value } = props;
+    input = <DatePicker value={value} onChange={(v) => onChange?.({ target: { value: v } })} className={className} aria-label={typeof label === 'string' ? label : undefined} />;
+  } else {
+    input = <Input id={inputId} className={className} invalid={Boolean(error)} {...props} />;
+  }
   if (!label && !help && !error) return input;
   return <Field label={label} help={help} error={error} htmlFor={inputId} required={props.required}>{input}</Field>;
+}
+
+/** Labelled number field with − / + steppers and min/max clamping (the kit's NumberInput). */
+export function NumberField({ label, help, error, className = '', id, required, ...props }) {
+  const autoId = useId();
+  const inputId = id || autoId;
+  const input = <NumberInput id={inputId} className={className} invalid={Boolean(error)} {...props} />;
+  if (!label && !help && !error) return input;
+  return <Field label={label} help={help} error={error} htmlFor={inputId} required={required}>{input}</Field>;
 }
 
 export function TextArea({ label, help, className = '', id, ...props }) {

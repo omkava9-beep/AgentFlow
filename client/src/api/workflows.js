@@ -6,8 +6,9 @@ export const getWorkflow = (id) => apiClient.get(`/workflows/${id}`).then((r) =>
 export const updateWorkflow = (id, payload) => apiClient.put(`/workflows/${id}`, payload).then((r) => r.data);
 export const deleteWorkflow = (id) => apiClient.delete(`/workflows/${id}`);
 // spec/30: 'draft' is the Builder's test run; 'published' runs the live version.
-export const createRun = (workflowId, source = 'draft') =>
-  apiClient.post(`/workflows/${workflowId}/runs`, { source }).then((r) => r.data);
+// `input` is an optional test payload handed to the Start node (e.g. a template's sample input).
+export const createRun = (workflowId, source = 'draft', input) =>
+  apiClient.post(`/workflows/${workflowId}/runs`, { source, ...(input != null && { input }) }).then((r) => r.data);
 export const listRuns = (workflowId, page = 1) =>
   apiClient.get(`/workflows/${workflowId}/runs`, { params: { page } }).then((r) => r.data);
 

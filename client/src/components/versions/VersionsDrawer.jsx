@@ -50,29 +50,29 @@ export default function VersionsDrawer({ workflowId, onView, onCompare, onClose,
   }
 
   return (
-    <div className="absolute inset-y-0 right-0 z-30 flex w-96 flex-col border-l border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-900">
-      <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-slate-800">
-        <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Versions</h3>
-        <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600" aria-label="Close"><X className="h-4 w-4" aria-hidden="true" /></button>
+    <div className="absolute inset-y-0 right-0 z-30 flex w-96 flex-col border-l border-default bg-surface shadow-xl">
+      <div className="flex items-center justify-between border-b border-default px-4 py-3">
+        <h3 className="text-sm font-semibold text-fg">Versions</h3>
+        <button type="button" onClick={onClose} className="text-subtle hover:text-muted" aria-label="Close"><X className="h-4 w-4" aria-hidden="true" /></button>
       </div>
-      {error && <p className="px-4 pt-3 text-xs text-red-500">{error}</p>}
+      {error && <p className="px-4 pt-3 text-xs text-danger">{error}</p>}
       <div className="flex-1 overflow-y-auto p-3">
-        {!versions && !error && <p className="text-sm text-slate-400">Loading…</p>}
+        {!versions && !error && <p className="text-sm text-subtle">Loading…</p>}
         {versions?.length === 0 && (
-          <p className="text-sm text-slate-500 dark:text-slate-400">Never published. Schedules, webhooks, events and API calls skip this workflow until you publish it.</p>
+          <p className="text-sm text-muted">Never published. Schedules, webhooks, events and API calls skip this workflow until you publish it.</p>
         )}
         <ul className="space-y-2">
           {versions?.map((v) => (
-            <li key={v.id} className="rounded-lg border border-slate-200 p-3 text-sm dark:border-slate-700">
+            <li key={v.id} className="rounded-lg border border-default p-3 text-sm">
               <div className="flex items-center gap-2">
-                <span className="font-semibold text-slate-800 dark:text-slate-100">v{v.version}</span>
-                {v.isLive && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">Live</span>}
-                {v.rolledBackFrom && <span className="text-[11px] text-slate-500">rollback of v{v.rolledBackFrom}</span>}
-                {v.warningsCount > 0 && <span className="text-[11px] text-amber-600 dark:text-amber-400" title={v.warnings.map((w) => w.message).join('\n')}>⚠ {v.warningsCount}</span>}
-                <span className="ml-auto text-[11px] text-slate-400">{v.nodeCount} nodes</span>
+                <span className="font-semibold text-fg">v{v.version}</span>
+                {v.isLive && <span className="rounded-full bg-success-subtle px-2 py-0.5 text-[10px] font-bold uppercase text-success-subtle-fg">Live</span>}
+                {v.rolledBackFrom && <span className="text-[11px] text-muted">rollback of v{v.rolledBackFrom}</span>}
+                {v.warningsCount > 0 && <span className="text-[11px] text-warning" title={v.warnings.map((w) => w.message).join('\n')}>⚠ {v.warningsCount}</span>}
+                <span className="ml-auto text-[11px] text-subtle">{v.nodeCount} nodes</span>
               </div>
-              {v.message && <p className="mt-1 text-slate-600 dark:text-slate-300">{v.message}</p>}
-              <p className="mt-1 text-[11px] text-slate-400">{v.publishedBy?.name || 'someone'} · {when(v.createdAt)}</p>
+              {v.message && <p className="mt-1 text-muted">{v.message}</p>}
+              <p className="mt-1 text-[11px] text-subtle">{v.publishedBy?.name || 'someone'} · {when(v.createdAt)}</p>
               <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs">
                 <LinkButton onClick={() => onView(v.version)}>View</LinkButton>
                 <LinkButton onClick={() => onCompare(v.version, 'draft')}>Compare with draft</LinkButton>
@@ -86,17 +86,17 @@ export default function VersionsDrawer({ workflowId, onView, onCompare, onClose,
       </div>
 
       {confirm && (
-        <div className="border-t border-slate-200 bg-slate-50 p-4 text-sm dark:border-slate-800 dark:bg-slate-950">
-          <p className="text-slate-700 dark:text-slate-200">
+        <div className="border-t border-default bg-bg-subtle p-4 text-sm">
+          <p className="text-fg">
             {confirm.kind === 'restore'
               ? `Replace the draft with v${confirm.version} for everyone editing it? Nothing is published; triggers keep running the live version.`
               : `This publishes v${confirm.version}'s graph as v${(latest || 0) + 1}. Triggers switch immediately.`}
           </p>
           <div className="mt-3 flex gap-2">
-            <button type="button" onClick={act} disabled={busy} className="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">
+            <button type="button" onClick={act} disabled={busy} className="rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">
               {busy ? 'Working…' : confirm.kind === 'restore' ? 'Restore draft' : 'Roll back'}
             </button>
-            <button type="button" onClick={() => setConfirm(null)} className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs dark:border-slate-700">Cancel</button>
+            <button type="button" onClick={() => setConfirm(null)} className="rounded-lg border border-default px-3 py-1.5 text-xs">Cancel</button>
           </div>
         </div>
       )}
@@ -105,5 +105,5 @@ export default function VersionsDrawer({ workflowId, onView, onCompare, onClose,
 }
 
 function LinkButton({ onClick, children }) {
-  return <button type="button" onClick={onClick} className="text-brand-600 hover:underline dark:text-brand-400">{children}</button>;
+  return <button type="button" onClick={onClick} className="text-accent hover:underline">{children}</button>;
 }

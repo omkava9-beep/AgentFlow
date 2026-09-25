@@ -1,5 +1,6 @@
 import { Play, Clock, Webhook, Zap, KeyRound, FlaskConical, Workflow } from 'lucide-react';
 import { Badge } from './ui/Badge';
+import Tooltip from './ui/Tooltip';
 
 const STYLES = {
   manual: { label: 'Manual', icon: Play, tone: 'neutral' },
@@ -19,13 +20,15 @@ export default function TriggerBadge({ trigger, apiKeyName, test = false }) {
   const title = trigger === 'api' && apiKeyName
     ? `Started by: API key "${apiKeyName}"`
     : `Started by: ${style.label.toLowerCase()} trigger`;
-  const badge = <Badge tone={style.tone} icon={style.icon} title={title}>{style.label}</Badge>;
+  const badge = <Tooltip content={title}><span className="inline-flex"><Badge tone={style.tone} icon={style.icon}>{style.label}</Badge></span></Tooltip>;
   if (!test) return badge;
   // spec/27 §5: runs started by "Send test event" carry a sample payload.
   return (
     <span className="inline-flex items-center gap-1">
       {badge}
-      <Badge tone="warning" icon={FlaskConical} title="Started by “Send test event” with a sample payload">Test</Badge>
+      <Tooltip content="Started by “Send test event” with a sample payload">
+        <span className="inline-flex"><Badge tone="warning" icon={FlaskConical}>Test</Badge></span>
+      </Tooltip>
     </span>
   );
 }

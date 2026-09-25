@@ -8,6 +8,34 @@ import { RunCancelledError } from './nodes/shared.js';
 import { armWait, clearWait, clearWaitsForRun } from './waitTimers.js';
 import { withRunLock } from './runLocks.js';
 
+/** Start and End can't be switched off: a run needs a beginning and a result. */
+function isDisabledNode(node) {
+  return Boolean(node?.data?.config?.disabled) && node.type !== 'start' && node.type !== 'end';
+}
+
+/** A persisted node result that was a disabled pass-through (see runNode). */
+function isDisabledPassThrough(result) {
+  return result?.status === 'skipped' && result?.skipReason === 'disabled';
+}
+
+/**
+ * Which outgoing edges a disabled node still feeds. It has no decision to make,
+ * so multi-output nodes follow their "positive" branch: a condition its `true`
+ * handle, an approval `approved`, a handoff agent its first candidate. Error
+ * edges never fire - nothing failed.
+ */
+function isPrimaryEdge(node, edge) {
+  if (edge.sourceHandle === 'error') return false;
+  if (node.type === 'condition') return edge.sourceHandle === 'true';
+  if (node.type === 'approval') return edge.sourceHandle === 'approved';
+  const config = node.data?.config || {};
+  if (node.type === 'agent' && config.isHandoff) {
+    const first = (config.candidates || [])[0];
+    return first ? edge.label === first : true;
+  }
+  return true;
+}
+
 /** In-flight runs, so a cancel request can reach the loop driving one. */
 const activeRuns = new Map();
 /**
@@ -262,7 +290,7 @@ async function runEngine(runId, workflow, { timeoutMs = env.runTimeoutMs, input:
     const results = [...(runDoc.nodeResults || [])]
       .sort((a, b) => new Date(a.finishedAt || 0) - new Date(b.finishedAt || 0));
     for (const r of results) {
-      if (r.status === 'success') resolved.set(r.nodeId, 'success');
+      if (r.status === 'success' || isDisabledPassThrough(r)) resolved.set(r.nodeId, 'success');
       else if (r.status === 'skipped') resolved.set(r.nodeId, 'skipped');
       else if (r.status === 'failed') {
         resolved.set(r.nodeId, r.handled ? 'handled' : 'failed');
@@ -289,7 +317,7 @@ async function runEngine(runId, workflow, { timeoutMs = env.runTimeoutMs, input:
     // Reused nodes count as already resolved, in the order they finished.
     const reusedInOrder = [...reusedById.values()].sort((a, b) => new Date(a.finishedAt || 0) - new Date(b.finishedAt || 0));
     for (const r of reusedInOrder) {
-      if (r.status === 'success') resolved.set(r.nodeId, 'success');
+      if (r.status === 'success' || isDisabledPassThrough(r)) resolved.set(r.nodeId, 'success');
       else if (r.status === 'skipped') resolved.set(r.nodeId, 'skipped');
       else if (r.status === 'failed') resolved.set(r.nodeId, r.handled ? 'handled' : 'failed');
       if (resolved.has(r.nodeId)) arrival.set(r.nodeId, order++);
@@ -470,6 +498,33 @@ async function runEngine(runId, workflow, { timeoutMs = env.runTimeoutMs, input:
     }
 
     const input = buildInput(live);
+
+    // A node switched off in the builder (n8n-style "disable") doesn't execute:
+    // its input becomes its output and the flow carries on. Recorded as skipped
+    // with skipReason 'disabled' so the monitor can say so, but it counts as a
+    // success for the edges leaving it - otherwise everything downstream would
+    // be skipped too, which is exactly what disabling a step is meant to avoid.
+    if (isDisabledNode(node)) {
+      const prunedHere = [];
+      for (const edge of outgoingFor(nodeId)) {
+        if (isPrimaryEdge(node, edge)) continue;
+        const key = edgeKey(edge);
+        pruned.add(key);
+        prunedHere.push(key);
+      }
+      outputs.set(nodeId, input);
+      await updateNodeResult(runId, nodeId, {
+        status: 'skipped',
+        skipReason: 'disabled',
+        output: input,
+        startedAt: new Date(),
+        finishedAt: new Date(),
+        durationMs: 0,
+        logs: ['[disabled] node is switched off - passed its input straight through'],
+      }, { output: input, pruned: prunedHere });
+      return { status: 'success' };
+    }
+
     const begunAt = Date.now();
     await updateNodeResult(runId, nodeId, { status: 'running', startedAt: new Date() });
 

@@ -1,80 +1,111 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
+import * as AD from '@radix-ui/react-alert-dialog';
+import { AlertTriangle, Check, Copy } from 'lucide-react';
 import { useConfirmStore } from './confirm';
+import { cx } from './cx';
 
-/** Renders whichever `confirm()` request is pending; mounted once at the root. */
+const buttonBase = 'inline-flex h-8 items-center gap-1.5 rounded-control px-3 text-sm font-medium shadow-sm disabled:cursor-not-allowed disabled:opacity-50';
+const inputClass = 'mt-1.5 h-8 w-full rounded-control border border-default bg-surface px-2.5 text-sm text-fg focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20';
+
+/** Renders whichever `confirm()` / `prompt()` request is pending; mounted once at the root. */
 export default function ConfirmHost() {
   const request = useConfirmStore((s) => s.request);
   const close = useConfirmStore((s) => s.close);
   const [typed, setTyped] = useState('');
-  const confirmRef = useRef(null);
-  const inputRef = useRef(null);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    if (!request) return undefined;
-    setTyped('');
-    const t = setTimeout(() => (request.typeToConfirm ? inputRef.current : confirmRef.current)?.focus(), 0);
-    return () => clearTimeout(t);
+    setTyped(request?.kind === 'prompt' ? String(request.defaultValue ?? '') : '');
+    setCopied(false);
   }, [request]);
 
   if (!request) return null;
   const {
-    title, body, confirmLabel = 'Confirm', cancelLabel = 'Cancel', destructive = false, typeToConfirm = null, resolve,
+    kind, title, body, confirmLabel, cancelLabel = 'Cancel', destructive = false, typeToConfirm = null, resolve,
+    placeholder, readOnly = false, copy = false, label,
   } = request;
-  const blocked = Boolean(typeToConfirm) && typed !== typeToConfirm;
-  const answer = (value) => {
+  const isPrompt = kind === 'prompt';
+  const blocked = (!isPrompt && Boolean(typeToConfirm) && typed !== typeToConfirm) || (isPrompt && !readOnly && !typed.trim() && request.required);
+  const answer = (ok) => {
     close();
-    resolve(value);
+    if (isPrompt) resolve(ok ? typed : null);
+    else resolve(ok);
   };
 
+  async function doCopy() {
+    try { await navigator.clipboard.writeText(typed); } catch { /* clipboard blocked */ }
+    setCopied(true);
+  }
+
   return (
-    <div
-      className="fixed inset-0 z-[60] flex animate-fade-in items-center justify-center bg-zinc-950/50 p-4"
-      onMouseDown={(e) => { if (e.target === e.currentTarget) answer(false); }}
-      onKeyDown={(e) => { if (e.key === 'Escape') answer(false); }}
-    >
-      <div
-        role="alertdialog"
-        aria-modal="true"
-        aria-labelledby="confirm-title"
-        data-testid="confirm-dialog"
-        className="w-full max-w-md animate-pop-in rounded-dialog border border-default bg-surface-raised p-5 shadow-popover"
-      >
-        <h2 id="confirm-title" className="text-base font-semibold text-fg">{title}</h2>
-        {body && <p className="mt-2 text-sm leading-relaxed text-muted">{body}</p>}
-        {typeToConfirm && (
-          <label className="mt-4 block text-sm text-muted">
-            Type <span className="font-mono font-semibold">{typeToConfirm}</span> to confirm
-            <input
-              ref={inputRef}
-              value={typed}
-              onChange={(e) => setTyped(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter' && !blocked) answer(true); }}
-              className="mt-1.5 h-8 w-full rounded-control border border-default bg-surface px-2.5 text-sm text-fg focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
-            />
-          </label>
-        )}
-        <div className="mt-5 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={() => answer(false)}
-            className="inline-flex h-8 items-center rounded-control border border-default bg-surface px-3 text-sm font-medium text-fg shadow-sm hover:bg-bg-subtle"
-          >
-            {cancelLabel}
-          </button>
-          <button
-            ref={confirmRef}
-            type="button"
-            data-testid="confirm-accept"
-            onClick={() => answer(true)}
-            disabled={blocked}
-            className={`inline-flex h-8 items-center rounded-control px-3 text-sm font-medium shadow-sm disabled:cursor-not-allowed disabled:opacity-50 ${
-              destructive ? 'bg-danger text-white hover:brightness-95 dark:text-zinc-950' : 'bg-accent text-accent-fg hover:bg-accent-hover'
-            }`}
-          >
-            {confirmLabel}
-          </button>
-        </div>
-      </div>
-    </div>
+    <AD.Root open onOpenChange={(o) => { if (!o) answer(false); }}>
+      <AD.Portal>
+        <AD.Overlay className="fixed inset-0 z-[60] bg-zinc-950/50 data-[state=open]:animate-fade-in" />
+        <AD.Content
+          data-testid="confirm-dialog"
+          className="fixed left-1/2 top-[18vh] z-[60] w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 rounded-dialog border border-default bg-surface-raised p-5 shadow-popover outline-none data-[state=open]:animate-pop-in"
+        >
+          <div className="flex items-start gap-3">
+            {destructive && (
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-danger-subtle text-danger">
+                <AlertTriangle className="h-4 w-4" aria-hidden="true" />
+              </span>
+            )}
+            <div className="min-w-0 flex-1">
+              <AD.Title className="text-base font-semibold text-fg">{title}</AD.Title>
+              <AD.Description className={body ? 'mt-1.5 text-sm leading-relaxed text-muted' : 'sr-only'}>{body || title}</AD.Description>
+            </div>
+          </div>
+          {typeToConfirm && !isPrompt && (
+            <label className="mt-4 block text-sm text-muted">
+              Type <span className="font-mono font-semibold text-fg">{typeToConfirm}</span> to confirm
+              <input autoFocus value={typed} onChange={(e) => setTyped(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !blocked) answer(true); }} className={inputClass} />
+            </label>
+          )}
+          {isPrompt && (
+            <label className="mt-4 block text-sm text-muted">
+              {label}
+              <div className="flex items-center gap-2">
+                <input
+                  autoFocus
+                  readOnly={readOnly}
+                  value={typed}
+                  placeholder={placeholder}
+                  onFocus={(e) => readOnly && e.target.select()}
+                  onChange={(e) => setTyped(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && !blocked) answer(true); }}
+                  className={cx(inputClass, readOnly && 'font-mono text-xs')}
+                  data-testid="prompt-input"
+                />
+                {copy && (
+                  <button type="button" onClick={doCopy} className={cx(buttonBase, 'mt-1.5 shrink-0 border border-default bg-surface text-fg hover:bg-bg-subtle')}>
+                    {copied ? <Check className="h-3.5 w-3.5 text-success" aria-hidden="true" /> : <Copy className="h-3.5 w-3.5" aria-hidden="true" />}
+                    {copied ? 'Copied' : 'Copy'}
+                  </button>
+                )}
+              </div>
+            </label>
+          )}
+          <div className="mt-5 flex justify-end gap-2">
+            {!(isPrompt && readOnly) && (
+              <AD.Cancel asChild>
+                <button type="button" className={cx(buttonBase, 'border border-default bg-surface text-fg hover:bg-bg-subtle')}>{cancelLabel}</button>
+              </AD.Cancel>
+            )}
+            <AD.Action asChild>
+              <button
+                type="button"
+                data-testid="confirm-accept"
+                onClick={(e) => { e.preventDefault(); if (!blocked) answer(true); }}
+                disabled={blocked}
+                className={cx(buttonBase, destructive ? 'bg-danger text-white hover:brightness-95 dark:text-zinc-950' : 'bg-accent text-accent-fg hover:bg-accent-hover')}
+              >
+                {confirmLabel || (isPrompt ? (readOnly ? 'Done' : 'OK') : 'Confirm')}
+              </button>
+            </AD.Action>
+          </div>
+        </AD.Content>
+      </AD.Portal>
+    </AD.Root>
   );
 }

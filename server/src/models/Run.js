@@ -23,6 +23,9 @@ const nodeResultSchema = new mongoose.Schema({
   // spec/31: a failure routed down the node's error edge. Status stays 'failed',
   // but the run doesn't fail because of it.
   handled: { type: Boolean, default: false },
+  // Why a node was skipped: 'disabled' (switched off in the builder, passed its
+  // input through) — anything else is an ordinary dead branch.
+  skipReason: { type: String, default: null },
   // Loop / sub-workflow children, and a loop's live `done / total`.
   childRunIds: { type: [mongoose.Schema.Types.ObjectId], default: undefined },
   progress: { type: { done: Number, total: Number }, default: null },

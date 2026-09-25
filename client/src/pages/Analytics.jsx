@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
+import { BarChart3, Activity, CheckCircle2, Timer, Gauge, Table2, LineChart, LayoutTemplate } from 'lucide-react';
 import { getAnalyticsSummary } from '../api/analytics';
 import { apiErrorMessage } from '../api/client';
-import { Card, ErrorText } from '../components/ui';
+import { PageHeader, StatTile, Combobox, Segmented, Button, EmptyState, Skeleton, Tooltip, cx } from '../components/ui';
+import { ErrorText } from '../components/ui.jsx';
 import ChartCard from '../components/charts/ChartCard';
-import StatTile from '../components/charts/StatTile';
 import RunsOverTime from '../components/charts/RunsOverTime';
 import CategoryBars from '../components/charts/CategoryBars';
 import OutcomeMeters from '../components/charts/OutcomeMeters';
@@ -20,7 +21,18 @@ import NodeStatsTable from '../components/analytics/NodeStatsTable';
 const LIVE_DEBOUNCE_MS = 2000;
 
 const RANGES = [7, 30, 90];
-const TRIGGER_LABELS = { manual: 'Manual', schedule: 'Scheduled', webhook: 'Webhook', event: 'Event' };
+const TRIGGER_LABELS = { manual: 'Manual', schedule: 'Scheduled', webhook: 'Webhook', event: 'Event', api: 'API', subworkflow: 'Sub-workflow' };
+const NODE_LABELS = { subworkflow: 'Sub-workflow' };
+
+function LoadingGrid() {
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-24 rounded-card" />)}</div>
+      <Skeleton className="h-72 rounded-card" />
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">{[0, 1].map((i) => <Skeleton key={i} className="h-48 rounded-card" />)}</div>
+    </div>
+  );
+}
 
 export default function Analytics() {
   const wp = useWorkspacePath();
@@ -62,80 +74,64 @@ export default function Analytics() {
     return () => { off(); clearTimeout(timer.current); };
   }, [load, workflowId]);
 
+  const finished = data ? data.statusBreakdown.success + data.statusBreakdown.failed + data.statusBreakdown.cancelled : 0;
+  const workflowName = workflowId ? (data?.workflowName || (workflows || []).find((w) => w._id === workflowId)?.name) : null;
+
   return (
     <div>
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="flex items-center gap-2 text-2xl font-semibold text-slate-900 dark:text-slate-100">
-            Analytics
-            <span
-              title="Updates live as runs finish"
-              className={`inline-block h-2 w-2 rounded-full ${pulse ? 'animate-ping bg-emerald-500' : 'bg-emerald-500/40'}`}
+      <PageHeader
+        icon={BarChart3}
+        title={workflowName ? `${workflowName} · analytics` : 'Analytics'}
+        breadcrumbs={workflowId ? [{ label: 'Analytics', to: wp('/analytics') }, { label: workflowName || 'Workflow' }] : undefined}
+        meta={(
+          <Tooltip content="Updates live as runs finish">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-success-subtle px-2 py-0.5 text-2xs font-medium text-success-subtle-fg">
+              <span className={cx('h-1.5 w-1.5 rounded-full bg-success', pulse && 'animate-ping')} aria-hidden="true" />
+              Live
+            </span>
+          </Tooltip>
+        )}
+        description="Your run history, aggregated. Days are bucketed in UTC."
+        actions={(
+          <div className="flex items-center gap-2">
+            <div className="w-60"><Combobox
+              size="sm"
+              aria-label="Workflow"
+              placeholder="All workflows"
+              searchPlaceholder="Find a workflow…"
+              clearable
+              value={workflowId || ''}
+              onChange={(v) => navigate(wp(v ? `/analytics/workflows/${v}` : '/analytics'))}
+              options={(workflows || []).map((w) => ({ value: w._id, label: w.name }))}
+            /></div>
+            <Segmented
+              aria-label="Range"
+              value={String(days)}
+              onChange={(v) => setDays(Number(v))}
+              items={RANGES.map((r) => ({ value: String(r), label: `${r}d` }))}
             />
-          </h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            Your run history, aggregated. Dates are bucketed in UTC.
-          </p>
-        </div>
-
-        {/* Filters sit in one row above the charts. */}
-        <div className="flex items-center gap-2">
-        <select
-          value={workflowId || ''}
-          onChange={(e) => navigate(wp(e.target.value ? `/analytics/workflows/${e.target.value}` : '/analytics'))}
-          aria-label="Workflow"
-          className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
-        >
-          <option value="">All workflows</option>
-          {(workflows || []).map((w) => <option key={w._id} value={w._id}>{w.name}</option>)}
-        </select>
-        <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white p-1 dark:border-slate-700 dark:bg-slate-900">
-          {RANGES.map((r) => (
-            <button
-              key={r}
-              onClick={() => setDays(r)}
-              aria-pressed={days === r}
-              className={`rounded px-2.5 py-1 text-xs font-medium transition ${
-                days === r
-                  ? 'bg-gradient-to-br from-brand-500 to-purple-600 text-white shadow-sm'
-                  : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
-              }`}
-            >
-              {r}d
-            </button>
-          ))}
-        </div>
-        </div>
-      </div>
+          </div>
+        )}
+      />
 
       <ErrorText>{error}</ErrorText>
 
       {loading && !data ? (
-        <p className="text-sm text-slate-500 dark:text-slate-400">Loading...</p>
+        <LoadingGrid />
       ) : !data ? null : data.totalRuns === 0 ? (
-        <Card className="p-10 text-center">
-          <p className="text-slate-600 dark:text-slate-300">No runs in the last {days} days.</p>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Run a workflow to see analytics here — try the{' '}
-            <Link to={wp('/templates')} className="text-brand-600 hover:underline dark:text-brand-400">
-              templates gallery
-            </Link>{' '}
-            for something ready to execute.
-          </p>
-        </Card>
+        <EmptyState
+          icon={BarChart3}
+          title={`No runs in the last ${days} days`}
+          body="Run a workflow to see analytics here — the templates gallery has workflows that are ready to execute."
+          action={<Button icon={LayoutTemplate} onClick={() => navigate(wp('/templates'))}>Browse templates</Button>}
+        />
       ) : (
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <StatTile label="Total runs" value={data.totalRuns} hint={`Last ${data.rangeDays} days`} />
-            <StatTile
-              label="Success rate"
-              value={formatPercent(data.successRate)}
-              hint={`${data.statusBreakdown.success} of ${
-                data.statusBreakdown.success + data.statusBreakdown.failed + data.statusBreakdown.cancelled
-              } finished`}
-            />
-            <StatTile label="Avg duration" value={formatDuration(data.avgDurationMs)} hint="Per completed run" />
-            <StatTile label="Median duration" value={formatDuration(data.medianDurationMs)} hint="Less skewed by outliers" />
+            <StatTile label="Total runs" icon={Activity} value={data.totalRuns.toLocaleString()} hint={`Last ${data.rangeDays} days`} />
+            <StatTile label="Success rate" icon={CheckCircle2} value={formatPercent(data.successRate)} hint={`${data.statusBreakdown.success} of ${finished} finished`} />
+            <StatTile label="Avg duration" icon={Timer} value={formatDuration(data.avgDurationMs)} hint="Per completed run" />
+            <StatTile label="Median duration" icon={Gauge} value={formatDuration(data.medianDurationMs)} hint="Less skewed by outliers" />
           </div>
 
           {data.nodeStats && (
@@ -147,14 +143,11 @@ export default function Analytics() {
           <ChartCard
             title="Runs over time"
             subtitle={`Runs started per day over the last ${data.rangeDays} days`}
-            action={
-              <button
-                onClick={() => setShowTable((v) => !v)}
-                className="rounded border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-              >
+            action={(
+              <Button size="xs" variant="ghost" icon={showTable ? LineChart : Table2} onClick={() => setShowTable((v) => !v)}>
                 {showTable ? 'Show chart' : 'Show data'}
-              </button>
-            }
+              </Button>
+            )}
           >
             {showTable ? (
               <DataTable
@@ -175,22 +168,20 @@ export default function Analytics() {
             </ChartCard>
 
             <ChartCard title="Runs by trigger" subtitle="What started each run">
-              <CategoryBars
-                data={data.runsByTrigger.map((t) => ({ label: TRIGGER_LABELS[t.trigger] || t.trigger, count: t.count }))}
-              />
+              <CategoryBars data={data.runsByTrigger.map((t) => ({ label: TRIGGER_LABELS[t.trigger] || t.trigger, count: t.count }))} />
             </ChartCard>
 
-            <ChartCard title="Node types" subtitle="Across all your workflows">
+            <ChartCard title="Node types" subtitle={workflowId ? 'In this workflow' : 'Across all your workflows'}>
               <CategoryBars
-                data={data.topNodeTypes.map((n) => ({ label: n.type, count: n.count }))}
+                data={data.topNodeTypes.map((n) => ({ label: NODE_LABELS[n.type] || n.type.charAt(0).toUpperCase() + n.type.slice(1), count: n.count }))}
                 emptyMessage="No nodes yet."
               />
             </ChartCard>
 
-            <ChartCard title="Tool types" subtitle="Most-used tools across your workflows">
+            <ChartCard title="Integrations used" subtitle="Most-used integration actions">
               <CategoryBars
                 data={data.topToolTypes.map((n) => ({ label: n.type, count: n.count }))}
-                emptyMessage="No tool nodes configured yet."
+                emptyMessage="No integration nodes configured yet."
               />
             </ChartCard>
           </div>

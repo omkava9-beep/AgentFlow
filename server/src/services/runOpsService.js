@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import User from '../models/User.js';
 import Run from '../models/Run.js';
 import { HttpError } from '../middleware/errorHandler.js';
 import { scopedFilter, isValidObjectId } from '../tenancy/scoped.js';
@@ -248,12 +249,21 @@ export async function listRuns(req) {
         test: { $eq: ['$input.test', true] },
         workflowName: { $arrayElemAt: ['$wf.name', 0] },
         childCount: { $size: '$children' },
+        triggeredBy: 1,
+        // Row summary for the runs table: how far the run got and whether it retried.
+        nodeTotal: { $size: { $ifNull: ['$nodeResults', []] } },
+        nodeDone: { $size: { $filter: { input: { $ifNull: ['$nodeResults', []] }, cond: { $eq: ['$$this.status', 'success'] } } } },
+        nodeFailed: { $size: { $filter: { input: { $ifNull: ['$nodeResults', []] }, cond: { $and: [{ $eq: ['$$this.status', 'failed'] }, { $ne: ['$$this.handled', true] }] } } } },
+        maxAttempts: { $max: { $ifNull: ['$nodeResults.attempts', [1]] } },
       },
     },
   ]);
 
   const hasMore = rows.length > limit;
   const page = hasMore ? rows.slice(0, limit) : rows;
+  const userIds = [...new Set(page.map((r) => r.triggeredBy).filter(Boolean).map(String))];
+  const users = new Map((userIds.length ? await User.find({ _id: { $in: userIds } }).select('name email').lean() : [])
+    .map((u) => [String(u._id), { id: String(u._id), name: u.name || u.email, email: u.email }]));
   return {
     items: page.map((r) => ({
       id: String(r._id),
@@ -274,6 +284,9 @@ export async function listRuns(req) {
       retryOf: r.retryOf ? String(r.retryOf) : null,
       parentRunId: r.parentRunId ? String(r.parentRunId) : null,
       childCount: r.childCount,
+      nodeCounts: { total: r.nodeTotal || 0, succeeded: r.nodeDone || 0, failed: r.nodeFailed || 0 },
+      maxAttempts: r.maxAttempts || 1,
+      triggeredBy: r.triggeredBy ? (users.get(String(r.triggeredBy)) || { id: String(r.triggeredBy), name: null }) : null,
     })),
     nextCursor: hasMore ? encodeCursor(page[page.length - 1]) : null,
   };

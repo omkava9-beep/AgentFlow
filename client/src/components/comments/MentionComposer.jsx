@@ -80,29 +80,29 @@ export default function MentionComposer({ initialText = '', initialPicked = [], 
         onChange={(e) => { setText(e.target.value); setCaret(e.target.selectionStart); setHighlight(0); }}
         onSelect={(e) => setCaret(e.target.selectionStart)}
         onKeyDown={onKeyDown}
-        className="w-full resize-y rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-800 focus:border-brand-400 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+        className="w-full resize-y rounded-lg border border-default bg-surface px-2 py-1.5 text-sm text-fg focus:border-accent focus:outline-none"
       />
       {suggestions.length > 0 && (
-        <ul className="absolute left-0 top-full z-50 mt-1 w-full overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900" data-testid="mention-suggestions">
+        <ul className="absolute left-0 top-full z-50 mt-1 w-full overflow-hidden rounded-lg border border-default bg-surface shadow-lg" data-testid="mention-suggestions">
           {suggestions.map((m, i) => (
             <li key={m.userId}>
               <button
                 type="button"
                 onMouseDown={(e) => { e.preventDefault(); choose(m); }}
-                className={`flex w-full items-center justify-between px-2 py-1.5 text-left text-sm ${i === highlight ? 'bg-brand-50 dark:bg-brand-500/10' : ''}`}
+                className={`flex w-full items-center justify-between px-2 py-1.5 text-left text-sm ${i === highlight ? 'bg-accent-subtle ' : ''}`}
               >
-                <span className="font-medium text-slate-800 dark:text-slate-100">{m.name || m.email}</span>
-                <span className="text-xs text-slate-400">{m.role}</span>
+                <span className="font-medium text-fg">{m.name || m.email}</span>
+                <span className="text-xs text-subtle">{m.role}</span>
               </button>
             </li>
           ))}
         </ul>
       )}
-      {error && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{error}</p>}
+      {error && <p className="mt-1 text-xs text-danger">{error}</p>}
       <div className="mt-1.5 flex items-center justify-end gap-2">
-        <span className="mr-auto text-[11px] text-slate-400">⌘↵ to send</span>
+        <span className="mr-auto text-[11px] text-subtle">⌘↵ to send</span>
         {onCancel && (
-          <button type="button" onClick={onCancel} className="rounded-md px-2 py-1 text-xs text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800">
+          <button type="button" onClick={onCancel} className="rounded-md px-2 py-1 text-xs text-muted hover:bg-bg-subtle">
             Cancel
           </button>
         )}
@@ -111,7 +111,7 @@ export default function MentionComposer({ initialText = '', initialPicked = [], 
           onClick={submit}
           disabled={!text.trim() || busy}
           data-testid="comment-submit"
-          className="rounded-md bg-brand-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-40"
+          className="rounded-md bg-accent px-2.5 py-1 text-xs font-medium text-white hover:bg-accent disabled:opacity-40"
         >
           {busy ? 'Sending…' : submitLabel}
         </button>

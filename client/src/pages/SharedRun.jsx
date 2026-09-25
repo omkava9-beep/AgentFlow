@@ -1,14 +1,16 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { ArrowLeft, Eye, Network, Layers, SearchX, GitBranch, UserCheck, Repeat2 } from 'lucide-react';
 import { getSharedRun } from '../api/share';
 import RunGraphView from '../components/RunGraphView';
 import TriggerBadge from '../components/TriggerBadge';
 import RunGantt from '../components/runs/RunGantt';
 import AttemptsTimeline from '../components/runs/AttemptsTimeline';
-import { Card, StatusBadge } from '../components/ui';
+import { Card, StatusBadge, Badge, Segmented, DataTable, EmptyState, Skeleton, NodeTypeIcon } from '../components/ui';
 import { Wordmark } from '../components/Logo';
 import ThemeToggle from '../components/ThemeToggle';
 import { formatDuration } from '../utils/format';
+import { RelativeTime } from '../components/runs/RunBits';
 
 /**
  * spec/35 §4: one run behind a share link. Only what the server's whitelist
@@ -27,87 +29,107 @@ export default function SharedRun() {
 
   if (notFound) {
     return (
-      <div className="flex min-h-screen items-center justify-center p-6">
-        <Card className="max-w-md p-8 text-center">
-          <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Run not found</h1>
-          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">This run isn't available through this link.</p>
-          <Link to={`/shared/${shareToken}`} className="mt-4 inline-block text-sm text-brand-600 hover:underline dark:text-brand-400">
-            Back to the shared workflow
-          </Link>
+      <div className="flex min-h-screen items-center justify-center bg-bg-subtle p-6">
+        <Card className="max-w-md p-8">
+          <EmptyState
+            icon={SearchX}
+            title="Run not found"
+            body="This run isn't available through this link."
+            action={<Link to={`/shared/${shareToken}`} className="text-sm font-medium text-accent hover:underline">Back to the shared workflow</Link>}
+          />
         </Card>
       </div>
     );
   }
-  if (!data) return <p className="p-6 text-sm text-slate-500 dark:text-slate-400">Loading run...</p>;
 
-  const { run, graph, nodes } = data;
-  const labels = new Map((graph.nodes || []).map((n) => [n.id, n.data?.config?.label || n.id]));
-  const labelOf = (id) => labels.get(id) || id;
-  const asRun = { ...run, nodeResults: nodes };
+  const run = data?.run;
+  const graph = data?.graph;
+  const nodes = data?.nodes || [];
+  const nodesById = new Map((graph?.nodes || []).map((n) => [n.id, n]));
+  const labelOf = (id) => nodesById.get(id)?.data?.config?.label || id;
+  const asRun = run ? { ...run, nodeResults: nodes } : null;
+
+  const columns = [
+    {
+      key: 'node', header: 'Node',
+      cell: (n) => (
+        <span className="inline-flex min-w-0 items-center gap-2">
+          <NodeTypeIcon type={nodesById.get(n.nodeId)?.type || 'tool'} size="sm" />
+          <span className="truncate font-medium">{labelOf(n.nodeId)}</span>
+        </span>
+      ),
+    },
+    { key: 'status', header: 'Status', cell: (n) => <StatusBadge size="xs" status={n.handled ? 'handled' : n.status} /> },
+    {
+      key: 'routing', header: 'Routing',
+      cell: (n) => (
+        <span className="flex flex-wrap gap-1">
+          {n.routing?.taken !== undefined && <Badge size="xs" tone="accent" icon={GitBranch}>took {String(n.routing.taken)}</Badge>}
+          {n.routing?.handoffTarget && <Badge size="xs" tone="accent" icon={GitBranch}>{n.routing.handoffTarget}</Badge>}
+          {n.routing?.approval && <Badge size="xs" tone="warning" icon={UserCheck}>{n.routing.approval}</Badge>}
+          {n.reused && <Badge size="xs" icon={Repeat2}>Reused</Badge>}
+          {n.cached && <Badge size="xs" tone="info">Cached</Badge>}
+          {!n.routing && !n.reused && !n.cached && <span className="text-subtle">—</span>}
+        </span>
+      ),
+    },
+    {
+      key: 'attempts', header: 'Attempts', width: 200,
+      cell: (n) => (n.attemptsLog?.length > 1 ? <AttemptsTimeline attempts={n.attemptsLog} compact /> : <span className="tabular-nums text-subtle">{n.attempts || 1}</span>),
+    },
+    { key: 'duration', header: 'Duration', align: 'right', className: 'tabular-nums', cell: (n) => formatDuration(n.durationMs) },
+  ];
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-20 border-b border-slate-200/80 bg-white/70 backdrop-blur-md dark:border-slate-800/80 dark:bg-slate-950/70">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
+    <div className="flex min-h-screen flex-col bg-bg">
+      <header className="sticky top-0 z-20 border-b border-default bg-surface/80 backdrop-blur">
+        <div className="mx-auto flex h-12 max-w-6xl items-center justify-between gap-3 px-4">
           <div className="flex min-w-0 items-center gap-3">
-            <Wordmark className="text-lg" />
-            <Link to={`/shared/${shareToken}`} className="text-sm text-brand-600 hover:underline dark:text-brand-400">← Workflow</Link>
-            <StatusBadge status={run.status} />
-            <TriggerBadge trigger={run.trigger} />
-            {run.versionNumber && <span className="text-xs text-slate-500">v{run.versionNumber}</span>}
-            <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-              Read-only
-            </span>
+            <Wordmark className="text-base" />
+            <span className="h-5 w-px bg-[rgb(var(--border))]" aria-hidden="true" />
+            <Link to={`/shared/${shareToken}`} className="inline-flex items-center gap-1 text-sm text-muted hover:text-fg">
+              <ArrowLeft className="h-4 w-4" aria-hidden="true" />Workflow
+            </Link>
           </div>
-          <ThemeToggle />
+          <div className="flex items-center gap-2">
+            <Badge size="xs" icon={Eye}>Read-only</Badge>
+            <ThemeToggle />
+          </div>
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">
-        <p className="mb-3 text-sm text-slate-500 dark:text-slate-400">
-          {run.startedAt ? `Started ${new Date(run.startedAt).toLocaleString()}` : 'Not started'}
-          {run.durationMs != null && ` · took ${formatDuration(run.durationMs)}`}
-        </p>
-        <div className="mb-2 flex gap-1 text-xs">
-          {['graph', 'timeline'].map((v) => (
-            <button
-              key={v}
-              onClick={() => setView(v)}
-              aria-pressed={view === v}
-              className={`rounded px-2.5 py-1 font-medium capitalize ${view === v ? 'bg-brand-500 text-white' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'}`}
-            >
-              {v}
-            </button>
-          ))}
-        </div>
-        <Card className="h-[420px] overflow-hidden p-0">
-          {view === 'graph'
-            ? <RunGraphView workflow={graph} nodeResults={nodes} />
-            : <RunGantt run={asRun} labelOf={labelOf} />}
-        </Card>
-
-        <h2 className="mb-2 mt-6 text-xs font-semibold uppercase tracking-wide text-slate-400">Nodes</h2>
-        <div className="space-y-2">
-          {nodes.map((n) => (
-            <Card key={n.nodeId} className="p-3 text-xs">
-              <div className="flex items-center justify-between">
-                <span className="font-medium text-slate-700 dark:text-slate-200">{labelOf(n.nodeId)}</span>
-                <div className="flex items-center gap-1.5">
-                  {n.routing?.taken !== undefined && <span className="rounded bg-brand-100 px-1.5 py-0.5 text-[10px] text-brand-700 dark:bg-brand-950 dark:text-brand-300">took {String(n.routing.taken)}</span>}
-                  {n.routing?.handoffTarget && <span className="rounded bg-brand-100 px-1.5 py-0.5 text-[10px] text-brand-700 dark:bg-brand-950 dark:text-brand-300">⇄ {n.routing.handoffTarget}</span>}
-                  {n.routing?.approval && <span className="rounded bg-orange-100 px-1.5 py-0.5 text-[10px] text-orange-700 dark:bg-orange-950 dark:text-orange-300">{n.routing.approval}</span>}
-                  {n.reused && <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500 dark:bg-slate-800">⟲ reused</span>}
-                  {n.handled && <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-700 dark:bg-amber-950 dark:text-amber-300">handled</span>}
-                  {n.cached && <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] text-blue-700 dark:bg-blue-950 dark:text-blue-300">cached</span>}
-                  <span className="text-slate-400">{formatDuration(n.durationMs)}</span>
-                  <StatusBadge status={n.status} />
-                </div>
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
+        {!run ? (
+          <div className="space-y-4"><Skeleton className="h-8 w-80" /><Skeleton className="h-[420px] rounded-card" /></div>
+        ) : (
+          <>
+            <div className="mb-6 flex flex-wrap items-center gap-3">
+              <h1 className="text-xl font-semibold tracking-tight text-fg">{graph?.name || 'Run'}</h1>
+              <StatusBadge status={run.status} />
+              <TriggerBadge trigger={run.trigger} />
+              {run.versionNumber && <Badge size="xs" tone="accent">v{run.versionNumber}</Badge>}
+              <span className="text-sm text-muted">
+                {run.startedAt ? <>Started <RelativeTime value={run.startedAt} /></> : 'Not started'}
+                {run.durationMs != null && ` · took ${formatDuration(run.durationMs)}`}
+              </span>
+            </div>
+            <Card className="relative mb-6 h-[420px] overflow-hidden">
+              <div className="absolute left-3 top-3 z-10">
+                <Segmented
+                  aria-label="View"
+                  value={view}
+                  onChange={setView}
+                  items={[{ value: 'graph', label: 'Graph', icon: Network }, { value: 'timeline', label: 'Timeline', icon: Layers }]}
+                />
               </div>
-              {n.summary && <p className="mt-1 text-slate-500 dark:text-slate-400">{n.summary}</p>}
-              {n.attemptsLog?.length > 1 && <AttemptsTimeline attempts={n.attemptsLog} compact />}
+              {view === 'graph'
+                ? <RunGraphView workflow={graph} nodeResults={nodes} />
+                : <div className="h-full pt-12"><RunGantt run={asRun} labelOf={labelOf} /></div>}
             </Card>
-          ))}
-        </div>
+            <h2 className="mb-2 text-sm font-semibold text-fg">Nodes</h2>
+            <DataTable dense columns={columns} rows={nodes} rowKey={(n) => n.nodeId} empty={{ icon: Layers, title: 'No nodes ran', compact: true }} />
+          </>
+        )}
       </main>
     </div>
   );

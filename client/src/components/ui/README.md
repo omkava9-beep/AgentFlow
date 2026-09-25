@@ -28,6 +28,19 @@ from `components/ui.jsx`, which is a thin facade over this kit.
    `Skeleton*` components — never bare "Loading…" text.
 7. **Modals are `<Dialog>`**, side panels `<Drawer>`, confirmations `confirm()`.
 8. Numbers use `tabular-nums`; ids, code and JSON use `font-mono`.
+9. **Never use native form controls or native tooltips.** No `<select>`,
+   `<input type="checkbox|radio|range|date|number">`, `window.prompt/confirm`
+   or `title=` tooltips in new code. Use `Select` (options with groups,
+   descriptions, icons), `Combobox`/`MultiSelect` for long or searchable
+   lists, `Checkbox`, `Switch`, `RadioGroup`, `Segmented`, `Slider`,
+   `NumberInput`, `DatePicker`/`DateRangePicker`, `Tooltip`, `confirm()` and
+   `prompt()`. (Legacy `title=` attributes are auto-upgraded to styled
+   tooltips by `<TitleTooltips>` at the root, but new code wraps with
+   `<Tooltip>`.) `TextField type="number"|"date"` in the `components/ui.jsx`
+   facade already renders `NumberInput`/`DatePicker`.
+10. Right-click menus use `ContextMenu*` (Radix Context Menu); dropdowns use
+   `Menu` (Radix Dropdown Menu); toasts go through `toastStore` (`push(msg,
+   tone)`), rendered by sonner.
 
 ## Tokens (src/index.css)
 
@@ -76,7 +89,15 @@ Motion: `animate-fade-in`, `animate-pop-in`, `animate-slide-in-right`.
 | `EmptyState` | `icon` (lucide component), `title body action secondaryAction compact` |
 | `Skeleton`, `SkeletonCard`, `SkeletonGrid`, `SkeletonTable` | Loading placeholders |
 | `Menu`, `MenuLink`, `MenuButton`, `MenuSeparator`, `MenuHeading` | Dropdowns; items accept a leading lucide icon as their first child; `align`, `up` |
-| `confirm()` | Promise-based confirmation (`title body confirmLabel destructive typeToConfirm`) |
+| `confirm()` / `prompt()` | Promise-based dialogs (Radix AlertDialog). `confirm({ title body confirmLabel destructive typeToConfirm })` → bool; `prompt({ title label defaultValue placeholder readOnly copy })` → string \| null |
+| `Select` | Radix Select. `options=[{ value label description icon disabled }]` or grouped `[{ label, options }]`, or legacy `<option>` children; `onChange(e)` (e.target.value) or `onValueChange(v)`; `placeholder`, `size="sm"` |
+| `Combobox` / `MultiSelect` | cmdk in a Popover. `options`, `value`, `onChange(value \| value[])`, `multiple`, `onSearch(q)` (async), `onCreate(q)`, `clearable` |
+| `Checkbox` / `Switch` / `RadioGroup` / `Slider` / `NumberInput` | Radix-backed; `Checkbox onChange(e)` (e.target.checked) or `onCheckedChange(bool)`; `Switch onChange(bool)`; `RadioGroup options value onChange`; `Slider value onChange min max step format`; `NumberInput value onChange(e) \| onValueChange(n) min max step suffix` |
+| `DatePicker` / `DateRangePicker` | react-day-picker in a Popover; values are `'yyyy-MM-dd'` strings; the range picker has presets |
+| `Popover` (+ `Trigger`, `Content`, `Anchor`, `Close`) | Radix Popover |
+| `ContextMenu` family | `ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem (icon shortcut destructive disabled), ContextMenuCheckboxItem, ContextMenuRadioGroup/Item, ContextMenuSeparator, ContextMenuLabel, ContextMenuSub/SubTrigger/SubContent` |
+| `ScrollArea` | Radix ScrollArea with themed overlay scrollbars |
+| `AddNodeMenu` / `AddNodeList` | `components/canvas/AddNodeMenu.jsx`: searchable node picker (cmdk). `<AddNodeMenu onPick={type => …}>trigger</AddNodeMenu>` or `open onOpenChange position={{x,y}}` to anchor at a point (pane "Add node here", insert on edge); rows are draggable onto the canvas (`NODE_DRAG_TYPE` from `components/nodeCatalog.js`) |
 
 ## App shell
 

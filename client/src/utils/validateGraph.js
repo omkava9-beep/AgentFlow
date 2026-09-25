@@ -81,7 +81,7 @@ const sameSet = (a, b) => {
  * Returns `{ errors, warnings, info }`. `info` is advisory only — it never
  * blocks saving or running.
  */
-export function validateGraph({ nodes = [], edges = [], integrations = null, connections = null, tools = null, workflows = null, currentWorkflowId = null }) {
+function collectProblems({ nodes = [], edges = [], integrations = null, connections = null, tools = null, workflows = null, currentWorkflowId = null }) {
   const errors = [];
   const warnings = [];
   const info = [];
@@ -237,4 +237,38 @@ function validateToolNode(node, { catalog, connections, errors, warnings, info, 
   } else if (connection.status === 'error') {
     warnings.push({ id: at('tool-conn-error'), nodeId: node.id, message: `"${name}"'s connection "${connection.name}" failed its last test.` });
   }
+}
+
+/**
+ * A disabled node (builder "Disable", spec/31 revision) doesn't run - it passes
+ * its input through - so its own config problems can't break a run. They're
+ * reported as info, prefixed, rather than as errors/warnings: a warning would
+ * still block a test run, which is exactly what disabling a broken step is for.
+ * Start and End can't be disabled.
+ */
+function downgradeDisabled(result, nodes) {
+  const disabled = new Map(
+    nodes
+      .filter((n) => n.data?.config?.disabled && n.type !== 'start' && n.type !== 'end')
+      .map((n) => [n.id, n.data?.config?.label || n.id]),
+  );
+  if (!disabled.size) return result;
+  const onDisabled = (p) => p.nodeId && disabled.has(p.nodeId);
+  const moved = [...result.errors, ...result.warnings]
+    .filter(onDisabled)
+    .map((p) => ({ ...p, id: `disabled:${p.id}`, message: `(disabled) ${p.message}` }));
+  const notes = [...disabled].map(([id, name]) => ({
+    id: `node-disabled:${id}`,
+    nodeId: id,
+    message: `"${name}" is disabled — it passes its input straight through.`,
+  }));
+  return {
+    errors: result.errors.filter((p) => !onDisabled(p)),
+    warnings: result.warnings.filter((p) => !onDisabled(p)),
+    info: [...result.info, ...moved, ...notes],
+  };
+}
+
+export function validateGraph(input = {}) {
+  return downgradeDisabled(collectProblems(input), input.nodes || []);
 }

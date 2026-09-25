@@ -29,7 +29,8 @@ import { TEMPLATE_DIFFICULTIES, TEMPLATE_TRIGGER_TYPES } from '../models/Templat
 const SERVER_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const BASE_URI = (process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/agentflow').replace(/\/+$/, '').replace(/\/[^/]*$/, '');
 const RUN_TIMEOUT_MS = 60_000;
-const MIN_NODE_DISTANCE = 140;
+// Canvas nodes are 248px wide and ~64px tall; keep a margin so edges and labels fit.
+const NODE_W = 248, NODE_H = 64, NODE_MARGIN = 24;
 
 let pass = 0;
 let fail = 0;
@@ -85,7 +86,7 @@ console.log(`A. catalogue metadata and layout (${BUILT_IN_TEMPLATES.length} temp
       for (let j = i + 1; j < t.nodes.length; j += 1) {
         const a = t.nodes[i].position;
         const b = t.nodes[j].position;
-        if (Math.hypot(a.x - b.x, a.y - b.y) < MIN_NODE_DISTANCE) problems.push(`nodes ${t.nodes[i].id}/${t.nodes[j].id} overlap`);
+        if (Math.abs(a.x - b.x) < NODE_W + NODE_MARGIN && Math.abs(a.y - b.y) < NODE_H + NODE_MARGIN) problems.push(`nodes ${t.nodes[i].id}/${t.nodes[j].id} overlap`);
       }
     }
     for (const key of t.companions) if (!companionsByKey.has(key)) problems.push(`missing companion ${key}`);

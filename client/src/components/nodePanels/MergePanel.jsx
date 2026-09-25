@@ -15,7 +15,7 @@ export default function MergePanel({ config, set }) {
         <option value="all">All</option>
         <option value="first">First</option>
       </Select>
-      <p className="text-xs text-slate-400">{MODE_HELP[mode]}</p>
+      <p className="text-xs text-subtle">{MODE_HELP[mode]}</p>
       <Select label="Output" value={config.output || 'keyed'} onChange={(e) => set({ output: e.target.value })}>
         <option value="keyed">Keyed by source node</option>
         <option value="array">Array, in edge order</option>

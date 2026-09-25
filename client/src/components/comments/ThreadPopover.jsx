@@ -24,22 +24,22 @@ export default function ThreadPopover({ thread, api, onClose, style }) {
     <div
       style={style}
       data-testid="thread-popover"
-      className="pointer-events-auto absolute z-30 w-80 rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900"
+      className="pointer-events-auto absolute z-30 w-80 rounded-xl border border-default bg-surface shadow-2xl"
       onMouseDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
     >
-      <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2 dark:border-slate-800">
-        <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+      <div className="flex items-center justify-between border-b border-default px-3 py-2">
+        <span className="text-xs font-medium text-muted">
           {thread.anchor.detached ? 'Node deleted' : thread.anchor.type === 'node' ? `On ${thread.anchor.nodeId}` : 'On the canvas'}
           {resolved && ' · Resolved'}
         </span>
         <div className="flex items-center gap-1">
           {canWrite && (
-            <button type="button" onClick={toggleResolved} data-testid="thread-resolve" className="rounded-md px-2 py-0.5 text-xs font-medium text-brand-600 hover:bg-brand-50 dark:text-brand-400 dark:hover:bg-brand-500/10">
+            <button type="button" onClick={toggleResolved} data-testid="thread-resolve" className="rounded-md px-2 py-0.5 text-xs font-medium text-accent hover:bg-accent-subtle">
               {resolved ? 'Reopen' : 'Resolve'}
             </button>
           )}
-          <button type="button" onClick={onClose} aria-label="Close" className="rounded-md px-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">✕</button>
+          <button type="button" onClick={onClose} aria-label="Close" className="rounded-md px-1.5 text-subtle hover:bg-bg-subtle">✕</button>
         </div>
       </div>
       <div className="max-h-72 space-y-3 overflow-y-auto px-3 py-2.5">
@@ -48,14 +48,14 @@ export default function ThreadPopover({ thread, api, onClose, style }) {
           return (
             <div key={c.id} data-testid="thread-comment">
               <div className="mb-0.5 flex items-center gap-2 text-xs">
-                <span className="font-semibold text-slate-800 dark:text-slate-100">
-                  {c.author?.name}{c.author?.left && <span className="font-normal text-slate-400"> (left)</span>}
+                <span className="font-semibold text-fg">
+                  {c.author?.name}{c.author?.left && <span className="font-normal text-subtle"> (left)</span>}
                 </span>
-                <span className="text-slate-400">{formatRelativeTime(c.createdAt)}{c.editedAt && ' · edited'}</span>
+                <span className="text-subtle">{formatRelativeTime(c.createdAt)}{c.editedAt && ' · edited'}</span>
                 {!c.deleted && (
                   <span className="ml-auto flex gap-1">
                     {mine && (
-                      <button type="button" onClick={() => setEditing(c.id)} className="text-slate-400 hover:text-slate-600">Edit</button>
+                      <button type="button" onClick={() => setEditing(c.id)} className="text-subtle hover:text-muted">Edit</button>
                     )}
                     {(mine || canModerate) && (
                       <button
@@ -65,7 +65,7 @@ export default function ThreadPopover({ thread, api, onClose, style }) {
                           api.removeComment(thread.id, c.id, thread.comments[0]?.id === c.id);
                           if (thread.comments[0]?.id === c.id) onClose();
                         }}
-                        className="text-slate-400 hover:text-red-600"
+                        className="text-subtle hover:text-danger"
                       >
                         Delete
                       </button>
@@ -91,7 +91,7 @@ export default function ThreadPopover({ thread, api, onClose, style }) {
         })}
       </div>
       {canWrite && (
-        <div className="border-t border-slate-100 px-3 py-2 dark:border-slate-800">
+        <div className="border-t border-default px-3 py-2">
           <MentionComposer
             placeholder="Reply… (@ to mention)"
             submitLabel="Reply"

@@ -17,7 +17,7 @@ const STATUSES = [
 ];
 
 export default function OutcomeMeters({ breakdown, total }) {
-  if (!total) return <p className="py-6 text-center text-xs text-slate-400">No runs in this range.</p>;
+  if (!total) return <p className="py-6 text-center text-xs text-subtle">No runs in this range.</p>;
 
   return (
     <ul className="space-y-3">
@@ -27,15 +27,15 @@ export default function OutcomeMeters({ breakdown, total }) {
         return (
           <li key={status.key}>
             <div className="flex items-baseline justify-between gap-2 text-xs">
-              <span className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300">
+              <span className="flex items-center gap-1.5 text-muted">
                 <span aria-hidden="true" style={{ color: status.color }}>{status.icon}</span>
                 {status.label}
               </span>
-              <span className="tabular-nums text-slate-500 dark:text-slate-400">
-                {count} <span className="text-slate-400">· {formatPercent(share)}</span>
+              <span className="tabular-nums text-muted">
+                {count} <span className="text-subtle">· {formatPercent(share)}</span>
               </span>
             </div>
-            <span className="mt-1 block h-2 w-full overflow-hidden rounded-sm bg-slate-100 dark:bg-slate-800">
+            <span className="mt-1 block h-2 w-full overflow-hidden rounded-sm bg-bg-subtle">
               <span
                 className="block h-full rounded-r-[4px]"
                 style={{

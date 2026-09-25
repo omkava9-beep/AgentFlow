@@ -1,21 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { listMcpTools, refreshMcpTools } from '../api/mcp';
 import { apiErrorMessage } from '../api/client';
+import { RefreshCw, Wrench } from 'lucide-react';
 import { annotationBadges } from '../utils/mcpSchema';
+import { Badge, Button, Skeleton } from './ui/index';
 
 const SOURCE_LABEL = { live: 'from the live server', cache: 'cached from the server', snapshot: 'from the saved snapshot' };
 
-const BADGE_TONE = {
-  'read-only': 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300',
-  'side effect': 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300',
-  destructive: 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300',
-};
+const BADGE_TONE = { 'read-only': 'success', 'side effect': 'warning', destructive: 'danger' };
 
 export function ToolBadges({ annotations }) {
   return annotationBadges(annotations).map((b) => (
-    <span key={b} className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${BADGE_TONE[b]}`}>
-      {b}
-    </span>
+    <Badge key={b} tone={BADGE_TONE[b] || 'neutral'} size="xs">{b}</Badge>
   ));
 }
 
@@ -59,40 +55,43 @@ export default function McpToolList({ connectionId, onLoaded }) {
   }
 
   return (
-    <div data-testid="mcp-tool-list" className="space-y-2 rounded-lg border border-slate-200 p-3 dark:border-slate-800">
-      <div className="flex items-center justify-between">
-        <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-          {state.loading ? 'Discovering tools…' : `Discovered ${state.tools.length} tool${state.tools.length === 1 ? '' : 's'}`}
-        </p>
-        <button
-          type="button"
-          onClick={refresh}
-          disabled={refreshing}
-          className="text-xs text-brand-600 hover:underline disabled:opacity-50 dark:text-brand-400"
-        >
+    <div data-testid="mcp-tool-list" className="overflow-hidden rounded-card border border-default">
+      <div className="flex items-center justify-between gap-3 border-b border-default bg-bg-subtle/60 px-3 py-2">
+        <div className="min-w-0">
+          <p className="flex items-center gap-1.5 text-sm font-medium text-fg">
+            <Wrench className="h-3.5 w-3.5 text-subtle" aria-hidden="true" />
+            {state.loading ? 'Discovering tools…' : `Discovered ${state.tools.length} tool${state.tools.length === 1 ? '' : 's'}`}
+          </p>
+          {(state.fetchedAt || state.source) && (
+            <p className="truncate text-2xs text-subtle">
+              {state.fetchedAt && `Fetched ${new Date(state.fetchedAt).toLocaleString()}`}
+              {state.source && ` · ${SOURCE_LABEL[state.source] || state.source}`}
+            </p>
+          )}
+        </div>
+        <Button variant="ghost" size="xs" icon={RefreshCw} loading={refreshing} onClick={refresh}>
           {refreshing ? 'Refreshing…' : 'Refresh tools'}
-        </button>
+        </Button>
       </div>
-      {(state.fetchedAt || state.source) && (
-        <p className="text-[11px] text-slate-400">
-          {state.fetchedAt && `Fetched ${new Date(state.fetchedAt).toLocaleString()}`}
-          {state.source && ` · ${SOURCE_LABEL[state.source] || state.source}`}
-        </p>
+      {state.error && <p className="px-3 py-2 text-xs text-danger">{state.error}</p>}
+      {state.loading && !state.tools.length && (
+        <div className="space-y-2 p-3"><Skeleton className="h-3 w-2/3" /><Skeleton className="h-3 w-1/2" /></div>
       )}
-      {state.error && <p className="text-xs text-red-500">{state.error}</p>}
-      <ul className="max-h-56 space-y-1.5 overflow-y-auto">
-        {state.tools.map((tool) => (
-          <li key={tool.name} className="rounded-md bg-slate-50 px-2 py-1.5 text-xs dark:bg-slate-800/60">
-            <div className="flex items-center gap-1.5">
-              <code className="font-semibold text-slate-700 dark:text-slate-200">{tool.name}</code>
-              <ToolBadges annotations={tool.annotations} />
-            </div>
-            {tool.description && <p className="mt-0.5 text-slate-500 dark:text-slate-400">{tool.description}</p>}
-          </li>
-        ))}
-      </ul>
+      {state.tools.length > 0 && (
+        <ul className="max-h-56 divide-y divide-default overflow-y-auto">
+          {state.tools.map((tool) => (
+            <li key={tool.name} className="px-3 py-2">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <code className="font-mono text-xs font-semibold text-fg">{tool.name}</code>
+                <ToolBadges annotations={tool.annotations} />
+              </div>
+              {tool.description && <p className="mt-0.5 text-xs text-muted">{tool.description}</p>}
+            </li>
+          ))}
+        </ul>
+      )}
       {!state.loading && !state.error && !state.tools.length && (
-        <p className="text-xs text-slate-400">This server offers no tools.</p>
+        <p className="px-3 py-3 text-xs text-subtle">This server offers no tools.</p>
       )}
     </div>
   );

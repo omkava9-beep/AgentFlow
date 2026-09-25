@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Checkbox } from '../ui/Form';
+import Select from '../ui/Select';
 import { X } from 'lucide-react';
 import { useIntegrationStore } from '../../store/integrationStore';
 import { useWorkspaceStore } from '../../store/workspaceStore';
@@ -95,31 +97,25 @@ export default function AgentToolsField({ config, set, readOnly }) {
     return (
       <label
         key={`${entry.integration}:${entry.connectionId || ''}:${entry.action}`}
-        className="flex items-start gap-2 rounded px-1 py-0.5 text-xs text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800/60"
+        className="flex items-start gap-2 rounded px-1 py-0.5 text-xs text-fg hover:bg-bg-subtle"
       >
-        <input
-          type="checkbox"
-          className="mt-0.5 accent-brand-500"
-          checked={checked}
-          disabled={readOnly || (!checked && atCap)}
-          onChange={() => toggle(entry)}
-        />
+        <Checkbox checked={checked} disabled={readOnly || (!checked && atCap)} onChange={() => toggle(entry)} />
         <span className="min-w-0 flex-1">
           <span className="font-medium">{action.name}</span>
-          {action.description && <span className="block truncate text-slate-400">{action.description}</span>}
+          {action.description && <span className="block truncate text-subtle">{action.description}</span>}
         </span>
         {actionHasSideEffect(action) && (
-          <span className="rounded bg-amber-100 px-1 text-[10px] text-amber-700 dark:bg-amber-950 dark:text-amber-300">side effect</span>
+          <span className="rounded bg-warning-subtle px-1 text-[10px] text-warning-subtle-fg">side effect</span>
         )}
       </label>
     );
   };
 
   return (
-    <div data-testid="agent-tools" className="space-y-3 rounded-lg border border-slate-200 p-3 dark:border-slate-800">
+    <div data-testid="agent-tools" className="space-y-3 rounded-lg border border-default p-3">
       <div className="flex items-center justify-between">
-        <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Tools</p>
-        <span className={`text-xs ${atCap ? 'text-amber-600' : 'text-slate-400'}`}>
+        <p className="text-xs font-semibold uppercase tracking-wide text-subtle">Tools</p>
+        <span className={`text-xs ${atCap ? 'text-warning' : 'text-subtle'}`}>
           {tools.length} / {MAX_AGENT_TOOLS}
         </span>
       </div>
@@ -132,26 +128,28 @@ export default function AgentToolsField({ config, set, readOnly }) {
             const conn = (connections || []).find((c) => c.id === entry.connectionId);
             const own = (connections || []).filter((c) => c.integration === entry.integration);
             return (
-              <li key={i} className="rounded-md bg-slate-50 px-2 py-1.5 text-xs dark:bg-slate-800/60">
+              <li key={i} className="rounded-md bg-bg-subtle px-2 py-1.5 text-xs">
                 <div className="flex items-center gap-1.5">
                   <IntegrationLogo id={entry.integration} name={integration?.name} size="xs" />
-                  <span className="min-w-0 flex-1 truncate font-medium text-slate-700 dark:text-slate-200">
+                  <span className="min-w-0 flex-1 truncate font-medium text-fg">
                     {entry.integration === 'mcp' ? `${conn?.name || 'Missing connection'} → ` : `${integration?.name || entry.integration} · `}
                     {action?.name || entry.action}
                   </span>
                   {action?.annotations ? <ToolBadges annotations={action.annotations} /> : actionHasSideEffect(action) && (
-                    <span className="rounded bg-amber-100 px-1 text-[10px] text-amber-700 dark:bg-amber-950 dark:text-amber-300">side effect</span>
+                    <span className="rounded bg-warning-subtle px-1 text-[10px] text-warning-subtle-fg">side effect</span>
                   )}
                   {!readOnly && (
-                    <button type="button" aria-label="Remove tool" onClick={() => toggle(entry)} className="text-slate-400 hover:text-red-500"><X className="h-4 w-4" aria-hidden="true" /></button>
+                    <button type="button" aria-label="Remove tool" onClick={() => toggle(entry)} className="text-subtle hover:text-danger"><X className="h-4 w-4" aria-hidden="true" /></button>
                   )}
                 </div>
                 {entry.integration !== 'mcp' && integration && needsCredentials(integration) && (
-                  <select
+                  <Select
+                    size="sm"
+                    className="mt-1"
+                    aria-label="Connection"
                     disabled={readOnly}
                     value={entry.connectionId || ''}
                     onChange={(e) => setEntryConnection(i, e.target.value || null)}
-                    className="mt-1 w-full rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[11px] dark:border-slate-700 dark:bg-slate-900"
                   >
                     <option value="">No connection — sandbox</option>
                     {own.map((c) => (
@@ -161,7 +159,7 @@ export default function AgentToolsField({ config, set, readOnly }) {
                       </option>
                     ))}
                     <option value="sandbox">Sandbox (no account)</option>
-                  </select>
+                  </Select>
                 )}
               </li>
             );
@@ -176,7 +174,7 @@ export default function AgentToolsField({ config, set, readOnly }) {
             placeholder="Search tools…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+            className="w-full rounded-lg border border-default bg-surface px-2 py-1 text-xs"
           />
           <div className="max-h-64 space-y-2 overflow-y-auto">
             {mcpConnections.map((c) => {
@@ -187,14 +185,14 @@ export default function AgentToolsField({ config, set, readOnly }) {
               if (q && Array.isArray(loaded) && !list.length) return null;
               return (
                 <div key={key}>
-                  <button type="button" onClick={() => toggleGroup(key, c.id)} className="flex w-full items-center gap-1 text-left text-xs font-semibold text-slate-600 dark:text-slate-300">
+                  <button type="button" onClick={() => toggleGroup(key, c.id)} className="flex w-full items-center gap-1 text-left text-xs font-semibold text-muted">
                     <span>{expanded ? '▾' : '▸'}</span> <IntegrationLogo id="mcp" name={c.name} size="xs" /> {c.name}
-                    <span className="font-normal text-slate-400">MCP</span>
+                    <span className="font-normal text-subtle">MCP</span>
                   </button>
                   {expanded && (
                     <div className="ml-3 mt-1">
-                      {loaded === 'loading' && <p className="text-xs text-slate-400">Discovering tools…</p>}
-                      {loaded === 'error' && <p className="text-xs text-red-500">Couldn&rsquo;t list this server&rsquo;s tools.</p>}
+                      {loaded === 'loading' && <p className="text-xs text-subtle">Discovering tools…</p>}
+                      {loaded === 'error' && <p className="text-xs text-danger">Couldn&rsquo;t list this server&rsquo;s tools.</p>}
                       {list.map((a) => checkbox({ integration: 'mcp', action: a.id, connectionId: c.id }, a))}
                     </div>
                   )}
@@ -208,7 +206,7 @@ export default function AgentToolsField({ config, set, readOnly }) {
               const expanded = open.has(key) || Boolean(q);
               return (
                 <div key={key}>
-                  <button type="button" onClick={() => toggleGroup(key)} className="flex w-full items-center gap-1 text-left text-xs font-semibold text-slate-600 dark:text-slate-300">
+                  <button type="button" onClick={() => toggleGroup(key)} className="flex w-full items-center gap-1 text-left text-xs font-semibold text-muted">
                     <span>{expanded ? '▾' : '▸'}</span> <IntegrationLogo id={integration.id} name={integration.name} size="xs" /> {integration.name}
                   </button>
                   {expanded && (
@@ -217,36 +215,30 @@ export default function AgentToolsField({ config, set, readOnly }) {
                 </div>
               );
             })}
-            {!catalog && <p className="text-xs text-slate-400">Loading tools…</p>}
+            {!catalog && <p className="text-xs text-subtle">Loading tools…</p>}
           </div>
         </>
       )}
 
-      <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
-        <input
-          type="checkbox"
-          className="accent-brand-500"
-          disabled={readOnly}
-          checked={Boolean(config.allowSideEffects)}
-          onChange={(e) => set({ allowSideEffects: e.target.checked })}
-        />
+      <label className="flex items-center gap-2 text-sm text-fg">
+        <Checkbox disabled={readOnly} checked={Boolean(config.allowSideEffects)} onChange={(e) => set({ allowSideEffects: e.target.checked })} />
         Allow side-effecting tools
       </label>
       {config.allowSideEffects ? (
-        <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:bg-amber-950/60 dark:text-amber-300">
+        <p className="rounded-lg bg-warning-subtle px-3 py-2 text-xs text-warning-subtle-fg">
           Tool output is untrusted: a hostile page or ticket could steer the agent into calling a tool that sends or changes
           something. Put an Approval node in front of anything with real consequences.
         </p>
       ) : (
         sideEffectTools.length > 0 && (
-          <p className="text-xs text-red-500">
+          <p className="text-xs text-danger">
             {sideEffectTools.length} selected tool{sideEffectTools.length === 1 ? ' has' : 's have'} side effects — allow them
             above or remove {sideEffectTools.length === 1 ? 'it' : 'them'}.
           </p>
         )
       )}
       {tools.length > 0 && (
-        <p className="text-xs text-slate-400">
+        <p className="text-xs text-subtle">
           With a real model the agent takes at most 8 tool-use steps before it must answer; the mock agent uses at most 2.
         </p>
       )}

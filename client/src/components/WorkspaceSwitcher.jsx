@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Check, ChevronsUpDown, Plus } from 'lucide-react';
-import { useWorkspaceStore, workspacePath } from '../store/workspaceStore';
+import { useWorkspaceStore, workspacePath, defaultWorkspace } from '../store/workspaceStore';
 import { useEnsureWorkspaces } from '../hooks/useEnsureWorkspaces';
 import RoleBadge from './RoleBadge';
 import CreateWorkspaceDialog from './CreateWorkspaceDialog';
 import { cx } from './ui/cx';
+import Tooltip from './ui/Tooltip';
 
 function WorkspaceMark({ name, size = 'md' }) {
   return (
@@ -22,7 +23,9 @@ function WorkspaceMark({ name, size = 'md' }) {
 /** The sidebar's workspace picker. `compact` renders just the mark (collapsed rail). */
 export default function WorkspaceSwitcher({ compact = false }) {
   const { workspaces } = useEnsureWorkspaces();
-  const current = useWorkspaceStore((s) => s.current);
+  // Outside a workspace route (Outbox, Notifications) show the default one - the
+  // workspace the nav links point at - rather than an empty "Select workspace".
+  const current = useWorkspaceStore((s) => s.current || defaultWorkspace(s.workspaces));
   const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const ref = useRef(null);
@@ -49,6 +52,7 @@ export default function WorkspaceSwitcher({ compact = false }) {
 
   return (
     <div className="relative" ref={ref}>
+      <Tooltip content={compact ? current?.name : undefined} side="right">
       <button
         onClick={() => setOpen((o) => !o)}
         className={cx(
@@ -57,7 +61,6 @@ export default function WorkspaceSwitcher({ compact = false }) {
         )}
         aria-haspopup="menu"
         aria-expanded={open}
-        title={current?.name}
         data-testid="workspace-switcher"
       >
         <WorkspaceMark name={current?.name} />
@@ -68,6 +71,7 @@ export default function WorkspaceSwitcher({ compact = false }) {
           </>
         )}
       </button>
+      </Tooltip>
 
       {open && (
         <div role="menu" className="absolute left-0 z-40 mt-1.5 w-64 animate-pop-in overflow-hidden rounded-card border border-default bg-surface-raised p-1 shadow-popover">

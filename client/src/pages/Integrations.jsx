@@ -1,18 +1,28 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import {
+  ArrowRight, BookOpen, Blocks, CheckCircle2, Database, FlaskConical, Link2, Plus, Radio, RefreshCw, RotateCcw, Search, Send, Zap,
+} from 'lucide-react';
 import { useIntegrationStore } from '../store/integrationStore';
 import { useWorkspaceStore } from '../store/workspaceStore';
 import { useWorkspacePath } from '../hooks/useWorkspacePath';
 import { useCan } from '../hooks/useCan';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { apiClient, apiErrorMessage } from '../api/client';
 import { sendTestEvent, pollFeedNow } from '../api/integrationTriggers';
-import { findIntegration, groupByCategory, integrationIcon, actionIsLive, CATEGORY_LABELS } from '../utils/integrationCatalog';
-import ConnectionDialog from '../components/ConnectionDialog';
+import { testConnection, updateConnection, connectionUsage, deleteConnection } from '../api/connections';
+import { findIntegration, actionIsLive, CATEGORY_LABELS } from '../utils/integrationCatalog';
 import { describeDispatch } from '../utils/dispatchSummary';
-import { confirm } from '../components/ui/confirm';
+import { formatRelativeTime } from '../utils/time';
+import ConnectionDialog from '../components/ConnectionDialog';
+import ConnectionsTable from '../components/ConnectionsTable';
+import ConnectionDeleteDialog from '../components/ConnectionDeleteDialog';
 import { useToastStore } from '../store/toastStore';
-import { Button, Card, ErrorText, TextField } from '../components/ui';
-import { SkeletonGrid } from '../components/ui/Skeleton';
+import { useBreadcrumb } from '../store/breadcrumbStore';
+import {
+  PageHeader, Tabs, Card, CardHeader, Badge, Button, Input, Select, IntegrationLogo, EmptyState, SkeletonGrid,
+  Drawer, DataTable, IconButton, confirm, prompt, cx,
+} from '../components/ui/index';
 
 /**
  * The Integrations gallery and each integration's detail page (spec/27 §8).
@@ -20,28 +30,7 @@ import { SkeletonGrid } from '../components/ui/Skeleton';
  * integration number twenty-one needs no change here.
  */
 
-const CATEGORY_TONE = {
-  communication: 'bg-sky-100 text-sky-700 dark:bg-sky-950/60 dark:text-sky-300',
-  developer: 'bg-violet-100 text-violet-700 dark:bg-violet-950/60 dark:text-violet-300',
-  data: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300',
-  productivity: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300',
-  commerce: 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300',
-  web: 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
-  ai: 'bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-950/60 dark:text-fuchsia-300',
-};
-const tone = (category) => CATEGORY_TONE[category] || 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300';
-
-function Tile({ integration, size = 'h-9 w-9 text-lg' }) {
-  return (
-    <span className={`inline-flex shrink-0 items-center justify-center rounded-lg ${size} ${tone(integration.category)}`} aria-hidden>
-      {integrationIcon(integration.icon || integration.id)}
-    </span>
-  );
-}
-
-const LiveBadge = () => (
-  <span className="rounded bg-green-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-green-700 dark:bg-green-950/60 dark:text-green-300">Live</span>
-);
+const toast = (msg, tone) => useToastStore.getState().push(msg, tone);
 
 function useCatalogAndConnections() {
   const { catalog, catalogError, loadCatalog, connections, loadConnections } = useIntegrationStore();
@@ -51,6 +40,13 @@ function useCatalogAndConnections() {
   return { catalog, catalogError, connections: connections || [], workspaceId };
 }
 
+// Categories the catalogue adds later still read as words, not ids.
+const labelFor = (category) => CATEGORY_LABELS[category] || (category ? category[0].toUpperCase() + category.slice(1) : 'Other');
+
+const describe = (integration) => (integration.id === 'mcp'
+  ? 'Connect any MCP server — its tools become nodes, and agents can call them.'
+  : integration.description);
+
 // ------------------------------------------------------------------ gallery
 
 export default function Integrations() {
@@ -58,158 +54,236 @@ export default function Integrations() {
   return id ? <IntegrationDetail id={id} /> : <Gallery />;
 }
 
+function FilterPill({ active, onClick, icon: Icon, children, count }) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onClick}
+      className={cx(
+        'inline-flex h-7 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 text-xs font-medium transition-colors',
+        active ? 'border-accent/40 bg-accent-subtle text-accent-subtle-fg' : 'border-default bg-surface text-muted hover:border-strong hover:text-fg',
+      )}
+    >
+      {Icon && <Icon className="h-3.5 w-3.5" aria-hidden="true" />}
+      {children}
+      {count != null && <span className="tabular-nums text-subtle">{count}</span>}
+    </button>
+  );
+}
+
 function Gallery() {
+  useDocumentTitle('Integrations');
   const { catalog, catalogError, connections } = useCatalogAndConnections();
   const wp = useWorkspacePath();
-  const [filter, setFilter] = useState('');
-  const [category, setCategory] = useState('');
+  const navigate = useNavigate();
+  const [query, setQuery] = useState('');
+  const [category, setCategory] = useState('all');
+  const [liveOnly, setLiveOnly] = useState(false);
+  const [connectedOnly, setConnectedOnly] = useState(false);
 
-  const groups = useMemo(
-    () => groupByCategory((catalog || []).filter((i) => !category || i.category === category), filter),
-    [catalog, filter, category],
-  );
-  const categories = useMemo(() => [...new Set((catalog || []).map((i) => i.category))], [catalog]);
-  const countFor = (integrationId) => connections.filter((c) => c.integration === integrationId).length;
+  const countFor = useCallback((integrationId) => connections.filter((c) => c.integration === integrationId).length, [connections]);
+  const categories = useMemo(() => {
+    const seen = new Map();
+    for (const i of catalog || []) seen.set(i.category, (seen.get(i.category) || 0) + 1);
+    return [...seen.entries()].map(([value, count]) => ({ value, count }));
+  }, [catalog]);
+
+  const visible = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return (catalog || []).filter((i) => (category === 'all' || i.category === category)
+      && (!liveOnly || i.liveCapable)
+      && (!connectedOnly || countFor(i.id) > 0)
+      && (!q || `${i.name} ${i.description} ${i.id}`.toLowerCase().includes(q)));
+  }, [catalog, category, liveOnly, connectedOnly, query, countFor]);
+
+  const grouped = useMemo(() => {
+    if (category !== 'all') return [{ label: labelFor(category), items: visible }];
+    const byCat = new Map();
+    for (const i of visible) {
+      if (!byCat.has(i.category)) byCat.set(i.category, []);
+      byCat.get(i.category).push(i);
+    }
+    return [...byCat.entries()].map(([cat, items]) => ({ label: labelFor(cat), items }));
+  }, [visible, category]);
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold text-slate-900 dark:text-white">Integrations</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            Every integration works against a per-workspace sandbox; the ones marked Live can call the real service.
-          </p>
+    <div>
+      <PageHeader
+        title="Integrations"
+        icon={Blocks}
+        description="Every integration works against a per-workspace sandbox. The ones marked Live can also call the real service once connected."
+        actions={<Button variant="secondary" icon={Link2} onClick={() => navigate(wp('/connections'))}>Manage connections</Button>}
+      />
+
+      <div className="mb-5 space-y-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative w-full max-w-xs">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-subtle" aria-hidden="true" />
+            <Input placeholder="Search integrations…" value={query} onChange={(e) => setQuery(e.target.value)} className="pl-8" aria-label="Search integrations" />
+          </div>
+          <div className="flex items-center gap-2">
+            <FilterPill active={liveOnly} onClick={() => setLiveOnly((v) => !v)} icon={Radio}>Live-capable</FilterPill>
+            <FilterPill active={connectedOnly} onClick={() => setConnectedOnly((v) => !v)} icon={CheckCircle2}>Connected</FilterPill>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <select
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            className="rounded-lg border border-slate-300 bg-white px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-            aria-label="Category"
-          >
-            <option value="">All categories</option>
-            {categories.map((c) => <option key={c} value={c}>{CATEGORY_LABELS[c] || c}</option>)}
-          </select>
-          <TextField placeholder="Search integrations…" value={filter} onChange={(e) => setFilter(e.target.value)} />
+        <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1" role="group" aria-label="Category">
+          <FilterPill active={category === 'all'} onClick={() => setCategory('all')} count={(catalog || []).length}>All</FilterPill>
+          {categories.map((c) => (
+            <FilterPill key={c.value} active={category === c.value} onClick={() => setCategory(c.value)} count={c.count}>
+              {labelFor(c.value)}
+            </FilterPill>
+          ))}
         </div>
       </div>
 
-      {catalogError && <ErrorText>{apiErrorMessage(catalogError, 'Could not load the integration catalogue')}</ErrorText>}
-      {!catalog && !catalogError && <SkeletonGrid count={6} />}
-      {catalog && !groups.length && <Card className="p-8 text-center text-sm text-slate-500">No integration matches “{filter}”.</Card>}
+      {catalogError && <p className="mb-4 text-sm text-danger">{apiErrorMessage(catalogError, 'Could not load the integration catalogue')}</p>}
+      {!catalog && !catalogError && <SkeletonGrid count={9} />}
+      {catalog && !visible.length && (
+        <EmptyState
+          icon={Search}
+          title="No integrations match"
+          body="Try a different search, or clear the filters."
+          action={<Button variant="secondary" onClick={() => { setQuery(''); setCategory('all'); setLiveOnly(false); setConnectedOnly(false); }}>Clear filters</Button>}
+        />
+      )}
 
-      {groups.map((group) => (
-        <section key={group.label}>
-          <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">{group.label}</h2>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {group.items.map((integration) => {
-              const count = countFor(integration.id);
-              return (
-                <Link
-                  key={integration.id}
-                  to={wp(`/integrations/${integration.id}`)}
-                  className="group rounded-xl border border-slate-200 bg-white p-4 transition hover:border-brand-400 hover:shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:hover:border-brand-600"
-                >
-                  <div className="flex items-start gap-3">
-                    <Tile integration={integration} />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-slate-900 dark:text-white">{integration.name}</span>
-                        {integration.liveCapable && <LiveBadge />}
-                      </div>
-                      <p className="mt-0.5 line-clamp-2 text-xs text-slate-500 dark:text-slate-400">
-                        {integration.id === 'mcp'
-                          ? 'Connect any MCP server — its tools become nodes, and agents can call them.'
-                          : integration.description}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-400">
-                    {integration.dynamicActions ? (
-                      <span>tools discovered per server</span>
-                    ) : (
-                      <span>{integration.actions.length} action{integration.actions.length === 1 ? '' : 's'}</span>
-                    )}
-                    {integration.triggers?.length > 0 && <span>{integration.triggers.length} trigger{integration.triggers.length === 1 ? '' : 's'}</span>}
-                    {count > 0 && <span className="text-brand-600 dark:text-brand-400">{count} connection{count === 1 ? '' : 's'}</span>}
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-        </section>
-      ))}
+      <div className="space-y-8">
+        {grouped.map((group) => (
+          <section key={group.label}>
+            <h2 className="mb-3 text-2xs font-semibold uppercase tracking-wider text-subtle">{group.label}</h2>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {group.items.map((integration) => (
+                <IntegrationCard key={integration.id} integration={integration} connected={countFor(integration.id)} to={wp(`/integrations/${integration.id}`)} />
+              ))}
+            </div>
+          </section>
+        ))}
+      </div>
     </div>
+  );
+}
+
+function IntegrationCard({ integration, connected, to }) {
+  const actionCount = integration.dynamicActions ? null : integration.actions.length;
+  const triggerCount = integration.triggers?.length || 0;
+  return (
+    <Link
+      to={to}
+      className="group flex flex-col rounded-card border border-default bg-surface p-4 transition-colors hover:border-strong hover:bg-bg-subtle/40 focus-visible:border-accent"
+    >
+      <div className="flex items-start gap-3">
+        <IntegrationLogo id={integration.id} name={integration.name} size="lg" />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-2">
+            <span className="truncate font-medium text-fg">{integration.name}</span>
+            {connected > 0 && (
+              <Badge tone="accent" dot size="xs">{connected} connected</Badge>
+            )}
+          </div>
+          <span className="text-xs text-subtle">{labelFor(integration.category)}</span>
+        </div>
+      </div>
+      <p className="mt-3 line-clamp-2 min-h-[2.5rem] text-sm text-muted">{describe(integration)}</p>
+      <div className="mt-4 flex flex-wrap items-center gap-1.5">
+        {integration.liveCapable
+          ? <Badge tone="success" icon={Radio} size="xs">Live</Badge>
+          : <Badge tone="neutral" icon={FlaskConical} size="xs">Sandbox only</Badge>}
+        {actionCount == null
+          ? <Badge tone="neutral" size="xs">Tools discovered per server</Badge>
+          : <Badge tone="neutral" size="xs">{actionCount} action{actionCount === 1 ? '' : 's'}</Badge>}
+        {triggerCount > 0 && <Badge tone="info" icon={Zap} size="xs">{triggerCount} trigger{triggerCount === 1 ? '' : 's'}</Badge>}
+        <ArrowRight className="ml-auto h-4 w-4 text-subtle opacity-0 transition-opacity group-hover:opacity-100" aria-hidden="true" />
+      </div>
+    </Link>
   );
 }
 
 // ------------------------------------------------------------------ detail
 
-function Tab({ active, onClick, children }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`border-b-2 px-3 py-2 text-sm font-medium transition ${
-        active ? 'border-brand-500 text-brand-600 dark:text-brand-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-200'
-      }`}
-    >
-      {children}
-    </button>
-  );
-}
-
 function IntegrationDetail({ id }) {
   const { catalog, catalogError, connections, workspaceId } = useCatalogAndConnections();
   const loadConnections = useIntegrationStore((s) => s.loadConnections);
   const wp = useWorkspacePath();
+  const canManage = useCan('connections:manage');
   const [tab, setTab] = useState('overview');
+  const [creating, setCreating] = useState(false);
   const integration = findIntegration(catalog, id);
+  useDocumentTitle(integration?.name || 'Integration');
+  useBreadcrumb(integration?.name);
+  const refresh = useCallback(() => loadConnections(workspaceId, { force: true }), [loadConnections, workspaceId]);
 
-  if (catalogError) return <ErrorText>{apiErrorMessage(catalogError, 'Could not load the integration catalogue')}</ErrorText>;
-  if (!catalog) return <p className="text-sm text-slate-500">Loading…</p>;
+  if (catalogError) return <p className="text-sm text-danger">{apiErrorMessage(catalogError, 'Could not load the integration catalogue')}</p>;
+  if (!catalog) return <SkeletonGrid count={2} className="grid gap-4 lg:grid-cols-2" />;
   if (!integration) {
     return (
-      <Card className="p-8 text-center text-sm text-slate-500">
-        No integration called “{id}”. <Link to={wp('/integrations')} className="text-brand-600 hover:underline">Back to integrations</Link>
-      </Card>
+      <EmptyState
+        icon={Blocks}
+        title={`No integration called “${id}”`}
+        body="It may have been removed from this server's catalogue."
+        action={<Link to={wp('/integrations')}><Button variant="secondary">Back to integrations</Button></Link>}
+      />
     );
   }
 
   const mine = connections.filter((c) => c.integration === id);
+  const Logo = () => <IntegrationLogo id={integration.id} name={integration.name} size="md" />;
+
   return (
-    <div className="space-y-4">
-      <Link to={wp('/integrations')} className="text-sm text-brand-600 hover:underline dark:text-brand-400">← Integrations</Link>
-      <div className="flex items-start gap-4">
-        <Tile integration={integration} size="h-12 w-12 text-2xl" />
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-semibold text-slate-900 dark:text-white">{integration.name}</h1>
-            {integration.liveCapable && <LiveBadge />}
-          </div>
-          <p className="text-sm text-slate-500 dark:text-slate-400">{integration.description}</p>
-        </div>
-      </div>
+    <div>
+      <PageHeader
+        breadcrumbs={[{ label: '← All integrations', to: wp('/integrations') }]}
+        title={integration.name}
+        icon={Logo}
+        description={describe(integration)}
+        meta={(
+          <>
+            {integration.liveCapable
+              ? <Badge tone="success" icon={Radio}>Live-capable</Badge>
+              : <Badge tone="neutral" icon={FlaskConical}>Sandbox only</Badge>}
+            <Badge tone="neutral">{labelFor(integration.category)}</Badge>
+          </>
+        )}
+        actions={(
+          <>
+            {id === 'knowledge' && <Link to={wp('/knowledge')}><Button variant="secondary" icon={BookOpen}>Documents</Button></Link>}
+            {canManage && <Button icon={Plus} onClick={() => setCreating(true)}>Connect {integration.name}</Button>}
+          </>
+        )}
+        tabs={(
+          <Tabs
+            value={tab}
+            onChange={setTab}
+            items={[
+              { value: 'overview', label: 'Overview' },
+              { value: 'connections', label: 'Connections', count: mine.length },
+              { value: 'sandbox', label: 'Sandbox data', icon: Database },
+            ]}
+          />
+        )}
+      />
 
-      <div className="flex gap-1 border-b border-slate-200 dark:border-slate-800">
-        <Tab active={tab === 'overview'} onClick={() => setTab('overview')}>Overview</Tab>
-        <Tab active={tab === 'connections'} onClick={() => setTab('connections')}>Connections ({mine.length})</Tab>
-        <Tab active={tab === 'sandbox'} onClick={() => setTab('sandbox')}>Sandbox data</Tab>
-        {id === 'knowledge' && <Tab active={false} onClick={() => {}}><Link to={wp('/knowledge')}>Documents ↗</Link></Tab>}
-      </div>
-
-      {tab === 'overview' && <Overview integration={integration} connections={mine} />}
-      {tab === 'connections' && (
-        <ConnectionsTab integration={integration} connections={mine} onChanged={() => loadConnections(workspaceId, { force: true })} />
-      )}
+      {tab === 'overview' && <Overview integration={integration} connections={mine} onConnect={canManage ? () => setCreating(true) : null} />}
+      {tab === 'connections' && <ConnectionsTab integration={integration} connections={mine} onChanged={refresh} onConnect={() => setCreating(true)} />}
       {tab === 'sandbox' && <SandboxTab integration={integration} />}
+
+      {creating && (
+        <ConnectionDialog
+          integration={integration}
+          connection={null}
+          onClose={() => setCreating(false)}
+          onSaved={() => { refresh(); }}
+        />
+      )}
     </div>
   );
 }
 
-function Overview({ integration, connections }) {
+function Overview({ integration, connections, onConnect }) {
   const canTest = useCan('triggers:manage');
   const [results, setResults] = useState({});
   const [connectionId, setConnectionId] = useState('');
+  const [openSample, setOpenSample] = useState(null);
 
   async function test(trigger) {
     setResults((r) => ({ ...r, [trigger.id]: { busy: true } }));
@@ -222,145 +296,244 @@ function Overview({ integration, connections }) {
   }
 
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
-      <Card className="p-4">
-        <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Actions</h3>
-        {integration.dynamicActions && (
-          <p className="text-xs text-slate-500 dark:text-slate-400">
+    <div className="grid items-start gap-4 lg:grid-cols-5">
+      <Card className="lg:col-span-3">
+        <CardHeader
+          title="Actions"
+          description={integration.dynamicActions ? 'Discovered from each connected server' : `${integration.actions.length} things a workflow node can do`}
+        />
+        {integration.dynamicActions ? (
+          <div className="p-4 text-sm text-muted">
             Connect any MCP server — a remote one by URL, or a local one your operator has allowlisted. Its tools are
             discovered when you connect, appear as nodes, and can be given to agents. Open a connection to see them.
-          </p>
+            {onConnect && <div className="mt-3"><Button size="sm" icon={Plus} onClick={onConnect}>Connect a server</Button></div>}
+          </div>
+        ) : (
+          <ul className="divide-y divide-default">
+            {integration.actions.map((action) => (
+              <li key={action.id} className="px-4 py-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-medium text-fg">{action.name}</span>
+                  <code className="font-mono text-2xs text-subtle">{integration.id}.{action.id}</code>
+                  {actionIsLive(action) ? <Badge tone="success" size="xs">Live</Badge> : <Badge tone="neutral" size="xs">Sandbox</Badge>}
+                  {action.sideEffect && <Badge tone="warning" size="xs">Side effect</Badge>}
+                  {action.outputSample && (
+                    <button
+                      type="button"
+                      onClick={() => setOpenSample(openSample === action.id ? null : action.id)}
+                      className="ml-auto text-xs font-medium text-accent hover:underline"
+                      aria-expanded={openSample === action.id}
+                    >
+                      {openSample === action.id ? 'Hide output' : 'Sample output'}
+                    </button>
+                  )}
+                </div>
+                {action.description && <p className="mt-0.5 text-sm text-muted">{action.description}</p>}
+                {openSample === action.id && (
+                  <pre className="mt-2 max-h-48 overflow-auto rounded-control border border-default bg-surface-sunken p-3 font-mono text-2xs text-muted">
+                    {JSON.stringify(action.outputSample, null, 2)}
+                  </pre>
+                )}
+              </li>
+            ))}
+          </ul>
         )}
-        <ul className="space-y-3">
-          {integration.actions.map((action) => (
-            <li key={action.id}>
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-slate-800 dark:text-slate-100">{action.name}</span>
-                <span className="font-mono text-[10px] text-slate-400">{integration.id}.{action.id}</span>
-                {actionIsLive(action) && <LiveBadge />}
-              </div>
-              {action.description && <p className="text-xs text-slate-500 dark:text-slate-400">{action.description}</p>}
-              {action.outputSample && (
-                <pre className="mt-1 max-h-32 overflow-auto rounded bg-slate-100 p-2 text-[10px] text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                  {JSON.stringify(action.outputSample, null, 2)}
-                </pre>
-              )}
-            </li>
-          ))}
-        </ul>
       </Card>
 
-      <Card className="p-4">
-        <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Triggers</h3>
-        {!integration.triggers?.length && <p className="text-sm text-slate-500">This integration has no triggers.</p>}
-        {integration.triggers?.length > 0 && canTest && connections.length > 0 && (
-          <label className="mb-3 block text-xs text-slate-500">
-            Test events as connection{' '}
-            <select value={connectionId} onChange={(e) => setConnectionId(e.target.value)} className="ml-1 rounded border border-slate-300 bg-white px-1.5 py-0.5 text-xs dark:border-slate-700 dark:bg-slate-800">
-              <option value="">(none)</option>
-              {connections.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          </label>
-        )}
-        <ul className="space-y-3">
-          {(integration.triggers || []).map((trigger) => (
-            <li key={trigger.id}>
-              <div className="flex items-center justify-between gap-2">
-                <div>
-                  <span className="text-sm font-medium text-slate-800 dark:text-slate-100">{trigger.name}</span>
-                  <span className="ml-2 font-mono text-[10px] text-slate-400">{integration.id}.{trigger.id}</span>
+      <div className="space-y-4 lg:col-span-2">
+        <Card>
+          <CardHeader title="Triggers" description={integration.triggers?.length ? 'Events that can start a workflow' : undefined} />
+          {!integration.triggers?.length ? (
+            <p className="p-4 text-sm text-muted">This integration has no triggers.</p>
+          ) : (
+            <>
+              {canTest && connections.length > 0 && (
+                <div className="border-b border-default px-4 py-3">
+                  <label className="mb-1.5 block text-xs font-medium text-muted" htmlFor="test-as-connection">Send test events as</label>
+                  <Select
+                    id="test-as-connection"
+                    size="sm"
+                    value={connectionId}
+                    onValueChange={setConnectionId}
+                    options={[{ value: '', label: 'No connection' }, ...connections.map((c) => ({ value: c.id, label: c.name }))]}
+                  />
                 </div>
-                {canTest && (
-                  <Button variant="secondary" className="!px-2 !py-1 text-xs" disabled={results[trigger.id]?.busy} onClick={() => test(trigger)}>
-                    Send test event
-                  </Button>
-                )}
-              </div>
-              {trigger.description && <p className="text-xs text-slate-500 dark:text-slate-400">{trigger.description}</p>}
-              {results[trigger.id]?.message && <p className="text-xs text-green-600 dark:text-green-400">{results[trigger.id].message}</p>}
-              {results[trigger.id]?.error && <p className="text-xs text-red-500">{results[trigger.id].error}</p>}
-            </li>
-          ))}
-        </ul>
-        {integration.triggers?.length > 0 && (
-          <p className="mt-3 text-[11px] text-slate-400">
-            Subscribe a workflow from its Trigger panel → External Event → “From an integration”.
-          </p>
-        )}
-      </Card>
+              )}
+              <ul className="divide-y divide-default">
+                {integration.triggers.map((trigger) => (
+                  <li key={trigger.id} className="px-4 py-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium text-fg">{trigger.name}</div>
+                        <code className="font-mono text-2xs text-subtle">{integration.id}.{trigger.id}</code>
+                      </div>
+                      {canTest && (
+                        <Button variant="secondary" size="xs" icon={Send} loading={results[trigger.id]?.busy} onClick={() => test(trigger)}>
+                          Send test event
+                        </Button>
+                      )}
+                    </div>
+                    {trigger.description && <p className="mt-1 text-sm text-muted">{trigger.description}</p>}
+                    {results[trigger.id]?.message && <p className="mt-1.5 text-xs text-success">{results[trigger.id].message}</p>}
+                    {results[trigger.id]?.error && <p className="mt-1.5 text-xs text-danger">{results[trigger.id].error}</p>}
+                  </li>
+                ))}
+              </ul>
+              <p className="border-t border-default px-4 py-2.5 text-xs text-subtle">
+                Subscribe a workflow from its Trigger panel → External Event → “From an integration”.
+              </p>
+            </>
+          )}
+        </Card>
+
+        <Card padded>
+          <h3 className="text-sm font-semibold text-fg">How it runs</h3>
+          <ul className="mt-2 space-y-2 text-sm text-muted">
+            <li className="flex gap-2"><FlaskConical className="mt-0.5 h-4 w-4 shrink-0 text-subtle" aria-hidden="true" />
+              Without a live connection, actions run against this workspace&rsquo;s sandbox — realistic data, nothing sent.</li>
+            {integration.liveCapable && (
+              <li className="flex gap-2"><Radio className="mt-0.5 h-4 w-4 shrink-0 text-success" aria-hidden="true" />
+                With a connection in Live mode, calls go to the real {integration.name} through the outbound guard.</li>
+            )}
+            {integration.hasInbound && (
+              <li className="flex gap-2"><Link2 className="mt-0.5 h-4 w-4 shrink-0 text-subtle" aria-hidden="true" />
+                Each connection gets an inbound webhook URL so {integration.name}&rsquo;s events can start workflows.</li>
+            )}
+          </ul>
+        </Card>
+      </div>
     </div>
   );
 }
 
-function ConnectionsTab({ integration, connections, onChanged }) {
+function ConnectionsTab({ integration, connections, onChanged, onConnect }) {
   const canManage = useCan('connections:manage');
+  const canUse = useCan('connections:use');
   const canTrigger = useCan('triggers:manage');
+  const catalog = useIntegrationStore((s) => s.catalog);
   const [editing, setEditing] = useState(null);
-  const [pollState, setPollState] = useState({});
+  const [testing, setTesting] = useState(null);
+  const [deleting, setDeleting] = useState(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   async function poll(connection) {
-    setPollState((s) => ({ ...s, [connection.id]: { busy: true } }));
     try {
       const r = await pollFeedNow(connection.id);
       const message = r.skipped ? `Not polled: ${r.skipped}${r.error ? ` (${r.error})` : ''}`
         : r.firstPoll ? `First poll: recorded ${r.fetched} item(s); new items fire from the next poll.`
           : `${r.fresh} new item(s), ${r.triggered.length} run(s) started.`;
-      setPollState((s) => ({ ...s, [connection.id]: { message } }));
+      toast(message, r.skipped ? 'info' : 'success');
     } catch (err) {
-      setPollState((s) => ({ ...s, [connection.id]: { error: apiErrorMessage(err, 'Poll failed') } }));
+      toast(apiErrorMessage(err, 'Poll failed'), 'error');
+    }
+  }
+
+  async function runTest(connection) {
+    setTesting(connection.id);
+    try {
+      const result = await testConnection(connection.id);
+      toast(result.status === 'ok' ? `${connection.name} works` : `${connection.name}: ${result.lastError || 'test failed'}`, result.status === 'ok' ? 'success' : 'error');
+      onChanged();
+    } catch (err) {
+      toast(apiErrorMessage(err, 'Test failed'), 'error');
+    } finally {
+      setTesting(null);
+    }
+  }
+
+  async function rename(connection) {
+    const name = await prompt({ title: 'Rename connection', label: 'Name', defaultValue: connection.name });
+    if (!name || name.trim() === connection.name) return;
+    try { await updateConnection(connection.id, { name: name.trim() }); onChanged(); } catch (err) { toast(apiErrorMessage(err, 'Rename failed'), 'error'); }
+  }
+
+  async function startDelete(connection) {
+    setDeleteError('');
+    const usage = await connectionUsage(connection.id).catch(() => []);
+    setDeleting({ connection, usage: Array.isArray(usage) ? usage : [] });
+  }
+
+  async function confirmDelete(force) {
+    setDeleteBusy(true);
+    try {
+      await deleteConnection(deleting.connection.id, { force });
+      setDeleting(null);
+      onChanged();
+    } catch (err) {
+      if (err?.response?.status === 409) {
+        setDeleting((d) => ({ ...d, usage: err.response.data?.usage || [] }));
+        setDeleteError('This connection is in use — review the list and confirm.');
+      } else setDeleteError(apiErrorMessage(err, 'Failed to delete connection'));
+    } finally {
+      setDeleteBusy(false);
     }
   }
 
   return (
-    <div className="space-y-3">
-      {canManage && (
-        <Button onClick={() => setEditing({ connection: null })}>+ Connect {integration.name}</Button>
-      )}
-      {!connections.length && <Card className="p-6 text-center text-sm text-slate-500">No {integration.name} connections in this workspace yet.</Card>}
-      {connections.map((c) => (
-        <Card key={c.id} className="flex flex-wrap items-center justify-between gap-3 p-3">
-          <div>
-            <div className="text-sm font-medium text-slate-800 dark:text-slate-100">{c.name}</div>
-            <div className="text-xs text-slate-500">
-              {c.mode === 'live' ? 'Live' : 'Sandbox'} · {c.status}
-              {c.lastError && <span className="text-red-500"> · {c.lastError}</span>}
-            </div>
-            {pollState[c.id]?.message && <div className="text-xs text-green-600 dark:text-green-400">{pollState[c.id].message}</div>}
-            {pollState[c.id]?.error && <div className="text-xs text-red-500">{pollState[c.id].error}</div>}
-          </div>
-          <div className="flex gap-2">
-            {integration.id === 'rss' && canTrigger && (
-              <Button variant="secondary" className="!px-2 !py-1 text-xs" disabled={pollState[c.id]?.busy} onClick={() => poll(c)}>Check feed now</Button>
-            )}
-            {canManage && (
-              <Button variant="secondary" className="!px-2 !py-1 text-xs" onClick={() => setEditing({ connection: c })}>
-                {integration.hasInbound ? 'Edit · inbound URL' : 'Edit'}
-              </Button>
-            )}
-          </div>
-        </Card>
-      ))}
+    <div>
+      <ConnectionsTable
+        connections={connections}
+        catalog={catalog}
+        busyId={testing}
+        canManage={canManage}
+        canUse={canUse}
+        hideIntegration
+        onEdit={(c) => setEditing({ connection: c })}
+        onTest={runTest}
+        onRename={rename}
+        onDelete={startDelete}
+        onPoll={canTrigger ? poll : undefined}
+        empty={{
+          icon: Link2,
+          title: `No ${integration.name} connections yet`,
+          body: integration.auth?.type === 'none'
+            ? `${integration.name} needs no credentials — nodes work without a connection. Add one to set a default mode or an inbound URL.`
+            : `Add one to store ${integration.name} credentials (encrypted) so nodes can call it live.`,
+          action: canManage ? <Button icon={Plus} onClick={onConnect}>Connect {integration.name}</Button> : null,
+        }}
+      />
       {editing && (
         <ConnectionDialog
           integration={integration}
           connection={editing.connection}
           onClose={() => setEditing(null)}
-          onSaved={() => { setEditing(null); onChanged(); }}
+          onSaved={() => onChanged()}
+        />
+      )}
+      {deleting && (
+        <ConnectionDeleteDialog
+          connection={deleting.connection}
+          usage={deleting.usage}
+          busy={deleteBusy}
+          error={deleteError}
+          onClose={() => setDeleting(null)}
+          onConfirm={confirmDelete}
         />
       )}
     </div>
   );
 }
 
+function docPreview(doc) {
+  if (!doc || typeof doc !== 'object') return String(doc ?? '');
+  const entries = Object.entries(doc).filter(([k]) => !k.startsWith('_')).slice(0, 4);
+  return entries.map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`).join(' · ');
+}
+
 function SandboxTab({ integration }) {
   const [state, setState] = useState({ loading: true });
   const [reloadKey, setReloadKey] = useState(0);
   const [resetting, setResetting] = useState(false);
+  const [collection, setCollection] = useState('all');
+  const [open, setOpen] = useState(null);
   const canReset = useCan('connections:manage');
+
   useEffect(() => {
     let cancelled = false;
+    setState((s) => ({ ...s, loading: true }));
     apiClient
-      .get(`/integrations/${integration.id}/sandbox`, { params: { limit: 25 } })
+      .get(`/integrations/${integration.id}/sandbox`, { params: { limit: 100 } })
       .then(({ data }) => !cancelled && setState({ data }))
       .catch((err) => !cancelled && setState({ error: err?.response?.status === 404 ? 'unavailable' : apiErrorMessage(err, 'Could not load sandbox data') }));
     return () => { cancelled = true; };
@@ -377,44 +550,72 @@ function SandboxTab({ integration }) {
     setResetting(true);
     try {
       const { data } = await apiClient.post(`/integrations/${integration.id}/sandbox/reset`);
-      useToastStore.getState().push(`Sandbox reset (${data.deleted} record${data.deleted === 1 ? '' : 's'} removed).`, 'success');
+      toast(`Sandbox reset (${data.deleted} record${data.deleted === 1 ? '' : 's'} removed).`, 'success');
       setReloadKey((k) => k + 1);
     } catch (err) {
-      useToastStore.getState().push(apiErrorMessage(err, 'Could not reset the sandbox'), 'error');
+      toast(apiErrorMessage(err, 'Could not reset the sandbox'), 'error');
     } finally {
       setResetting(false);
     }
   }
 
-  if (state.loading) return <p className="text-sm text-slate-500">Loading…</p>;
   if (state.error === 'unavailable') {
-    return <Card className="p-6 text-sm text-slate-500">Sandbox data browsing isn't available on this server yet.</Card>;
+    return <EmptyState icon={Database} title="Sandbox browsing isn't available" body="This server doesn't expose sandbox data yet." compact />;
   }
-  if (state.error) return <ErrorText>{state.error}</ErrorText>;
+  if (state.error) return <p className="text-sm text-danger">{state.error}</p>;
+
   const { collections = [], records = [] } = state.data || {};
+  const rows = collection === 'all' ? records : records.filter((r) => r.collection === collection);
+
   return (
     <div className="space-y-3">
-      <div className="flex items-start justify-between gap-3">
-        <p className="text-xs text-slate-500">
-          What this workspace's sandbox {integration.name} holds — every sandbox write lands here and later reads see it.
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-muted">
+          What this workspace&rsquo;s sandbox {integration.name} holds — every sandbox write lands here, and later reads see it.
         </p>
-        {canReset && collections.length > 0 && (
-          <button type="button" onClick={handleReset} disabled={resetting} className="shrink-0 text-xs font-medium text-red-600 hover:underline disabled:opacity-50">
-            {resetting ? 'Resetting…' : 'Reset sandbox'}
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          <IconButton icon={RefreshCw} label="Reload sandbox data" size="sm" onClick={() => setReloadKey((k) => k + 1)} />
+          {canReset && collections.length > 0 && (
+            <Button variant="danger-ghost" size="sm" icon={RotateCcw} loading={resetting} onClick={handleReset}>Reset sandbox</Button>
+          )}
+        </div>
       </div>
-      <div className="flex flex-wrap gap-2">
-        {collections.map((c) => (
-          <span key={c.name} className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300">{c.name} · {c.count}</span>
-        ))}
-        {!collections.length && <span className="text-sm text-slate-500">Empty — nothing has been written yet.</span>}
-      </div>
-      {records.length > 0 && (
-        <pre className="max-h-96 overflow-auto rounded-lg bg-slate-100 p-3 text-[11px] text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-          {JSON.stringify(records, null, 2)}
-        </pre>
+
+      {collections.length > 0 && (
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Collection">
+          <FilterPill active={collection === 'all'} onClick={() => setCollection('all')} count={records.length}>All</FilterPill>
+          {collections.map((c) => {
+            const short = c.name.startsWith(`${integration.id}.`) ? c.name.slice(integration.id.length + 1) : c.name;
+            return <FilterPill key={c.name} active={collection === short} onClick={() => setCollection(short)} count={c.count}>{short}</FilterPill>;
+          })}
+        </div>
       )}
+
+      <DataTable
+        dense
+        loading={state.loading}
+        rows={rows}
+        onRowClick={(r) => setOpen(r)}
+        columns={[
+          { key: 'collection', header: 'Collection', width: 160, cell: (r) => <code className="font-mono text-xs text-muted">{r.collection}</code> },
+          { key: 'doc', header: 'Record', cell: (r) => <span className="line-clamp-1 font-mono text-xs text-fg">{docPreview(r.doc)}</span> },
+          { key: 'updatedAt', header: 'Updated', width: 140, align: 'right', cell: (r) => <span className="text-xs text-subtle">{r.updatedAt ? formatRelativeTime(r.updatedAt) : '—'}</span> },
+        ]}
+        empty={{ icon: Database, title: 'Nothing here yet', body: 'Run a workflow that uses this integration in sandbox mode and its writes show up here.', compact: true }}
+      />
+
+      <Drawer
+        open={Boolean(open)}
+        onClose={() => setOpen(null)}
+        title={open ? `${open.collection} record` : ''}
+        description={open?.updatedAt ? `Updated ${formatRelativeTime(open.updatedAt)}${open.runId ? ' by a workflow run' : ''}` : undefined}
+      >
+        {open && (
+          <pre className="overflow-auto rounded-control border border-default bg-surface-sunken p-3 font-mono text-xs text-fg">
+            {JSON.stringify(open.doc, null, 2)}
+          </pre>
+        )}
+      </Drawer>
     </div>
   );
 }

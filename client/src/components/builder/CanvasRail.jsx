@@ -1,6 +1,5 @@
-import { useEffect, useRef } from 'react';
 import { Plus, Zap } from 'lucide-react';
-import NodePalette from '../NodePalette';
+import AddNodeMenu from '../canvas/AddNodeMenu';
 import { NODE_DRAG_TYPE, nodeLabel } from '../nodeCatalog';
 import NodeTypeIcon from '../ui/NodeTypeIcon';
 import Tooltip from '../ui/Tooltip';
@@ -15,38 +14,25 @@ const QUICK = ['agent', 'tool', 'condition', 'approval', 'transform'];
  * view's centre, or drag onto the canvas), and the Triggers flyout toggle.
  */
 export default function CanvasRail({ canEdit, menuOpen, onMenuOpenChange, onAdd, triggersOpen, onToggleTriggers }) {
-  const ref = useRef(null);
-
-  useEffect(() => {
-    if (!menuOpen) return undefined;
-    const onDown = (e) => { if (ref.current && !ref.current.contains(e.target)) onMenuOpenChange(false); };
-    const onKey = (e) => { if (e.key === 'Escape') onMenuOpenChange(false); };
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
-    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
-  }, [menuOpen, onMenuOpenChange]);
-
   const railButton = (active) => cx(
     'relative flex h-9 w-9 items-center justify-center rounded-md transition-colors',
     active ? 'bg-accent-subtle text-accent-subtle-fg' : 'text-muted hover:bg-bg-subtle hover:text-fg',
   );
 
   return (
-    <div ref={ref} data-testid="canvas-rail" className="relative z-20 flex w-[52px] shrink-0 flex-col items-center gap-1 border-r border-default bg-surface py-2">
+    <div data-testid="canvas-rail" className="relative z-20 flex w-[52px] shrink-0 flex-col items-center gap-1 border-r border-default bg-surface py-2">
       {canEdit && (
         <>
-          <Tooltip content="Add node (⌘/)" side="right">
+          <AddNodeMenu open={menuOpen} onOpenChange={onMenuOpenChange} onPick={onAdd} side="right">
             <button
               type="button"
               data-testid="add-node"
-              aria-label="Add node"
-              aria-expanded={menuOpen}
-              onClick={() => onMenuOpenChange(!menuOpen)}
+              aria-label="Add node (⌘/)"
               className={cx('flex h-9 w-9 items-center justify-center rounded-md shadow-sm transition-colors', menuOpen ? 'bg-accent-hover text-accent-fg' : 'bg-accent text-accent-fg hover:bg-accent-hover')}
             >
               <Plus className="h-4 w-4" aria-hidden="true" />
             </button>
-          </Tooltip>
+          </AddNodeMenu>
           <div className="my-1 h-px w-6 bg-[rgb(var(--border))]" aria-hidden="true" />
           {QUICK.map((type) => (
             <Tooltip key={type} content={`${nodeLabel(type)} — click or drag`} side="right">
@@ -71,12 +57,6 @@ export default function CanvasRail({ canEdit, menuOpen, onMenuOpenChange, onAdd,
           <Zap className="h-4 w-4" aria-hidden="true" />
         </button>
       </Tooltip>
-
-      {menuOpen && canEdit && (
-        <div className="absolute left-[calc(100%+6px)] top-2 w-[320px] animate-pop-in overflow-hidden rounded-card border border-default bg-surface-raised shadow-popover" data-testid="add-node-menu">
-          <NodePalette autoFocus onAdd={(type) => { onAdd(type); onMenuOpenChange(false); }} />
-        </div>
-      )}
     </div>
   );
 }

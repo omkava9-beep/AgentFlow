@@ -17,6 +17,7 @@ import { OpClient } from '../src/collab/opClient.js';
 import { getOpClient } from '../src/store/workflowStore.js';
 import { mapInputSchema, schemaError, jsonFieldError, toolToAction, annotationBadges, actionHasSideEffect } from '../src/utils/mcpSchema.js';
 import { mcpPayload, mcpFormError } from '../src/utils/mcpConnection.js';
+import { autoLayout, alignNodes, distributeNodes, edgeMidpoint, overlaps } from '../src/components/canvas/layout.js';
 
 let pass = 0, fail = 0;
 const check = (name, ok, detail = '') => {
@@ -860,6 +861,101 @@ console.log('\nApproval validation (spec/32)');
     edges: wired,
   });
   check('minApprovals over the assigned people → warning', tooMany.warnings.some((w) => w.id === 'approval-min-size:a'));
+}
+
+console.log('\n=== canvas: context-menu actions & layout ===\n');
+{
+  const S = () => useWorkflowStore.getState();
+  const n = (id, type, config = {}, position = { x: 0, y: 0 }) => ({ id, type, position, data: { config: { label: id, ...config } } });
+  const load = (nodes, edges = []) => S().loadWorkflow({ _id: 'wc', name: 'canvas', nodes, edges });
+
+  console.log('1. insert a node on an edge: source → new → target, one undo step');
+  {
+    load([n('s', 'start'), n('c', 'condition', { expression: 'true' }, { x: 300, y: 0 }), n('e', 'end', {}, { x: 900, y: 0 })],
+      [{ id: 'e1', source: 's', target: 'c' }, { id: 'e2', source: 'c', target: 'e', sourceHandle: 'true', label: 'true' }]);
+    const newId = S().insertNodeOnEdge('e2', 'agent', edgeMidpoint(S().edges.find((e) => e.id === 'e2'), new Map(S().nodes.map((x) => [x.id, x]))));
+    const into = S().edges.find((e) => e.target === newId);
+    const out = S().edges.find((e) => e.source === newId);
+    check('the old edge is gone', !S().edges.some((e) => e.id === 'e2'));
+    check('the incoming edge keeps the condition branch handle and label', into?.source === 'c' && into.sourceHandle === 'true' && into.label === 'true', JSON.stringify(into));
+    check('the new node feeds the old target', out?.target === 'e');
+    check('the new node is selected for configuring', S().selectedNodeId === newId);
+    S().undo();
+    check('one undo restores the original wiring', S().edges.some((e) => e.id === 'e2') && !S().nodes.some((x) => x.id === newId));
+  }
+
+  console.log('\n2. connect-to-add wires the new node to the handle it was dragged from');
+  {
+    load([n('s', 'start'), n('c', 'condition', { expression: 'true' }, { x: 300, y: 0 })], [{ id: 'e1', source: 's', target: 'c' }]);
+    const a = S().addNodeConnected('agent', { x: 600, y: 120 }, { nodeId: 'c', handleId: 'false', handleType: 'source' });
+    const edge = S().edges.find((e) => e.target === a);
+    check('dragged from the false handle → edge c(false) → new', edge?.source === 'c' && edge.sourceHandle === 'false' && edge.label === 'false', JSON.stringify(edge));
+    const b = S().addNodeConnected('transform', { x: 0, y: 200 }, { nodeId: 'c', handleType: 'target' });
+    check('dragged from a target handle → edge new → c', S().edges.some((e) => e.source === b && e.target === 'c'));
+    const st = S().addNodeConnected('start', { x: 0, y: 0 }, null);
+    check('a second Start is refused', st === null && /one Start/.test(S().lastError || ''));
+  }
+
+  console.log('\n3. duplicate / delete / cut / paste-at by id');
+  {
+    load([n('s', 'start'), n('a', 'agent', {}, { x: 300, y: 0 }), n('b', 'agent', {}, { x: 600, y: 0 })], [{ id: 'e1', source: 'a', target: 'b' }]);
+    S().duplicateNodes(['a', 'b']);
+    check('duplicate copies both nodes and the edge between them', S().nodes.length === 5 && S().edges.length === 2);
+    S().deleteNodes(S().nodes.filter((x) => x.selected).map((x) => x.id));
+    check('delete removes the duplicates', S().nodes.length === 3 && S().edges.length === 1);
+    S().cutNodes(['b']);
+    check('cut removes b and keeps it on the clipboard', !S().nodes.some((x) => x.id === 'b') && S().clipboard?.nodes?.[0]?.id === 'b');
+    S().pasteAt({ x: 1000, y: 500 });
+    const pasted = S().nodes.find((x) => x.selected);
+    check('paste-at lands at the requested point', pasted?.position.x === 1000 && pasted?.position.y === 500, JSON.stringify(pasted?.position));
+  }
+
+  console.log('\n4. disable / enable');
+  {
+    load([n('s', 'start'), n('t', 'transform', {}, { x: 300, y: 0 }), n('e', 'end', {}, { x: 600, y: 0 })]);
+    S().setNodesDisabled(['t', 's', 'e'], true);
+    check('the transform is disabled', S().nodes.find((x) => x.id === 't').data.config.disabled === true);
+    check('Start and End are never disabled', !S().nodes.find((x) => x.id === 's').data.config.disabled && !S().nodes.find((x) => x.id === 'e').data.config.disabled);
+    S().undo();
+    check('undo re-enables it', !S().nodes.find((x) => x.id === 't').data.config.disabled);
+  }
+
+  console.log('\n5. auto-layout');
+  {
+    const nodes = [
+      n('s', 'start', {}, { x: 500, y: 400 }), n('c', 'condition', {}, { x: 20, y: 20 }),
+      n('t', 'agent', {}, { x: 10, y: 10 }), n('f', 'agent', {}, { x: 12, y: 12 }),
+      n('j', 'merge', {}, { x: 15, y: 15 }), n('x', 'transform', {}, { x: 900, y: 0 }),
+    ];
+    const edges = [
+      { id: '1', source: 's', target: 'c' }, { id: '2', source: 'c', target: 'f', sourceHandle: 'false' },
+      { id: '3', source: 'c', target: 't', sourceHandle: 'true' }, { id: '4', source: 't', target: 'j' }, { id: '5', source: 'f', target: 'j' },
+    ];
+    const pos = autoLayout(nodes, edges);
+    const at = (id) => ({ ...nodes.find((x) => x.id === id), position: pos[id] });
+    check('every edge points right', edges.every((e) => pos[e.source].x < pos[e.target].x));
+    check('the true branch sits above the false branch', pos.t.y < pos.f.y, `${pos.t.y} vs ${pos.f.y}`);
+    const all = nodes.map((x) => at(x.id));
+    check('no two nodes overlap', all.every((a, i) => all.every((b, k) => k <= i || !overlaps(a, b))));
+    check('the unconnected node goes below the graph', pos.x.y > Math.max(pos.t.y, pos.f.y));
+    load(nodes, edges);
+    S().moveNodes(pos);
+    check('applied as one undo step', S().past.length === 1);
+  }
+
+  console.log('\n6. align & distribute');
+  {
+    const nodes = [n('a', 'agent', {}, { x: 0, y: 0 }), n('b', 'agent', {}, { x: 100, y: 37 }), n('c', 'agent', {}, { x: 700, y: 90 })];
+    const top = alignNodes(nodes, 'top');
+    check('align top puts every node on the highest y', Object.values(top).every((p) => p.y === 0));
+    const left = alignNodes(nodes, 'left');
+    check('align left puts every node on the leftmost x', Object.values(left).every((p) => p.x === 0));
+    const dist = distributeNodes(nodes, 'horizontal');
+    const gaps = [dist.b.x - (dist.a.x + 248), dist.c.x - (dist.b.x + 248)];
+    check('distribute gives equal horizontal gaps', Math.abs(gaps[0] - gaps[1]) <= 1, JSON.stringify(gaps));
+    check('the outermost nodes stay put', dist.a.x === 0 && dist.c.x === 700);
+    check('fewer than 3 nodes: nothing to distribute', Object.keys(distributeNodes(nodes.slice(0, 2), 'vertical')).length === 0);
+  }
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

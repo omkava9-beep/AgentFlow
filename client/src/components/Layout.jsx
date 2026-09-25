@@ -17,6 +17,7 @@ import { cx } from './ui/cx';
 import { useAuthStore } from '../store/authStore';
 import { useThemeStore } from '../store/themeStore';
 import { useWorkspaceStore, workspacePath, defaultWorkspace } from '../store/workspaceStore';
+import { useBreadcrumbStore } from '../store/breadcrumbStore';
 import { usePaletteStore } from '../store/paletteStore';
 import { usePendingApprovals } from '../hooks/usePendingApprovals';
 import { useCan } from '../hooks/useCan';
@@ -78,12 +79,18 @@ const SECTION_LABELS = [
   [/^\/status/, 'Status'],
 ];
 
-function crumbsFor(pathname, slug) {
+function crumbsFor(pathname, slug, label) {
   const rest = slug ? pathname.replace(new RegExp(`^/w/${slug}`), '') : pathname;
   if (pathname.startsWith('/outbox')) return ['Outbox'];
   if (pathname.startsWith('/notifications')) return ['Notifications'];
   const hit = SECTION_LABELS.find(([re]) => re.test(rest));
-  return hit ? hit.slice(1) : [];
+  if (!hit) return [];
+  const crumbs = hit.slice(1);
+  if (!label) return crumbs;
+  // The page named itself (useBreadcrumb): show that instead of the generic tail.
+  if (/^\/workflows\/[^/]+\/runs/.test(rest)) return ['Workflows', label, 'Run history'];
+  if (crumbs.length > 1) return [crumbs[0], label];
+  return crumbs;
 }
 
 function NavItem({ item, to, collapsed, count, onNavigate }) {
@@ -99,16 +106,16 @@ function NavItem({ item, to, collapsed, count, onNavigate }) {
           'group flex h-8 items-center gap-2.5 rounded-md px-2 text-sm transition-colors',
           collapsed && 'justify-center px-0',
           isActive || extra
-            ? 'bg-surface font-medium text-fg shadow-sm ring-1 ring-zinc-900/5 dark:bg-zinc-800/80 dark:ring-white/5'
+            ? 'bg-surface font-medium text-fg shadow-sm ring-1 ring-[rgb(var(--border))]  dark:ring-white/5'
             : 'text-muted hover:bg-zinc-900/[0.04] hover:text-fg dark:hover:bg-white/[0.04]',
         )
       }
     >
       <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
-      {!collapsed && <span className="truncate">{item.label}</span>}
+      {collapsed ? <span className="sr-only">{item.label}</span> : <span className="truncate">{item.label}</span>}
       {count > 0 && (
         collapsed
-          ? <span className="absolute right-1.5 top-1 h-2 w-2 rounded-full bg-warning" aria-label={`${count} waiting`} />
+          ? <span className="absolute -right-0.5 -top-0.5 min-w-[16px] rounded-full bg-warning px-1 text-center text-[9px] font-semibold leading-4 text-white ring-2 ring-bg-subtle">{count}</span>
           : <span className="ml-auto rounded-full bg-warning-subtle px-1.5 text-2xs font-semibold tabular-nums text-warning-subtle-fg" title={`${count} waiting on you`}>{count}</span>
       )}
     </NavLink>
@@ -139,7 +146,7 @@ function Sidebar({ slug, collapsed, onToggle, onNavigate, mobile = false }) {
     <aside
       data-testid="app-sidebar"
       className={cx(
-        'flex h-full shrink-0 flex-col border-r border-default bg-bg-subtle/60 dark:bg-zinc-950',
+        'flex h-full shrink-0 flex-col border-r border-default bg-bg-subtle/60 ',
         collapsed ? 'w-16' : 'w-[var(--sidebar-w)]',
       )}
     >
@@ -244,9 +251,12 @@ function TopBar({ slug, onOpenMobileNav }) {
   const location = useLocation();
   const user = useAuthStore((s) => s.user);
   const { theme, toggle } = useThemeStore();
-  const workspaceName = useWorkspaceStore((s) => s.current?.name);
+  // Outside a workspace route (Outbox, Notifications) fall back to the default
+  // workspace, the same one the nav links point at.
+  const workspaceName = useWorkspaceStore((s) => (s.current || defaultWorkspace(s.workspaces))?.name);
+  const crumbLabel = useBreadcrumbStore((s) => s.label);
   const openPalette = usePaletteStore((s) => s.openPalette);
-  const crumbs = crumbsFor(location.pathname, slug);
+  const crumbs = crumbsFor(location.pathname, slug, crumbLabel);
 
   return (
     <header className="sticky top-0 z-20 flex h-[var(--topbar-h)] shrink-0 items-center gap-3 border-b border-default bg-surface/80 px-4 backdrop-blur supports-[backdrop-filter]:bg-surface/70">
@@ -255,7 +265,7 @@ function TopBar({ slug, onOpenMobileNav }) {
         {workspaceName && <span className="truncate text-subtle">{workspaceName}</span>}
         {crumbs.map((c, i) => (
           <span key={`${c}-${i}`} className="flex min-w-0 items-center gap-1.5">
-            <ChevronRight className="h-3.5 w-3.5 shrink-0 text-subtle" aria-hidden="true" />
+            {(workspaceName || i > 0) && <ChevronRight className="h-3.5 w-3.5 shrink-0 text-subtle" aria-hidden="true" />}
             <span className={cx('truncate', i === crumbs.length - 1 ? 'font-medium text-fg' : 'text-subtle')}>{c}</span>
           </span>
         ))}
@@ -316,7 +326,7 @@ export default function Layout() {
       </div>
       {mobileOpen && (
         <div className="fixed inset-0 z-40 flex lg:hidden">
-          <div className="absolute inset-0 animate-fade-in bg-zinc-950/40" onClick={() => setMobileOpen(false)} aria-hidden="true" />
+          <div className="absolute inset-0 animate-fade-in bg-surface-sunken/40" onClick={() => setMobileOpen(false)} aria-hidden="true" />
           <div className="relative animate-slide-in-right bg-surface">
             <Sidebar slug={slug} collapsed={false} mobile onNavigate={() => setMobileOpen(false)} />
           </div>

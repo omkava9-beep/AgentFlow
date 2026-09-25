@@ -1,24 +1,37 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { PlayCircle, Search, X, ListFilter } from 'lucide-react';
 import { searchRuns } from '../api/runs';
 import { apiErrorMessage } from '../api/client';
 import { on } from '../realtime/socket';
 import { useWorkspacePath } from '../hooks/useWorkspacePath';
 import { useWorkspaceWorkflows } from '../hooks/useWorkspaceWorkflows';
 import { useWorkspaceStore } from '../store/workspaceStore';
-import { Card, ErrorText, StatusBadge, Button } from '../components/ui';
+import {
+  PageHeader, DataTable, StatusBadge, StatusIcon, Button, Input, Select, Combobox, MultiSelect, Segmented,
+  DateRangePicker, Toolbar, cx,
+} from '../components/ui';
+import { ErrorText } from '../components/ui.jsx';
 import TriggerBadge from '../components/TriggerBadge';
 import VersionBadge from '../components/versions/VersionBadge';
-import { formatDuration } from '../utils/format';
+import { RelativeTime, Duration, NodeProgress, LineageIcons, TriggeredBy } from '../components/runs/RunBits';
+import { shortId } from '../utils/runIds';
 
-const STATUSES = ['success', 'failed', 'cancelled', 'running', 'waiting', 'pending'];
-const TRIGGERS = ['manual', 'schedule', 'webhook', 'event', 'api'];
+const STATUSES = ['success', 'failed', 'running', 'waiting', 'cancelled', 'pending'];
+const STATUS_LABELS = { success: 'Succeeded', failed: 'Failed', running: 'Running', waiting: 'Waiting', cancelled: 'Cancelled', pending: 'Pending' };
+const TRIGGERS = [
+  { value: 'manual', label: 'Manual' },
+  { value: 'schedule', label: 'Scheduled' },
+  { value: 'webhook', label: 'Webhook' },
+  { value: 'event', label: 'Event' },
+  { value: 'api', label: 'API' },
+];
 const RANGES = [
-  { id: '', label: 'All time' },
-  { id: '24h', label: '24 h', ms: 24 * 3600_000 },
-  { id: '7d', label: '7 d', ms: 7 * 86400_000 },
-  { id: '30d', label: '30 d', ms: 30 * 86400_000 },
-  { id: 'custom', label: 'Custom' },
+  { value: 'all', label: 'All time' },
+  { value: '24h', label: '24h', ms: 24 * 3600_000 },
+  { value: '7d', label: '7d', ms: 7 * 86400_000 },
+  { value: '30d', label: '30d', ms: 30 * 86400_000 },
+  { value: 'custom', label: 'Custom' },
 ];
 
 /** The API query for the filters in the URL (spec/35 §3: a filtered view is a shareable link). */
@@ -30,7 +43,7 @@ function queryFrom(params) {
   // Half-typed values would only earn a 400: send them once they're valid.
   if (/^[0-9a-f]{4,24}$/i.test(params.get('q') || '')) q.q = params.get('q');
   if (/^(\d+|draft)$/.test(params.get('version') || '')) q.version = params.get('version');
-  const range = RANGES.find((r) => r.id === params.get('range'));
+  const range = RANGES.find((r) => r.value === params.get('range'));
   if (range?.ms) q.from = new Date(Date.now() - range.ms).toISOString();
   if (params.get('range') === 'custom') {
     if (params.get('from')) q.from = params.get('from');
@@ -39,52 +52,66 @@ function queryFrom(params) {
   return q;
 }
 
-function Chip({ active, onClick, children }) {
+/** A multi-select status pill (quick filter). */
+function StatusPill({ status, active, onClick }) {
   return (
     <button
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className={`rounded-full border px-2.5 py-0.5 text-xs capitalize transition ${
-        active
-          ? 'border-brand-500 bg-brand-500 text-white'
-          : 'border-slate-200 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800'
-      }`}
+      className={cx(
+        'inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium transition-colors',
+        active ? 'border-accent bg-accent-subtle text-accent-subtle-fg' : 'border-default bg-surface text-muted hover:border-strong hover:text-fg',
+      )}
     >
-      {children}
+      <StatusIcon status={status} className="h-3.5 w-3.5" />
+      {STATUS_LABELS[status]}
     </button>
   );
 }
 
 /**
  * Every run in the workspace, filterable and live (spec/35 §3, §5). With
- * `fixedWorkflowId` it's one workflow's history.
+ * `fixedWorkflowId` it's one workflow's history (no page header, no workflow filter).
  */
 export default function Runs({ fixedWorkflowId = null }) {
   const wp = useWorkspacePath();
+  const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const { workflows } = useWorkspaceWorkflows();
   const workspaceId = useWorkspaceStore((s) => s.current?.id);
   const [items, setItems] = useState([]);
   const [nextCursor, setNextCursor] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState('');
+  const [idDraft, setIdDraft] = useState(params.get('q') || '');
 
   const query = useMemo(() => ({ ...queryFrom(params), ...(fixedWorkflowId && { workflowId: fixedWorkflowId }) }), [params, fixedWorkflowId]);
   const queryKey = JSON.stringify(query);
 
-  const setParam = (key, value) => {
-    const next = new URLSearchParams(params);
-    if (value === '' || value == null) next.delete(key);
-    else next.set(key, value);
-    setParams(next, { replace: true });
+  const setParam = useCallback((key, value) => {
+    setParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (value === '' || value == null || (Array.isArray(value) && !value.length)) next.delete(key);
+      else next.set(key, Array.isArray(value) ? value.join(',') : value);
+      return next;
+    }, { replace: true });
+  }, [setParams]);
+  const listParam = (key) => (params.get(key) || '').split(',').filter(Boolean);
+  const toggleStatus = (value) => {
+    const current = listParam('status');
+    setParam('status', current.includes(value) ? current.filter((v) => v !== value) : [...current, value]);
   };
-  const toggleList = (key, value) => {
-    const current = (params.get(key) || '').split(',').filter(Boolean);
-    const next = current.includes(value) ? current.filter((v) => v !== value) : [...current, value];
-    setParam(key, next.join(','));
-  };
-  const isOn = (key, value) => (params.get(key) || '').split(',').includes(value);
+
+  // The run-id box writes to the URL once it's a usable prefix (or cleared).
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const v = idDraft.trim();
+      if (!v || /^[0-9a-f]{4,24}$/i.test(v.replace(/^#/, ''))) setParam('q', v.replace(/^#/, ''));
+    }, 250);
+    return () => clearTimeout(t);
+  }, [idDraft, setParam]);
 
   // Filters changed → start again from the top; a cursor only encodes position.
   useEffect(() => {
@@ -104,6 +131,7 @@ export default function Runs({ fixedWorkflowId = null }) {
 
   async function loadMore() {
     if (!nextCursor) return;
+    setLoadingMore(true);
     try {
       const page = await searchRuns({ ...query, limit: 25, cursor: nextCursor });
       setItems((prev) => {
@@ -113,6 +141,8 @@ export default function Runs({ fixedWorkflowId = null }) {
       setNextCursor(page.nextCursor);
     } catch (err) {
       setError(apiErrorMessage(err, 'Failed to load more runs'));
+    } finally {
+      setLoadingMore(false);
     }
   }
 
@@ -143,119 +173,139 @@ export default function Runs({ fixedWorkflowId = null }) {
         }
         return prev.map((r) => (r.id === p.runId ? { ...r, status: p.status, finishedAt: p.finishedAt ?? r.finishedAt } : r));
       });
+      // A finished run's counts/duration only exist server-side; refresh them.
+      if (['success', 'failed', 'cancelled'].includes(p.status)) refreshFirstPage();
     });
     return () => { off(); clearTimeout(refreshTimer.current); };
   }, [workspaceId, refreshFirstPage]);
 
   const range = params.get('range') || '';
+  const maxVersion = Math.max(0, ...(workflows || [])
+    .filter((w) => !fixedWorkflowId || w._id === fixedWorkflowId)
+    .map((w) => w.publishedVersion || 0));
+  const versionOptions = [
+    { value: '', label: 'Any version' },
+    { value: 'draft', label: 'Draft test runs' },
+    ...Array.from({ length: maxVersion }, (_, i) => ({ value: String(maxVersion - i), label: `v${maxVersion - i}` })),
+  ];
+  const activeFilters = ['workflowId', 'status', 'trigger', 'version', 'range', 'q'].filter((k) => params.get(k) && !(k === 'workflowId' && fixedWorkflowId));
+
+  const columns = [
+    { key: 'status', header: 'Status', width: 128, cell: (r) => <StatusBadge status={r.failReason === 'interrupted' ? 'interrupted' : r.status} /> },
+    {
+      key: 'id', header: 'Run', width: 120,
+      cell: (r) => (
+        <span className="inline-flex items-center gap-1.5">
+          <Link to={wp(`/runs/${r.id}`)} onClick={(e) => e.stopPropagation()} className="font-mono text-xs text-accent hover:underline">{shortId(r.id)}</Link>
+          <LineageIcons run={r} />
+        </span>
+      ),
+    },
+    ...(!fixedWorkflowId ? [{
+      key: 'workflow', header: 'Workflow',
+      cell: (r) => (
+        <Link to={wp(`/workflows/${r.workflowId}`)} onClick={(e) => e.stopPropagation()} className="block max-w-[14rem] truncate font-medium text-fg hover:underline">
+          {r.workflowName}
+        </Link>
+      ),
+    }] : []),
+    { key: 'trigger', header: 'Trigger', className: 'whitespace-nowrap', cell: (r) => <TriggerBadge trigger={r.trigger} test={r.test} /> },
+    { key: 'version', header: 'Version', cell: (r) => (r.isDraft || r.versionNumber ? <VersionBadge isDraft={r.isDraft} versionNumber={r.versionNumber} /> : <span className="text-subtle">—</span>) },
+    { key: 'started', header: 'Started', className: 'whitespace-nowrap', cell: (r) => <RelativeTime value={r.startedAt || r.createdAt} className="text-muted" /> },
+    { key: 'duration', header: 'Duration', align: 'right', className: 'whitespace-nowrap', cell: (r) => <Duration ms={r.durationMs} running={['running', 'pending'].includes(r.status)} startedAt={r.startedAt} /> },
+    { key: 'nodes', header: 'Nodes', cell: (r) => <NodeProgress counts={r.nodeCounts} maxAttempts={r.maxAttempts} /> },
+    { key: 'by', header: '', width: 44, align: 'right', cell: (r) => <TriggeredBy run={r} /> },
+  ];
+
+  const filters = (
+    <div className="mb-4 space-y-3">
+      <Toolbar className="flex-wrap gap-2">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-subtle" aria-hidden="true" />
+          <Input size="sm" value={idDraft} onChange={(e) => setIdDraft(e.target.value)} placeholder="Run id…" aria-label="Run id prefix" className="w-36 pl-8 font-mono" />
+        </div>
+        {!fixedWorkflowId && (
+          <div className="w-56"><Combobox
+            size="sm"
+            placeholder="All workflows"
+            searchPlaceholder="Find a workflow…"
+            aria-label="Workflow"
+            clearable
+            value={params.get('workflowId') || ''}
+            onChange={(v) => setParam('workflowId', v || '')}
+            options={(workflows || []).map((w) => ({ value: w._id, label: w.name }))}
+          /></div>
+        )}
+        <div className="w-44"><MultiSelect
+          size="sm"
+          placeholder="Any trigger"
+          aria-label="Trigger"
+          value={listParam('trigger')}
+          onChange={(v) => setParam('trigger', v)}
+          options={TRIGGERS}
+        /></div>
+         <div className="w-40"><Select size="sm" aria-label="Version" value={params.get('version') || ''} onValueChange={(v) => setParam('version', v)} options={versionOptions} /></div>
+        <Segmented size="sm" aria-label="Time range" value={range || 'all'} onChange={(v) => setParam('range', v === 'all' ? '' : v)} items={RANGES.map(({ value, label }) => ({ value, label }))} />
+        {range === 'custom' && (
+          <div className="w-60"><DateRangePicker
+            aria-label="Custom date range"
+            value={{ from: params.get('from') || '', to: params.get('to') || '' }}
+            onChange={({ from, to }) => { setParam('from', from); setParam('to', to); }}
+          /></div>
+        )}
+        {activeFilters.length > 0 && (
+          <Button
+            size="sm"
+            variant="ghost"
+            icon={X}
+            onClick={() => { setIdDraft(''); setParams(new URLSearchParams(), { replace: true }); }}
+          >
+            Clear filters
+          </Button>
+        )}
+      </Toolbar>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <ListFilter className="mr-0.5 h-3.5 w-3.5 text-subtle" aria-hidden="true" />
+        {STATUSES.map((s) => <StatusPill key={s} status={s} active={listParam('status').includes(s)} onClick={() => toggleStatus(s)} />)}
+      </div>
+    </div>
+  );
 
   return (
     <div>
       {!fixedWorkflowId && (
-        <div className="mb-4">
-          <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">Runs</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">Every run in this workspace. Filters live in the URL, so a view can be shared.</p>
-        </div>
+        <PageHeader
+          icon={PlayCircle}
+          title="Runs"
+          description="Every run in this workspace, live. Filters live in the URL, so a view can be shared."
+        />
       )}
-
-      <Card className="mb-4 space-y-3 p-3">
-        <div className="flex flex-wrap items-center gap-2">
-          {!fixedWorkflowId && (
-            <select
-              value={params.get('workflowId') || ''}
-              onChange={(e) => setParam('workflowId', e.target.value)}
-              className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
-              aria-label="Workflow"
-            >
-              <option value="">All workflows</option>
-              {(workflows || []).map((w) => <option key={w._id} value={w._id}>{w.name}</option>)}
-            </select>
-          )}
-          <input
-            value={params.get('q') || ''}
-            onChange={(e) => setParam('q', e.target.value.trim())}
-            placeholder="Run id…"
-            className="w-28 rounded-lg border border-slate-200 bg-white px-2 py-1 font-mono text-xs dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
-            aria-label="Run id prefix"
-          />
-          <input
-            value={params.get('version') || ''}
-            onChange={(e) => setParam('version', e.target.value.trim())}
-            placeholder="Version (3 or draft)"
-            className="w-36 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
-            aria-label="Version"
-          />
-          <div className="flex items-center gap-1">
-            {RANGES.map((r) => <Chip key={r.id} active={range === r.id} onClick={() => setParam('range', r.id)}>{r.label}</Chip>)}
-          </div>
-          {range === 'custom' && (
-            <span className="flex items-center gap-1 text-xs text-slate-500">
-              <input type="date" value={params.get('from') || ''} onChange={(e) => setParam('from', e.target.value)} className="rounded border border-slate-200 bg-white px-1 py-0.5 dark:border-slate-700 dark:bg-slate-900" />
-              –
-              <input type="date" value={params.get('to') || ''} onChange={(e) => setParam('to', e.target.value)} className="rounded border border-slate-200 bg-white px-1 py-0.5 dark:border-slate-700 dark:bg-slate-900" />
-            </span>
-          )}
-        </div>
-        <div className="flex flex-wrap items-center gap-1">
-          <span className="mr-1 text-[10px] uppercase tracking-wide text-slate-400">Status</span>
-          {STATUSES.map((s) => <Chip key={s} active={isOn('status', s)} onClick={() => toggleList('status', s)}>{s}</Chip>)}
-          <span className="ml-3 mr-1 text-[10px] uppercase tracking-wide text-slate-400">Trigger</span>
-          {TRIGGERS.map((t) => <Chip key={t} active={isOn('trigger', t)} onClick={() => toggleList('trigger', t)}>{t}</Chip>)}
-        </div>
-      </Card>
-
+      {filters}
       <ErrorText>{error}</ErrorText>
-
-      {loading && !items.length ? (
-        <p className="text-sm text-slate-500 dark:text-slate-400">Loading…</p>
-      ) : !items.length ? (
-        <Card className="p-8 text-center text-sm text-slate-500 dark:text-slate-400">No runs match these filters.</Card>
-      ) : (
-        <Card className="overflow-hidden p-0">
-          <table className="w-full text-left text-sm">
-            <thead className="border-b border-slate-200 bg-slate-50 text-[10px] uppercase tracking-wide text-slate-400 dark:border-slate-800 dark:bg-slate-900">
-              <tr>
-                <th className="px-3 py-2">Status</th>
-                <th className="px-3 py-2">Run</th>
-                {!fixedWorkflowId && <th className="px-3 py-2">Workflow</th>}
-                <th className="px-3 py-2">Trigger</th>
-                <th className="px-3 py-2">Version</th>
-                <th className="px-3 py-2">Started</th>
-                <th className="px-3 py-2 text-right">Duration</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((r) => (
-                <tr key={r.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900/60">
-                  <td className="px-3 py-2"><StatusBadge status={r.status} /></td>
-                  <td className="px-3 py-2">
-                    <Link to={wp(`/runs/${r.id}`)} className="font-mono text-xs text-brand-600 hover:underline dark:text-brand-400">#{r.id.slice(-6)}</Link>
-                    {r.rerunOf && <span className="ml-1 text-[10px] text-slate-400" title="Re-run">↻</span>}
-                    {r.retryOf && <span className="ml-1 text-[10px] text-slate-400" title="Retry from failed">⟲</span>}
-                    {r.childCount > 0 && <span className="ml-1 text-[10px] text-slate-400" title="Child runs">↗{r.childCount}</span>}
-                    {r.failReason === 'interrupted' && <span className="ml-1 text-[10px] text-red-500">interrupted</span>}
-                  </td>
-                  {!fixedWorkflowId && (
-                    <td className="px-3 py-2 text-slate-600 dark:text-slate-300">
-                      <Link to={wp(`/workflows/${r.workflowId}`)} className="hover:underline">{r.workflowName}</Link>
-                    </td>
-                  )}
-                  <td className="px-3 py-2"><TriggerBadge trigger={r.trigger} test={r.test} /></td>
-                  <td className="px-3 py-2"><VersionBadge isDraft={r.isDraft} versionNumber={r.versionNumber} /></td>
-                  <td className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">{new Date(r.startedAt || r.createdAt).toLocaleString()}</td>
-                  <td className="px-3 py-2 text-right text-xs text-slate-500 dark:text-slate-400">{formatDuration(r.durationMs)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Card>
-      )}
-
-      {nextCursor && (
-        <div className="mt-3 text-center">
-          <Button variant="secondary" onClick={loadMore}>Load more</Button>
-        </div>
-      )}
+      <DataTable
+        dense
+        columns={columns}
+        rows={items}
+        loading={loading && !items.length}
+        onRowClick={(r) => navigate(wp(`/runs/${r.id}`))}
+        rowClassName={(r) => (r.status === 'failed' ? 'bg-danger-subtle/20' : '')}
+        empty={{
+          icon: PlayCircle,
+          title: activeFilters.length ? 'No runs match these filters' : 'No runs yet',
+          body: activeFilters.length
+            ? 'Try a wider time range or clear the filters.'
+            : 'Test-run a workflow from the Builder, or publish it so its triggers can start runs.',
+          action: activeFilters.length
+            ? <Button size="sm" variant="secondary" onClick={() => { setIdDraft(''); setParams(new URLSearchParams(), { replace: true }); }}>Clear filters</Button>
+            : null,
+        }}
+        footer={items.length > 0 ? (
+          <div className="flex items-center justify-between text-xs text-subtle">
+            <span className="tabular-nums">{items.length} run{items.length === 1 ? '' : 's'}{nextCursor ? ' loaded' : ''}</span>
+            {nextCursor && <Button size="sm" variant="secondary" loading={loadingMore} onClick={loadMore}>Load more</Button>}
+          </div>
+        ) : null}
+      />
     </div>
   );
 }

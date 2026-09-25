@@ -1,3 +1,4 @@
+import Tooltip from '../ui/Tooltip';
 /**
  * Horizontal bars for magnitude comparison, in one hue — colour isn't carrying
  * identity here, the label is, so a categorical palette would be noise.
@@ -8,7 +9,7 @@
  */
 export default function CategoryBars({ data, emptyMessage = 'No data yet.' }) {
   if (!data?.length) {
-    return <p className="py-6 text-center text-xs text-slate-400">{emptyMessage}</p>;
+    return <p className="py-6 text-center text-xs text-subtle">{emptyMessage}</p>;
   }
 
   const max = Math.max(...data.map((d) => d.count));
@@ -17,10 +18,10 @@ export default function CategoryBars({ data, emptyMessage = 'No data yet.' }) {
     <ul className="space-y-2">
       {data.map((item) => (
         <li key={item.label} className="grid grid-cols-[7.5rem_1fr_2.5rem] items-center gap-2">
-          <span className="truncate text-xs text-slate-600 dark:text-slate-300" title={item.label}>
+          <Tooltip content={item.label}><span className="truncate text-xs text-muted">
             {item.label}
-          </span>
-          <span className="h-2.5 w-full overflow-hidden rounded-sm bg-slate-100 dark:bg-slate-800">
+          </span></Tooltip>
+          <span className="h-2.5 w-full overflow-hidden rounded-sm bg-bg-subtle">
             <span
               className="block h-full rounded-r-[4px]"
               style={{
@@ -29,7 +30,7 @@ export default function CategoryBars({ data, emptyMessage = 'No data yet.' }) {
               }}
             />
           </span>
-          <span className="text-right text-xs tabular-nums text-slate-500 dark:text-slate-400">{item.count}</span>
+          <span className="text-right text-xs tabular-nums text-muted">{item.count}</span>
         </li>
       ))}
     </ul>

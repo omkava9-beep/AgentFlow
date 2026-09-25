@@ -303,6 +303,8 @@ export async function listApprovals({ workspaceId, userId, status = 'pending', a
         workflowId: String(run.workflowId),
         workflowName: names.get(String(run.workflowId)) || 'Workflow',
         runStatus: run.status,
+        trigger: run.trigger,
+        runCreatedAt: run.createdAt,
         title: a.title,
         description: a.description,
         input: a.showInput ? a.input : undefined,

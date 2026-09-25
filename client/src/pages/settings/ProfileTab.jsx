@@ -3,8 +3,9 @@ import { updateMe, changePassword, revokeOtherSessions } from '../../api/auth';
 import { apiErrorMessage } from '../../api/client';
 import { useAuthStore } from '../../store/authStore';
 import { useToastStore } from '../../store/toastStore';
-import { confirm } from '../../components/ui/confirm';
-import { Card, Button, TextField, ErrorText } from '../../components/ui';
+import { LogOut } from 'lucide-react';
+import { Avatar, Button, Field, Input, confirm } from '../../components/ui/index';
+import SettingsCard from './SettingsCard';
 
 const MIN_PASSWORD = 6;
 
@@ -16,8 +17,14 @@ export default function ProfileTab() {
   const user = useAuthStore((s) => s.user);
   if (!user) return null;
   return (
-    <div className="max-w-2xl space-y-6">
-      <p className="text-sm text-slate-500 dark:text-slate-400">Your profile applies across all your workspaces.</p>
+    <div className="max-w-3xl space-y-6">
+      <div className="flex items-center gap-3">
+        <Avatar name={user.name} email={user.email} size="lg" />
+        <div className="min-w-0">
+          <p className="truncate text-base font-semibold text-fg">{user.name || user.email}</p>
+          <p className="text-sm text-muted">Your profile applies across all your workspaces.</p>
+        </div>
+      </div>
       <NameCard user={user} />
       <PasswordCard />
       <SessionsCard />
@@ -59,18 +66,23 @@ function NameCard({ user }) {
   }
 
   return (
-    <Card className="p-5">
-      <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-400">Profile</h2>
-      <form onSubmit={handleSave} className="space-y-4">
-        <TextField label="Name" value={name} onChange={(e) => setName(e.target.value)} maxLength={80} required />
-        <div>
-          <TextField label="Email" value={user.email} disabled readOnly />
-          <p className="mt-1 text-xs text-slate-400">Your email is your sign-in and can't be changed here.</p>
+    <form onSubmit={handleSave}>
+      <SettingsCard
+        title="Profile"
+        description="How you appear to teammates in comments, presence and the audit log."
+        footer={<Button type="submit" loading={busy} disabled={!dirty}>Save name</Button>}
+      >
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Name" required htmlFor="profile-name">
+            <Input id="profile-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={80} />
+          </Field>
+          <Field label="Email" htmlFor="profile-email" help="Your sign-in; it can't be changed here.">
+            <Input id="profile-email" value={user.email} disabled readOnly />
+          </Field>
         </div>
-        <ErrorText>{error}</ErrorText>
-        <Button type="submit" disabled={busy || !dirty}>{busy ? 'Saving...' : 'Save name'}</Button>
-      </form>
-    </Card>
+        {error && <p className="mt-3 text-sm text-danger" role="alert">{error}</p>}
+      </SettingsCard>
+    </form>
   );
 }
 
@@ -104,23 +116,30 @@ function PasswordCard() {
   }
 
   return (
-    <Card className="p-5">
-      <h2 className="mb-1 text-sm font-semibold uppercase tracking-wide text-slate-400">Change password</h2>
-      <p className="mb-4 text-sm text-slate-500 dark:text-slate-400">
-        Changing your password signs you out everywhere else. This browser stays signed in.
-      </p>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <TextField label="Current password" type="password" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} required />
-        <TextField label="New password" type="password" autoComplete="new-password" value={next} onChange={(e) => setNext(e.target.value)} required />
-        <TextField label="Confirm new password" type="password" autoComplete="new-password" value={again} onChange={(e) => setAgain(e.target.value)} required />
-        {tooShort && <p className="text-xs text-amber-600">At least {MIN_PASSWORD} characters.</p>}
-        {mismatch && <p className="text-xs text-amber-600">The new passwords don't match.</p>}
-        <ErrorText>{error}</ErrorText>
-        <Button type="submit" disabled={busy || !current || !next || !again || mismatch || tooShort}>
-          {busy ? 'Changing...' : 'Change password'}
-        </Button>
-      </form>
-    </Card>
+    <form onSubmit={handleSubmit}>
+      <SettingsCard
+        title="Change password"
+        description="Changing your password signs you out everywhere else. This browser stays signed in."
+        footer={(
+          <Button type="submit" loading={busy} disabled={!current || !next || !again || mismatch || tooShort}>
+            Change password
+          </Button>
+        )}
+      >
+        <div className="grid max-w-md gap-4">
+          <Field label="Current password" required htmlFor="pw-current">
+            <Input id="pw-current" type="password" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} />
+          </Field>
+          <Field label="New password" required htmlFor="pw-next" error={tooShort ? `At least ${MIN_PASSWORD} characters.` : undefined} help={`At least ${MIN_PASSWORD} characters.`}>
+            <Input id="pw-next" type="password" autoComplete="new-password" value={next} onChange={(e) => setNext(e.target.value)} invalid={Boolean(tooShort)} />
+          </Field>
+          <Field label="Confirm new password" required htmlFor="pw-again" error={mismatch ? "The new passwords don't match." : undefined}>
+            <Input id="pw-again" type="password" autoComplete="new-password" value={again} onChange={(e) => setAgain(e.target.value)} invalid={Boolean(mismatch)} />
+          </Field>
+        </div>
+        {error && <p className="mt-3 text-sm text-danger" role="alert">{error}</p>}
+      </SettingsCard>
+    </form>
   );
 }
 
@@ -150,15 +169,13 @@ function SessionsCard() {
   }
 
   return (
-    <Card className="p-5">
-      <h2 className="mb-1 text-sm font-semibold uppercase tracking-wide text-slate-400">Sessions</h2>
-      <p className="mb-4 text-sm text-slate-500 dark:text-slate-400">
-        Lost a laptop or signed in on a shared computer? Sign out everywhere except here.
-      </p>
-      <ErrorText>{error}</ErrorText>
-      <Button variant="secondary" onClick={handleRevoke} disabled={busy}>
-        {busy ? 'Signing out...' : 'Sign out of all other sessions'}
-      </Button>
-    </Card>
+    <SettingsCard
+      title="Sessions"
+      description="Lost a laptop or signed in on a shared computer? Sign out everywhere except here."
+      footer={<Button variant="secondary" icon={LogOut} loading={busy} onClick={handleRevoke}>Sign out of all other sessions</Button>}
+    >
+      <p className="text-sm text-muted">Every other browser and device is signed out on its next request.</p>
+      {error && <p className="mt-3 text-sm text-danger" role="alert">{error}</p>}
+    </SettingsCard>
   );
 }

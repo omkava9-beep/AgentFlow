@@ -118,7 +118,10 @@ async function must(label, promise) {
 
 // ------------------------------------------------------------------ graph helpers
 
-const N = (id, type, x, y, config = {}) => ({ id, type, position: { x, y }, data: { config: { label: id, ...config } } });
+// Graphs below are laid out on a 220px grid; nodes are 248px wide on the canvas,
+// so x is stretched to leave room for edges and labels between columns.
+const X_SPACING = 1.5;
+const N = (id, type, x, y, config = {}) => ({ id, type, position: { x: Math.round(x * X_SPACING), y }, data: { config: { label: id, ...config } } });
 const E = (source, target, extra = {}) => ({ id: `${source}->${target}${extra.sourceHandle ? `:${extra.sourceHandle}` : ''}`, source, target, ...extra });
 const tool = (id, x, y, label, integration, action, params = {}, connectionId = null) =>
   N(id, 'tool', x, y, { label, integration, action, connectionId, params, mockOverrides: {} });

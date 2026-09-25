@@ -108,10 +108,18 @@ code, kbd, pre, samp, .font-mono {
   font-family: 'JetBrains Mono Variable', ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
-/* One focus treatment everywhere: keyboard focus only, on the token ring. */
-:focus-visible {
+/*
+ * One focus treatment for keyboard focus, on the token ring. `:where()` keeps
+ * it at zero specificity so any control with its own focus style (inputs draw
+ * an accent border + soft ring, and use `outline-none`) wins - otherwise text
+ * fields would show a second outline around their own.
+ */
+:where(:focus-visible) {
   outline: 2px solid rgb(var(--ring));
   outline-offset: 2px;
+}
+:where(input, textarea, [contenteditable='true'], [cmdk-input]):focus-visible {
+  outline: none;
 }
 
 ::selection {

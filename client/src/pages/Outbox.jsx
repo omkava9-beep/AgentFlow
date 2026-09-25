@@ -1,14 +1,20 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Mail, MailOpen, ExternalLink, Inbox, UserPlus, Send, Bell } from 'lucide-react';
 import { listOutbox } from '../api/outbox';
 import { apiErrorMessage } from '../api/client';
 import { useAuthStore } from '../store/authStore';
-import { Card, Button, ErrorText } from '../components/ui';
-import { formatRelativeTime } from '../utils/time';
-import { SkeletonTable } from '../components/ui/Skeleton';
-import EmptyState from '../components/ui/EmptyState';
+import { PageHeader, Card, Button, Badge, EmptyState, SkeletonTable, cx } from '../components/ui';
+import { ErrorText } from '../components/ui.jsx';
+import { RelativeTime } from '../components/runs/RunBits';
 
 const URL_RE = /https?:\/\/[^\s)>"']+/;
+const KIND = {
+  invite: { label: 'Invite', icon: UserPlus, tone: 'accent' },
+  smtp: { label: 'Email', icon: Send, tone: 'info' },
+  notification: { label: 'Notification', icon: Bell, tone: 'neutral' },
+};
+const kindOf = (k) => KIND[k] || { label: k || 'Mail', icon: Mail, tone: 'neutral' };
 
 /** The link an invite (or any message) points at, wherever the server put it. */
 function messageLink(msg) {
@@ -54,56 +60,69 @@ export default function Outbox() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">Outbox</h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400">
-          Development mail for {email}. AgentFlow doesn't send real email — invites and messages land here instead.
-        </p>
-      </div>
+      <PageHeader
+        icon={Mail}
+        title="Outbox"
+        meta={<Badge size="xs">Development mail</Badge>}
+        description={`Mail for ${email || 'you'}. AgentFlow doesn't send real email — invites and messages your workflows would send land here instead.`}
+      />
 
       <ErrorText>{error}</ErrorText>
 
       {loading ? (
         <SkeletonTable rows={4} columns={3} />
       ) : messages.length === 0 ? (
-        <EmptyState icon="✉️" title="No messages yet" body="Invites and emails your workflows would send to you land here in development instead of being delivered." />
+        <EmptyState icon={Inbox} title="No messages yet" body="Invites and emails your workflows would send to you land here in development instead of being delivered." />
       ) : (
-        <div className="grid gap-4 md:grid-cols-[18rem_1fr]">
-          <Card className="divide-y divide-slate-100 overflow-hidden p-0 dark:divide-slate-800">
-            {messages.map((m) => (
-              <button
-                key={m._id}
-                onClick={() => setSelectedId(m._id)}
-                className={`block w-full px-4 py-3 text-left transition hover:bg-slate-50 dark:hover:bg-slate-800 ${
-                  m._id === selectedId ? 'bg-brand-50 dark:bg-brand-950/40' : ''
-                }`}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="truncate text-sm font-medium text-slate-800 dark:text-slate-100">{m.subject}</span>
-                  <span className="shrink-0 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] uppercase text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-                    {m.kind}
-                  </span>
-                </div>
-                <div className="mt-0.5 text-xs text-slate-400">{formatRelativeTime(m.createdAt)}</div>
-              </button>
-            ))}
-          </Card>
+        <Card className="grid min-h-[28rem] overflow-hidden md:grid-cols-[20rem_1fr]">
+          <ul className="max-h-[70vh] divide-y divide-default overflow-y-auto border-b border-default md:border-b-0 md:border-r">
+            {messages.map((m) => {
+              const k = kindOf(m.kind);
+              const active = m._id === selectedId;
+              return (
+                <li key={m._id}>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedId(m._id)}
+                    aria-current={active}
+                    className={cx('block w-full px-4 py-3 text-left transition-colors', active ? 'bg-accent-subtle/50' : 'hover:bg-bg-subtle')}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <Badge size="xs" tone={k.tone} icon={k.icon}>{k.label}</Badge>
+                      <span className="shrink-0 text-2xs text-subtle"><RelativeTime value={m.createdAt} /></span>
+                    </div>
+                    <p className={cx('mt-1.5 truncate text-sm', active ? 'font-semibold text-fg' : 'font-medium text-fg')}>{m.subject}</p>
+                    <p className="mt-0.5 line-clamp-2 text-xs text-subtle">{m.text}</p>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
 
-          {selected && (
-            <Card className="p-5">
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{selected.subject}</h2>
-              <p className="mt-1 text-xs text-slate-400">
-                To {selected.to} · {new Date(selected.createdAt).toLocaleString()}
-              </p>
-              <pre className="mt-4 whitespace-pre-wrap font-sans text-sm text-slate-700 dark:text-slate-300">{selected.text}</pre>
+          {selected ? (
+            <article className="flex min-w-0 flex-col p-6">
+              <div className="flex items-start justify-between gap-4 border-b border-default pb-4">
+                <div className="min-w-0">
+                  <h2 className="text-lg font-semibold text-fg">{selected.subject}</h2>
+                  <p className="mt-1 text-xs text-subtle">
+                    To <span className="text-muted">{selected.to}</span> · {new Date(selected.createdAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                  </p>
+                </div>
+                <Badge tone={kindOf(selected.kind).tone} icon={kindOf(selected.kind).icon}>{kindOf(selected.kind).label}</Badge>
+              </div>
+              <pre className="mt-4 flex-1 whitespace-pre-wrap font-sans text-sm leading-relaxed text-fg">{selected.text}</pre>
               {messageLink(selected) && (
-                <Button className="mt-4" onClick={() => open(messageLink(selected))}>
-                  {selected.kind === 'invite' ? 'Open invite' : 'Open link'}
-                </Button>
+                <div className="mt-6">
+                  <Button icon={selected.kind === 'invite' ? UserPlus : ExternalLink} onClick={() => open(messageLink(selected))}>
+                    {selected.kind === 'invite' ? 'Open invite' : 'Open link'}
+                  </Button>
+                </div>
               )}
-            </Card>
+            </article>
+          ) : (
+            <div className="flex items-center justify-center p-10"><EmptyState compact icon={MailOpen} title="Select a message" /></div>
           )}
-        </div>
+        </Card>
       )}
     </div>
   );

@@ -10,3 +10,16 @@ export function formatRelativeTime(date) {
   if (diffDay < 7) return `${diffDay}d ago`;
   return new Date(date).toLocaleDateString();
 }
+
+/** "in 3h", "in 6d" for a future instant (e.g. an invite's expiry); past ones fall back to formatRelativeTime. */
+export function formatUntil(date) {
+  const diffMs = new Date(date).getTime() - Date.now();
+  if (diffMs <= 0) return formatRelativeTime(date);
+  const min = Math.round(diffMs / 60000);
+  if (min < 60) return `in ${Math.max(min, 1)}m`;
+  const hr = Math.round(min / 60);
+  if (hr < 48) return `in ${hr}h`;
+  const day = Math.round(hr / 24);
+  if (day < 30) return `in ${day}d`;
+  return `on ${new Date(date).toLocaleDateString()}`;
+}

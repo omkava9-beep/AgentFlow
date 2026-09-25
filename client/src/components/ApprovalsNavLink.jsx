@@ -1,6 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import { usePendingApprovals } from '../hooks/usePendingApprovals';
 import { useCan } from '../hooks/useCan';
+import { Tooltip } from './ui/index';
 
 /** Nav item for the Approvals inbox, with a live pending count (spec/32 UI). */
 export default function ApprovalsNavLink({ to, className }) {
@@ -13,9 +14,9 @@ export default function ApprovalsNavLink({ to, className }) {
       <span className="flex items-center gap-1.5">
         Approvals
         {count > 0 && (
-          <span className="rounded-full bg-orange-500 px-1.5 text-[10px] font-semibold leading-4 text-white" title={`${count} waiting on you`}>
-            {count}
-          </span>
+          <Tooltip content={`${count} waiting on you`}>
+            <span className="rounded-full bg-warning px-1.5 text-2xs font-semibold leading-4 text-white">{count}</span>
+          </Tooltip>
         )}
       </span>
     </NavLink>

@@ -53,18 +53,18 @@ export default function WorkspaceRoute() {
     return (
       <div className="mx-auto max-w-md py-10">
         <Card className="p-6">
-          <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+          <h1 className="text-lg font-semibold text-fg">
             {status === 'notfound' ? 'Workspace not found' : 'Could not load this workspace'}
           </h1>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+          <p className="mt-1 text-sm text-muted">
             {status === 'notfound'
               ? "It doesn't exist, or you're not a member of it."
               : 'Something went wrong. Try again, or pick another workspace.'}
           </p>
           {workspaces.length > 0 && (
             <>
-              <h2 className="mt-5 mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Your workspaces</h2>
-              <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800">
+              <h2 className="mt-5 mb-2 text-xs font-semibold uppercase tracking-wide text-subtle">Your workspaces</h2>
+              <div className="overflow-hidden rounded-lg border border-default">
                 <WorkspaceList workspaces={workspaces} />
               </div>
             </>

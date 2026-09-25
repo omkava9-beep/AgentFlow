@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Checkbox } from '../ui/Form';
 import { MessageSquarePlus } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useSearchParams } from 'react-router-dom';
@@ -9,6 +10,7 @@ import { useThreads } from './useThreads';
 import ThreadPopover from './ThreadPopover';
 import ThreadListPanel from './ThreadListPanel';
 import MentionComposer from './MentionComposer';
+import { useCanvasUi } from '../canvas/canvasUiStore';
 
 const DEFAULT_NODE_WIDTH = 180;
 const POPOVER_WIDTH = 330;
@@ -69,6 +71,17 @@ export default function CommentsLayer({ workflowId, nodes, viewport, flowRef, wi
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [canComment]);
+
+  // "Add comment" from a node's or the canvas's right-click menu: open the
+  // composer right there, as if placed in comment mode.
+  const commentRequest = useCanvasUi((st) => st.commentRequest);
+  useEffect(() => {
+    if (!commentRequest || !canComment) return;
+    const { anchor, flow } = commentRequest;
+    setMode(false);
+    setActiveId(null);
+    setDraft({ anchor, flow, screen: toScreen(flow) });
+  }, [commentRequest]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // A notification link (?thread=<id>) opens that thread and brings it into view.
   const threadParam = params.get('thread');
@@ -184,7 +197,7 @@ export default function CommentsLayer({ workflowId, nodes, viewport, flowRef, wi
         Threads{openCount ? ` · ${openCount}` : ''}
       </button>
       <label className={`${segment} cursor-pointer text-muted hover:bg-bg-subtle`} title="Show resolved threads on the canvas">
-        <input type="checkbox" className="h-3 w-3 accent-[rgb(var(--accent))]" checked={showResolved} onChange={(e) => setShowResolved(e.target.checked)} />
+        <Checkbox checked={showResolved} onChange={(e) => setShowResolved(e.target.checked)} />
         Resolved
       </label>
     </div>
@@ -203,7 +216,7 @@ export default function CommentsLayer({ workflowId, nodes, viewport, flowRef, wi
           onClick={onPlace}
           className="pointer-events-auto absolute inset-0 cursor-crosshair"
         >
-          <span className="absolute left-1/2 top-4 -translate-x-1/2 rounded-full bg-slate-900/80 px-3 py-1 text-xs text-white">
+          <span className="absolute left-1/2 top-4 -translate-x-1/2 rounded-full bg-surface-sunken/80 px-3 py-1 text-xs text-white">
             {repinning ? 'Click where this thread should live' : 'Click a node or an empty spot to comment · Esc to cancel'}
           </span>
         </div>
@@ -223,8 +236,8 @@ export default function CommentsLayer({ workflowId, nodes, viewport, flowRef, wi
             style={{ left: s.left - 12, top: s.top - 12 }}
             title={`${thread.comments[0]?.author?.name || ''}: ${thread.replyCount} repl${thread.replyCount === 1 ? 'y' : 'ies'}`}
             className={`pointer-events-auto absolute flex h-6 min-w-6 items-center justify-center gap-0.5 rounded-full rounded-bl-none border-2 border-white px-1 text-[10px] font-bold text-white shadow-md ${
-              resolved ? 'bg-slate-400' : 'bg-brand-600'
-            } ${thread.id === activeId ? 'ring-2 ring-brand-300' : ''}`}
+              resolved ? 'bg-surface-sunken' : 'bg-accent'
+            } ${thread.id === activeId ? 'ring-2 ring-accent/40' : ''}`}
           >
             {(thread.comments[0]?.author?.name || '?').slice(0, 1).toUpperCase()}
             {thread.replyCount > 0 && <span className="font-medium">{thread.replyCount}</span>}
@@ -234,11 +247,11 @@ export default function CommentsLayer({ workflowId, nodes, viewport, flowRef, wi
 
       {draft && (
         <div
-          className="pointer-events-auto absolute z-30 w-80 rounded-xl border border-slate-200 bg-white p-3 shadow-2xl dark:border-slate-700 dark:bg-slate-900"
+          className="pointer-events-auto absolute z-30 w-80 rounded-xl border border-default bg-surface p-3 shadow-2xl"
           style={{ left: clampLeft(draft.screen.left + 12), top: Math.max(8, draft.screen.top - 8) }}
           onClick={(e) => e.stopPropagation()}
         >
-          <p className="mb-1.5 text-xs text-slate-500 dark:text-slate-400">
+          <p className="mb-1.5 text-xs text-muted">
             {draft.anchor.type === 'node' ? `New thread on ${draft.anchor.nodeId}` : 'New thread on the canvas'}
           </p>
           <MentionComposer onSubmit={submitDraft} onCancel={() => setDraft(null)} />

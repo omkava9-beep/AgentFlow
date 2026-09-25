@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import Select from './ui/Select';
 import { useIntegrationStore } from '../store/integrationStore';
 import { useWorkspaceStore } from '../store/workspaceStore';
 import { useCan } from '../hooks/useCan';
@@ -6,10 +7,8 @@ import { sendTestEvent } from '../api/integrationTriggers';
 import { describeDispatch } from '../utils/dispatchSummary';
 import { apiErrorMessage } from '../api/client';
 
-const selectClass =
-  'w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-900 focus:border-brand-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100';
 const btnClass =
-  'rounded border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-40 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800';
+  'rounded border border-default px-2 py-1 text-xs font-medium text-fg hover:bg-bg-subtle disabled:opacity-40   ';
 
 /** Every integration trigger in the catalogue, as `<integration>.<trigger>` event names (spec/26 §7). */
 export function useIntegrationTriggers() {
@@ -55,10 +54,13 @@ export default function IntegrationEventPicker({ eventName, onEventName, connect
   if (!triggers.length) return null;
   return (
     <div className="space-y-1.5">
-      <label className="block text-[11px] font-medium text-slate-500 dark:text-slate-400">
+      <label className="block text-[11px] font-medium text-muted">
         From an integration
-        <select
-          className={`${selectClass} mt-0.5`}
+        <Select
+          size="sm"
+          className="mt-0.5"
+          aria-label="Integration trigger"
+          data-testid="integration-trigger-select"
           value={selected ? eventName : ''}
           disabled={readOnly}
           onChange={(e) => { onEventName(e.target.value); onConnectionId(null); setTestState(null); }}
@@ -67,28 +69,30 @@ export default function IntegrationEventPicker({ eventName, onEventName, connect
           {triggers.map((t) => (
             <option key={t.eventName} value={t.eventName}>{t.integration.name} · {t.trigger.name}</option>
           ))}
-        </select>
+        </Select>
       </label>
       {selected && (
         <>
-          <label className="block text-[11px] font-medium text-slate-500 dark:text-slate-400">
+          <label className="block text-[11px] font-medium text-muted">
             Only from connection
-            <select
-              className={`${selectClass} mt-0.5`}
+            <Select
+              size="sm"
+              className="mt-0.5"
+              aria-label="Connection filter"
               value={connectionId || ''}
               disabled={readOnly}
               onChange={(e) => onConnectionId(e.target.value || null)}
             >
               <option value="">Any {selected.integration.name} connection</option>
               {options.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+            </Select>
           </label>
-          {selected.trigger.description && <p className="text-[11px] text-slate-400">{selected.trigger.description}</p>}
+          {selected.trigger.description && <p className="text-[11px] text-subtle">{selected.trigger.description}</p>}
           {canTest && !readOnly && (
             <div className="flex items-center gap-1.5">
               <button type="button" className={btnClass} disabled={testState?.busy} onClick={test}>Send test event</button>
-              {testState?.message && <span className="text-[11px] text-green-600 dark:text-green-400">{testState.message}</span>}
-              {testState?.error && <span className="text-[11px] text-red-500">{testState.error}</span>}
+              {testState?.message && <span className="text-[11px] text-success">{testState.message}</span>}
+              {testState?.error && <span className="text-[11px] text-danger">{testState.error}</span>}
             </div>
           )}
         </>

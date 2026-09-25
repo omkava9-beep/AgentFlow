@@ -1,3 +1,4 @@
+import { Tooltip } from '../ui';
 import { formatDuration } from '../../utils/format';
 
 /**
@@ -11,7 +12,6 @@ export default function AttemptsTimeline({ attempts = [], compact = false }) {
   const last = new Date(attempts[attempts.length - 1].finishedAt || attempts[attempts.length - 1].startedAt).getTime();
   const span = Math.max(1, last - first);
 
-  // Bars and gaps as a single row of flex segments, widths proportional to time.
   const segments = [];
   attempts.forEach((a, i) => {
     const start = new Date(a.startedAt).getTime();
@@ -23,24 +23,25 @@ export default function AttemptsTimeline({ attempts = [], compact = false }) {
 
   const waits = attempts.map((a) => a.backoffMs).filter((b) => b != null);
   return (
-    <div className={compact ? 'mt-1' : 'mt-2'}>
-      <div className="flex h-3 w-full items-stretch overflow-hidden rounded bg-slate-100 dark:bg-slate-800" title="Attempts over time">
+    <div className={compact ? 'mt-2' : 'mt-3'}>
+      <div className="flex h-2.5 w-full items-stretch gap-px overflow-hidden rounded-full bg-bg-subtle" aria-label="Attempts over time">
         {segments.map((s, i) => (
-          <div
+          <Tooltip
             key={i}
-            style={{ flexGrow: s.ms / span, flexBasis: s.kind === 'attempt' ? 6 : 2 }}
-            title={s.kind === 'attempt'
+            content={s.kind === 'attempt'
               ? `Attempt ${s.entry.attempt}: ${s.entry.outcome}${s.entry.cached ? ' (cache hit)' : ''} · ${formatDuration(s.entry.durationMs)}${s.entry.error ? ` · ${s.entry.error}` : ''}`
-              : `waited ${formatDuration(s.ms)}`}
-            className={s.kind === 'gap'
-              ? 'bg-transparent'
-              : s.entry.outcome === 'success'
-                ? 'rounded-sm bg-emerald-500'
-                : 'rounded-sm bg-red-500'}
-          />
+              : `Backoff: waited ${formatDuration(s.ms)}`}
+          >
+            <div
+              style={{ flexGrow: s.ms / span, flexBasis: s.kind === 'attempt' ? 6 : 2 }}
+              className={s.kind === 'gap'
+                ? 'bg-[repeating-linear-gradient(90deg,rgb(var(--border-strong))_0_2px,transparent_2px_5px)] opacity-60'
+                : s.entry.outcome === 'success' ? 'rounded-full bg-success' : 'rounded-full bg-danger'}
+            />
+          </Tooltip>
         ))}
       </div>
-      <p className="mt-0.5 text-[10px] text-slate-400">
+      <p className="mt-1 text-2xs tabular-nums text-subtle">
         {attempts.length} attempt{attempts.length === 1 ? '' : 's'}
         {waits.length > 0 && ` · waited ${waits.map((w) => formatDuration(w)).join(', ')}`}
         {attempts.some((a) => a.cached) && ' · cache hit'}

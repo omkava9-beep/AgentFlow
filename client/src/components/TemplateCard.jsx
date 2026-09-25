@@ -1,95 +1,87 @@
-import NodeTypeIcon from './ui/NodeTypeIcon';
-import { nodeTypeMeta } from './ui/nodeTypes';
-
-/** A glanceable shape summary — enough to tell templates apart without a render. */
-function NodeMix({ nodes = [] }) {
-  const counts = nodes.reduce((acc, n) => ({ ...acc, [n.type]: (acc[n.type] || 0) + 1 }), {});
-  const order = ['agent', 'tool', 'condition', 'approval', 'loop', 'transform', 'code', 'merge', 'delay', 'subworkflow'];
-
-  return (
-    <div className="mt-3 flex flex-wrap items-center gap-1.5">
-      {order
-        .filter((type) => counts[type])
-        .map((type) => (
-          <span
-            key={type}
-            title={`${counts[type]} ${nodeTypeMeta(type).label.toLowerCase()} node${counts[type] > 1 ? 's' : ''}`}
-            className="inline-flex items-center gap-1 rounded-md border border-default bg-surface py-0.5 pl-0.5 pr-1.5 text-2xs font-medium tabular-nums text-muted"
-          >
-            <NodeTypeIcon type={type} size="xs" />
-            {counts[type]}
-          </span>
-        ))}
-    </div>
-  );
-}
-
-function ago(date) {
-  if (!date) return '';
-  const days = Math.floor((Date.now() - new Date(date).getTime()) / 86400000);
-  if (days <= 0) return 'today';
-  if (days === 1) return 'yesterday';
-  if (days < 30) return `${days} days ago`;
-  return new Date(date).toLocaleDateString();
-}
+import { MoreHorizontal, Pencil, Trash2, Timer } from 'lucide-react';
+import { Badge, IntegrationLogo, Menu, MenuButton, MenuSeparator, Tooltip, cx } from './ui/index';
+import { TRIGGER_META } from './workflows/workflowMeta';
+import { DIFFICULTY, categoryMeta, templateIcon, templateIntegrations } from './templates/templateMeta';
 
 /**
- * `onEdit` / `onDelete` are passed only for workspace templates the caller may
- * manage (spec/36 §5); built-ins are immutable and never get them.
+ * A gallery card. The whole card opens the template's detail; using it is one
+ * deliberate step there, not a giant button on every card. `onEdit` /
+ * `onDelete` are passed only for workspace templates the caller may manage
+ * (spec/36 §5).
  */
-export default function TemplateCard({ template, onUse, onEdit, onDelete, busy }) {
+export default function TemplateCard({ template, names, onOpen, onEdit, onDelete }) {
+  const Icon = templateIcon(template);
+  const category = categoryMeta(template.category);
+  const integrations = templateIntegrations(template);
+  const trigger = TRIGGER_META[template.triggerType || template.trigger?.type] || TRIGGER_META.manual;
+  const TriggerIcon = trigger.icon;
+  const difficulty = DIFFICULTY[template.difficulty];
+  const shown = integrations.slice(0, 6);
+
   return (
-    <div className="flex flex-col rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-brand-400 hover:shadow-lg dark:border-slate-800 dark:bg-slate-900 dark:hover:border-brand-600">
+    <div
+      role="button"
+      tabIndex={0}
+      data-testid="template-card"
+      onClick={() => onOpen(template)}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(template); } }}
+      className="group flex h-full cursor-pointer flex-col rounded-card border border-default bg-surface p-4 text-left transition-colors hover:border-strong hover:bg-bg-subtle/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+    >
       <div className="flex items-start justify-between gap-2">
-        <h2 className="font-semibold text-slate-900 dark:text-slate-100">{template.name}</h2>
-        <span
-          className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${
-            template.builtIn
-              ? 'bg-brand-100 text-brand-700 dark:bg-brand-950 dark:text-brand-300'
-              : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
-          }`}
-        >
-          {template.builtIn ? 'Built-in' : template.mine ? 'Yours' : 'Workspace'}
+        <span className={cx('flex h-9 w-9 shrink-0 items-center justify-center rounded-lg', category.tile)}>
+          <Icon className="h-[18px] w-[18px]" aria-hidden="true" />
         </span>
+        {(onEdit || onDelete) && (
+          <span onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+            <Menu
+              label={<MoreHorizontal className="h-4 w-4" aria-hidden="true" />}
+              title="Template actions"
+              align="right"
+              buttonClassName="inline-flex h-7 w-7 items-center justify-center rounded-control text-subtle opacity-60 transition hover:bg-bg-subtle hover:text-fg group-hover:opacity-100"
+              panelClassName="w-44"
+            >
+              {onEdit && <MenuButton onClick={() => onEdit(template)}><Pencil className="h-4 w-4" /> Edit details</MenuButton>}
+              {onEdit && onDelete && <MenuSeparator />}
+              {onDelete && <MenuButton danger onClick={() => onDelete(template)}><Trash2 className="h-4 w-4" /> Delete</MenuButton>}
+            </Menu>
+          </span>
+        )}
       </div>
 
-      <p className="mt-1 flex-1 text-sm text-slate-500 dark:text-slate-400">{template.description || 'No description.'}</p>
-
-      <NodeMix nodes={template.nodes} />
-
-      <p className="mt-2 text-xs text-slate-400">
-        {template.nodeCount} {template.nodeCount === 1 ? 'node' : 'nodes'} · {template.edgeCount}{' '}
-        {template.edgeCount === 1 ? 'connection' : 'connections'}
+      <h3 className="mt-3 text-sm font-semibold text-fg">{template.name}</h3>
+      <p className="mt-1 line-clamp-2 min-h-[2.5rem] text-sm leading-5 text-muted">
+        {template.summary || template.description || 'No description.'}
       </p>
-      {!template.builtIn && template.createdByName && (
-        <p className="mt-0.5 text-xs text-slate-400">by {template.createdByName} · {ago(template.createdAt)}</p>
-      )}
 
-      {(onEdit || onDelete) && (
-        <div className="mt-3 flex gap-3 text-xs">
-          {onEdit && (
-            <button type="button" onClick={() => onEdit(template)} className="font-medium text-slate-500 hover:text-brand-600 dark:text-slate-400">
-              Edit
-            </button>
-          )}
-          {onDelete && (
-            <button type="button" onClick={() => onDelete(template)} className="font-medium text-slate-500 hover:text-red-600 dark:text-slate-400">
-              Delete
-            </button>
-          )}
-        </div>
-      )}
+      <div className="mb-3 mt-3 flex min-h-[20px] items-center gap-1">
+        {shown.map((id) => (
+          <Tooltip key={id} content={names?.get(id) || id}>
+            <span><IntegrationLogo id={id} size="sm" /></span>
+          </Tooltip>
+        ))}
+        {integrations.length > shown.length && (
+          <span className="ml-1 text-2xs font-medium text-subtle">+{integrations.length - shown.length}</span>
+        )}
+        {!shown.length && <span className="text-xs text-subtle">No integrations needed</span>}
+      </div>
 
-      {/* No `onUse` means the caller's role can't create workflows (spec/23). */}
-      {onUse && (
-        <button
-          onClick={() => onUse(template)}
-          disabled={busy}
-          className="mt-4 rounded-lg bg-gradient-to-br from-brand-500 to-purple-600 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:brightness-110 disabled:opacity-50"
-        >
-          {busy ? 'Creating...' : 'Use template'}
-        </button>
-      )}
+      <div className="mt-auto flex items-center gap-3 border-t border-default pt-3 text-xs text-subtle">
+        <span className="flex items-center gap-1.5">
+          <TriggerIcon className="h-3.5 w-3.5" aria-hidden="true" />
+          {trigger.label}
+        </span>
+        {template.estimatedSetupMinutes && (
+          <span className="flex items-center gap-1.5 tabular-nums">
+            <Timer className="h-3.5 w-3.5" aria-hidden="true" />
+            ~{template.estimatedSetupMinutes} min
+          </span>
+        )}
+        <span className="ml-auto">
+          {difficulty ? <Badge tone={difficulty.tone} size="xs">{difficulty.label}</Badge> : (
+            template.createdByName && <span>by {template.createdByName}</span>
+          )}
+        </span>
+      </div>
     </div>
   );
 }

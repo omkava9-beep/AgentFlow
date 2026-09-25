@@ -1,7 +1,9 @@
 import { useState } from 'react';
+import { CheckCircle2, LayoutTemplate } from 'lucide-react';
 import { createTemplate } from '../api/templates';
 import { apiErrorMessage } from '../api/client';
-import { TextField, TextArea, Button, ErrorText } from './ui';
+import { Button, Dialog, Field, Input, Textarea } from './ui/index';
+import { ErrorText } from './ui.jsx';
 
 /** "Save as template" from the Builder (spec/15). Snapshots the *saved* graph. */
 export default function SaveAsTemplateDialog({ workflowId, defaultName, onClose }) {
@@ -24,43 +26,41 @@ export default function SaveAsTemplateDialog({ workflowId, defaultName, onClose 
     }
   }
 
-  return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-5 shadow-xl dark:border-slate-800 dark:bg-slate-900">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-400">Save as template</h3>
+  if (saved) {
+    return (
+      <Dialog open onClose={onClose} title="Template saved" icon={CheckCircle2} size="sm" footer={<Button onClick={onClose}>Done</Button>}>
+        <p className="text-sm text-muted">
+          It now appears under <strong className="font-medium text-fg">Your team’s templates</strong> in the Templates gallery, for everyone in this workspace.
+        </p>
+      </Dialog>
+    );
+  }
 
-        {saved ? (
-          <>
-            <p className="mt-4 text-sm text-slate-600 dark:text-slate-300">
-              Saved. It now appears under <strong>Your templates</strong> in the Templates gallery.
-            </p>
-            <Button className="mt-4 w-full" onClick={onClose}>Done</Button>
-          </>
-        ) : (
-          <>
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              Captures the last saved version of this graph as an independent copy.
-            </p>
-            <div className="mt-4 space-y-3">
-              <TextField label="Name" value={name} onChange={(e) => setName(e.target.value)} />
-              <TextArea
-                label="Description"
-                rows={3}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="What is this template for?"
-              />
-              <ErrorText>{error}</ErrorText>
-              <div className="flex gap-2">
-                <Button className="flex-1" onClick={handleSave} disabled={saving || !name.trim()}>
-                  {saving ? 'Saving...' : 'Save template'}
-                </Button>
-                <Button variant="secondary" onClick={onClose}>Cancel</Button>
-              </div>
-            </div>
-          </>
-        )}
+  return (
+    <Dialog
+      open
+      onClose={onClose}
+      title="Save as template"
+      description="Captures the last saved version of this graph as an independent copy. Connections aren't included."
+      icon={LayoutTemplate}
+      size="sm"
+      dismissable={!saving}
+      footer={(
+        <>
+          <Button variant="secondary" onClick={onClose} disabled={saving}>Cancel</Button>
+          <Button onClick={handleSave} loading={saving} disabled={!name.trim()}>Save template</Button>
+        </>
+      )}
+    >
+      <div className="space-y-4">
+        <Field label="Name" htmlFor="save-tpl-name" required>
+          <Input id="save-tpl-name" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+        </Field>
+        <Field label="Description" htmlFor="save-tpl-desc">
+          <Textarea id="save-tpl-desc" rows={3} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What problem does it solve?" />
+        </Field>
+        <ErrorText>{error}</ErrorText>
       </div>
-    </div>
+    </Dialog>
   );
 }

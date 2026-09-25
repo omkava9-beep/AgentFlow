@@ -1,86 +1,62 @@
-import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { on } from '../realtime/socket';
-import { useWorkspacePath } from '../hooks/useWorkspacePath';
-import { FlowIcon, TrashIcon, ArrowRightIcon, NodeDotsIcon, LinkIcon } from './icons';
+import { Avatar, Tooltip } from './ui/index';
 import { formatRelativeTime } from '../utils/time';
+import { Activity, IntegrationStack, LastRun, TriggerIcons, VersionBadge } from './workflows/parts';
+import { triggerLine } from './workflows/workflowMeta';
+import WorkflowActions from './workflows/WorkflowActions';
 
-export default function WorkflowCard({ workflow, onDelete }) {
+/**
+ * Grid view of a workflow: what it touches (integration marks), where it
+ * stands (version), what starts it, how its last run went and how busy it's
+ * been - so cards differ at a glance instead of all looking the same.
+ */
+export default function WorkflowCard({ workflow, wp, names, actions }) {
   const navigate = useNavigate();
-  const wp = useWorkspacePath();
-  const nodeCount = workflow.nodeCount ?? 0;
-  const edgeCount = workflow.edgeCount ?? 0;
-  // spec/30: "v3" with an amber dot for unpublished changes, kept live by the
-  // workspace room's version events.
-  const [version, setVersion] = useState({ published: workflow.publishedVersion ?? null, dirty: Boolean(workflow.hasUnpublishedChanges) });
-  useEffect(() => {
-    const mine = (p) => String(p?.workflowId) === String(workflow._id);
-    const offs = [
-      on('version:draft_state', (p) => mine(p) && setVersion((v) => ({ ...v, dirty: Boolean(p.hasUnpublishedChanges) }))),
-      on('version:published', (p) => mine(p) && setVersion((v) => ({ ...v, published: p.version }))),
-    ];
-    return () => offs.forEach((off) => off());
-  }, [workflow._id]);
+  const open = () => navigate(wp(`/workflows/${workflow._id}`));
+  const person = workflow.updatedBy || workflow.createdBy;
 
   return (
     <div
-      onClick={() => navigate(wp(`/workflows/${workflow._id}`))}
-      className="group relative flex cursor-pointer flex-col overflow-hidden rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-brand-400 hover:shadow-lg dark:border-slate-800 dark:bg-slate-900 dark:hover:border-brand-600"
+      role="link"
+      tabIndex={0}
+      data-testid="workflow-card"
+      onClick={open}
+      onKeyDown={(e) => { if (e.key === 'Enter') open(); }}
+      className="group flex cursor-pointer flex-col rounded-card border border-default bg-surface p-4 transition-colors hover:border-strong hover:bg-bg-subtle/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
     >
-      <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-brand-500 via-purple-500 to-brand-400 opacity-0 transition group-hover:opacity-100" />
+      <div className="flex items-start justify-between gap-2">
+        <IntegrationStack workflow={workflow} names={names} max={5} size="md" />
+        <WorkflowActions workflow={workflow} wp={wp} {...actions} className="-mr-1 -mt-1 opacity-60 transition-opacity group-hover:opacity-100" />
+      </div>
 
-      <div className="flex items-start justify-between">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-brand-500 to-purple-600 text-white shadow-sm">
-          <FlowIcon />
+      <div className="mt-3 min-w-0">
+        <div className="flex items-center gap-2">
+          <h3 className="truncate text-sm font-semibold text-fg">{workflow.name}</h3>
         </div>
-        {/* No `onDelete` means the caller's role can't delete (spec/23). */}
-        {onDelete && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete(workflow._id);
-            }}
-            title="Delete workflow"
-            className="rounded-lg p-2 text-slate-300 opacity-0 transition hover:bg-red-50 hover:text-red-500 group-hover:opacity-100 dark:text-slate-600 dark:hover:bg-red-950/40 dark:hover:text-red-400"
-          >
-            <TrashIcon />
-          </button>
-        )}
+        <p className="mt-1 flex items-center gap-1.5 truncate text-xs text-muted">
+          <TriggerIcons workflow={workflow} />
+          <span className="truncate">{triggerLine(workflow, names)}</span>
+        </p>
       </div>
 
       <div className="mt-3 flex items-center gap-2">
-        <h2 className="truncate font-semibold text-slate-900 dark:text-slate-100">{workflow.name}</h2>
-        {version.published ? (
-          <span
-            className="flex shrink-0 items-center gap-1 rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-semibold text-brand-700 dark:bg-brand-950 dark:text-brand-300"
-            title={version.dirty ? `Live: v${version.published} · unpublished changes` : `Live: v${version.published}`}
-          >
-            v{version.published}
-            {version.dirty && <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />}
-          </span>
-        ) : (
-          <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-500 dark:bg-slate-800 dark:text-slate-400" title="Never published: triggers skip it">
-            draft
-          </span>
-        )}
+        <VersionBadge workflow={workflow} />
+        <span className="text-2xs tabular-nums text-subtle">{workflow.nodeCount} {workflow.nodeCount === 1 ? 'node' : 'nodes'}</span>
       </div>
 
-      <div className="mt-2 flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
-        <span className="flex items-center gap-1">
-          <NodeDotsIcon />
-          {nodeCount} {nodeCount === 1 ? 'node' : 'nodes'}
-        </span>
-        <span className="flex items-center gap-1">
-          <LinkIcon />
-          {edgeCount} {edgeCount === 1 ? 'connection' : 'connections'}
-        </span>
-      </div>
-
-      <p className="mt-3 text-xs text-slate-400 dark:text-slate-500">Updated {formatRelativeTime(workflow.updatedAt)}</p>
-
-      <div className="mt-4 flex items-center gap-1 text-sm font-medium text-brand-600 dark:text-brand-400">
-        Open workflow
-        <ArrowRightIcon className="h-4 w-4 transition group-hover:translate-x-0.5" />
+      <div className="mt-4 flex items-end justify-between gap-3 border-t border-default pt-3">
+        <div className="min-w-0 space-y-1.5">
+          <LastRun workflow={workflow} wp={wp} />
+          <div className="flex items-center gap-1.5 text-2xs text-subtle">
+            {person && (
+              <Tooltip content={person.name || person.email}>
+                <span><Avatar name={person.name} email={person.email} seed={person.id} size="xs" /></span>
+              </Tooltip>
+            )}
+            <span className="truncate">Updated {formatRelativeTime(workflow.updatedAt)}</span>
+          </div>
+        </div>
+        <Activity workflow={workflow} />
       </div>
     </div>
   );

@@ -1,43 +1,33 @@
-import { Info, AlertTriangle, CheckCircle2, XCircle, X } from 'lucide-react';
-import { useToastStore } from '../store/toastStore';
+import { Toaster as Sonner } from 'sonner';
+import { AlertTriangle, CheckCircle2, Info, XCircle } from 'lucide-react';
+import { useThemeStore } from '../store/themeStore';
 
-const ICONS = {
-  info: [Info, 'text-info'],
-  error: [XCircle, 'text-danger'],
-  success: [CheckCircle2, 'text-success'],
-  warning: [AlertTriangle, 'text-warning'],
-};
-
+/** Toast host (sonner), themed with the design tokens. Mounted once at the root. */
 export default function Toaster() {
-  const { toasts, dismiss } = useToastStore();
-  if (!toasts.length) return null;
+  const theme = useThemeStore((s) => s.theme);
   return (
-    <div className="pointer-events-none fixed bottom-4 right-4 z-[70] flex w-[360px] max-w-[calc(100vw-2rem)] flex-col gap-2" aria-live="polite">
-      {toasts.map((t) => {
-        const [Icon, color] = ICONS[t.tone] || ICONS.info;
-        return (
-          <div
-            key={t.id}
-            role={t.tone === 'error' ? 'alert' : 'status'}
-            className="pointer-events-auto flex animate-pop-in items-start gap-3 rounded-card border border-default bg-surface-raised px-3.5 py-3 text-sm text-fg shadow-popover"
-          >
-            <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${color}`} aria-hidden="true" />
-            <span className="min-w-0 flex-1 leading-snug">{t.message}</span>
-            {t.action && (
-              <button
-                type="button"
-                onClick={() => { t.action.onClick?.(); dismiss(t.id); }}
-                className="shrink-0 text-xs font-semibold text-accent hover:underline"
-              >
-                {t.action.label}
-              </button>
-            )}
-            <button onClick={() => dismiss(t.id)} className="-mr-1 shrink-0 rounded p-0.5 text-subtle hover:bg-bg-subtle hover:text-fg" aria-label="Dismiss">
-              <X className="h-3.5 w-3.5" aria-hidden="true" />
-            </button>
-          </div>
-        );
-      })}
-    </div>
+    <Sonner
+      theme={theme === 'dark' ? 'dark' : 'light'}
+      position="bottom-right"
+      visibleToasts={5}
+      gap={8}
+      icons={{
+        success: <CheckCircle2 className="h-4 w-4 text-success" />,
+        error: <XCircle className="h-4 w-4 text-danger" />,
+        warning: <AlertTriangle className="h-4 w-4 text-warning" />,
+        info: <Info className="h-4 w-4 text-info" />,
+      }}
+      toastOptions={{
+        unstyled: true,
+        classNames: {
+          toast: 'flex w-[360px] max-w-[calc(100vw-2rem)] items-start gap-3 rounded-card border border-default bg-surface-raised px-3.5 py-3 text-sm text-fg shadow-popover',
+          title: 'leading-snug',
+          description: 'text-xs text-muted',
+          icon: 'mt-0.5 shrink-0',
+          actionButton: 'ml-auto shrink-0 text-xs font-semibold text-accent hover:underline',
+          closeButton: 'text-subtle',
+        },
+      }}
+    />
   );
 }

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Select, TextField } from '../ui';
+import { Select, TextField, NumberField } from '../ui';
 
 const UNITS = { s: 1000, m: 60_000, h: 3_600_000 };
 
@@ -23,9 +23,8 @@ export default function DelayPanel({ config, set }) {
       </Select>
       {mode === 'duration' ? (
         <div className="flex items-end gap-2">
-          <TextField
+          <NumberField
             label="Duration"
-            type="number"
             min="0"
             value={Number.isFinite(amount) ? amount : 0}
             onChange={(e) => set({ durationMs: Math.round(Number(e.target.value) * UNITS[unit]) })}
@@ -39,7 +38,7 @@ export default function DelayPanel({ config, set }) {
       ) : (
         <TextField label="Until (ISO date or template)" value={config.until || ''} placeholder="{{input.sendAt}}" onChange={(e) => set({ until: e.target.value })} />
       )}
-      <p className="text-xs text-slate-400">
+      <p className="text-xs text-subtle">
         Holds no queue slot while waiting. Up to 60 s runs inline; longer delays park the run (max 24 h).
       </p>
     </>

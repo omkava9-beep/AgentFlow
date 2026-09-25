@@ -1,12 +1,14 @@
+import { GanttChart } from 'lucide-react';
 import { formatDuration } from '../../utils/format';
+import { EmptyState, Tooltip, StatusIcon } from '../ui';
 
 const BAR = {
-  success: 'bg-emerald-500/80',
-  failed: 'bg-red-500/80',
-  running: 'bg-blue-500/80 animate-pulse',
-  waiting: 'bg-orange-400/80',
-  skipped: 'bg-slate-300 dark:bg-slate-700',
-  pending: 'bg-slate-200 dark:bg-slate-800',
+  success: 'bg-success/80',
+  failed: 'bg-danger/80',
+  running: 'bg-info/80 animate-pulse',
+  waiting: 'bg-warning/80',
+  skipped: 'bg-[rgb(var(--border-strong))]',
+  pending: 'bg-bg-subtle',
 };
 
 /**
@@ -17,7 +19,7 @@ const BAR = {
 export default function RunGantt({ run, labelOf = (id) => id }) {
   const rows = (run?.nodeResults || []).filter((r) => r.startedAt);
   if (!rows.length) {
-    return <p className="p-6 text-sm text-slate-500 dark:text-slate-400">Nothing has started yet.</p>;
+    return <div className="p-6"><EmptyState compact icon={GanttChart} title="Nothing has started yet" body="Bars appear as nodes start running." /></div>;
   }
   const t = (d) => new Date(d).getTime();
   const t0 = Math.min(...rows.map((r) => t(r.startedAt)), run.startedAt ? t(run.startedAt) : Infinity);
@@ -32,7 +34,7 @@ export default function RunGantt({ run, labelOf = (id) => id }) {
 
   return (
     <div className="h-full overflow-auto p-4">
-      <div className="mb-2 flex justify-between pl-40 text-[10px] text-slate-400">
+      <div className="mb-2 flex justify-between pl-44 pr-16 text-2xs tabular-nums text-subtle">
         <span>0</span>
         <span>{formatDuration(Math.round(span / 2))}</span>
         <span>{formatDuration(span)}</span>
@@ -44,15 +46,16 @@ export default function RunGantt({ run, labelOf = (id) => id }) {
           const width = Math.max(end - start, span * 0.004);
           return (
             <div key={r.nodeId} className="flex items-center gap-2 text-xs">
-              <span className="w-38 w-[9.5rem] shrink-0 truncate text-slate-600 dark:text-slate-300" title={labelOf(r.nodeId)}>
-                {labelOf(r.nodeId)}
-                {r.reused && <span className="ml-1 text-[10px] text-slate-400">⟲</span>}
+              <span className="flex w-[10.5rem] shrink-0 items-center gap-1.5 truncate text-muted">
+                <StatusIcon status={r.status} className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{labelOf(r.nodeId)}</span>
+                {r.reused && <span className="text-2xs text-subtle">reused</span>}
               </span>
-              <div className="relative h-5 flex-1 rounded bg-slate-100 dark:bg-slate-900">
+              <div className="relative h-5 flex-1 rounded bg-bg-subtle">
+                <Tooltip content={`${labelOf(r.nodeId)} · ${r.status} · ${formatDuration(r.durationMs ?? Math.round(end - start))}${r.queuedMs ? ` · queued ${formatDuration(r.queuedMs)}` : ''}`}>
                 <div
                   className={`absolute top-0 h-5 overflow-hidden rounded ${BAR[r.status] || BAR.pending} ${r.reused ? 'opacity-40' : ''}`}
                   style={{ left: pct(start), width: pct(width) }}
-                  title={`${labelOf(r.nodeId)} · ${r.status} · ${formatDuration(r.durationMs ?? Math.round(end - start))}${r.queuedMs ? ` · queued ${formatDuration(r.queuedMs)}` : ''}`}
                 >
                   {/* Attempt segments inside the bar, so retries and backoff show within the node's own span. */}
                   {(r.attemptsLog || []).map((a) => {
@@ -61,15 +64,15 @@ export default function RunGantt({ run, labelOf = (id) => id }) {
                     return (
                       <div
                         key={a.attempt}
-                        className={`absolute top-1 h-3 rounded-sm ${a.outcome === 'success' ? 'bg-emerald-800/60' : 'bg-red-900/60'}`}
+                        className={`absolute top-1 h-3 rounded-sm ${a.outcome === 'success' ? 'bg-black/25' : 'bg-black/40'}`}
                         style={{ left: `${(aStart / width) * 100}%`, width: `${Math.max(1, ((aEnd - aStart) / width) * 100)}%` }}
-                        title={`Attempt ${a.attempt}: ${a.outcome}`}
                       />
                     );
                   })}
                 </div>
+                </Tooltip>
               </div>
-              <span className="w-14 shrink-0 text-right text-[10px] text-slate-400">{formatDuration(r.durationMs ?? null)}</span>
+              <span className="w-14 shrink-0 text-right text-2xs tabular-nums text-subtle">{formatDuration(r.durationMs ?? null)}</span>
             </div>
           );
         })}

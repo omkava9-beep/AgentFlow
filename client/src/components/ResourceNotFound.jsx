@@ -14,13 +14,13 @@ export default function ResourceNotFound({ kind = 'workflow' }) {
   return (
     <div className="mx-auto max-w-md py-10">
       <Card className="p-6 text-center">
-        <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+        <h1 className="text-lg font-semibold text-fg">
           This {kind} isn't in {current?.name || 'this workspace'}
         </h1>
-        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+        <p className="mt-1 text-sm text-muted">
           It may have been deleted, or it belongs to a different workspace.
         </p>
-        <Link to={wp('/dashboard')} className="mt-4 inline-block text-sm font-medium text-brand-600 hover:underline dark:text-brand-400">
+        <Link to={wp('/dashboard')} className="mt-4 inline-block text-sm font-medium text-accent hover:underline">
           Back to dashboard
         </Link>
       </Card>

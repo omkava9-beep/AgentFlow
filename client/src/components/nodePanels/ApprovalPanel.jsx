@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { TextField, TextArea, Select } from '../ui';
+import { Checkbox } from '../ui/Form';
+import { TextField, TextArea, Select, NumberField } from '../ui';
 import { listMembers } from '../../api/members';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 
@@ -58,7 +59,7 @@ export default function ApprovalPanel({ config, set, readOnly }) {
       />
 
       <div className="flex flex-col gap-1.5">
-        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Assignees</span>
+        <span className="text-sm font-medium text-fg">Assignees</span>
         <div className="flex flex-wrap gap-1.5">
           {ROLE_CHIPS.map((role) => (
             <button
@@ -67,57 +68,45 @@ export default function ApprovalPanel({ config, set, readOnly }) {
               disabled={readOnly}
               onClick={() => setAssignees({ roles: toggle(roles, role) })}
               className={`rounded-full border px-2 py-0.5 text-xs capitalize transition ${roles.includes(role)
-                ? 'border-brand-500 bg-brand-50 text-brand-700 dark:bg-brand-950 dark:text-brand-300'
-                : 'border-slate-300 text-slate-500 dark:border-slate-700'}`}
+                ? 'border-accent bg-accent-subtle text-accent-subtle-fg  '
+                : 'border-default text-muted '}`}
             >
               every {role}
             </button>
           ))}
         </div>
-        <div className="max-h-36 overflow-y-auto rounded-lg border border-slate-200 p-1 dark:border-slate-700">
+        <div className="max-h-36 overflow-y-auto rounded-lg border border-default p-1">
           {members.map((m) => (
-            <label key={m.userId} className="flex items-center gap-2 rounded px-2 py-1 text-sm hover:bg-slate-50 dark:hover:bg-slate-800">
-              <input
-                type="checkbox"
-                disabled={readOnly}
-                checked={userIds.includes(m.userId)}
-                onChange={() => setAssignees({ userIds: toggle(userIds, m.userId) })}
-              />
+            <label key={m.userId} className="flex items-center gap-2 rounded px-2 py-1 text-sm hover:bg-bg-subtle">
+              <Checkbox disabled={readOnly} checked={userIds.includes(m.userId)} onChange={() => setAssignees({ userIds: toggle(userIds, m.userId) })} />
               <span className="truncate">{m.name || m.email}</span>
-              <span className="ml-auto text-[10px] uppercase text-slate-400">{m.role}</span>
+              <span className="ml-auto text-[10px] uppercase text-subtle">{m.role}</span>
             </label>
           ))}
-          {!members.length && <p className="px-2 py-1 text-xs text-slate-400">Loading members…</p>}
+          {!members.length && <p className="px-2 py-1 text-xs text-subtle">Loading members…</p>}
         </div>
-        {nobody && <p className="text-xs text-slate-400">No one picked: owners and admins will be asked.</p>}
+        {nobody && <p className="text-xs text-subtle">No one picked: owners and admins will be asked.</p>}
       </div>
 
-      <TextField
+      <NumberField
         label="Approvals needed"
-        type="number"
         min={1}
         value={config.minApprovals ?? 1}
         onChange={(e) => set({ minApprovals: Math.max(1, Number(e.target.value) || 1) })}
         disabled={readOnly}
       />
-      <p className="-mt-1 text-xs text-slate-400">The first rejection decides straight away.</p>
+      <p className="-mt-1 text-xs text-subtle">The first rejection decides straight away.</p>
 
-      <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
-        <input
-          type="checkbox"
-          disabled={readOnly}
-          checked={Boolean(timeout)}
-          onChange={(e) => set({ timeout: e.target.checked ? { afterMs: 60 * 60 * 1000, outcome: 'rejected' } : null })}
-        />
+      <label className="flex items-center gap-2 text-sm text-fg">
+        <Checkbox disabled={readOnly} checked={Boolean(timeout)} onChange={(e) => set({ timeout: e.target.checked ? { afterMs: 60 * 60 * 1000, outcome: 'rejected' } : null })} />
         Time out
       </label>
       {timeout && (
         <div className="flex flex-wrap items-end gap-2">
-          <TextField
+          <NumberField
             label="After"
-            type="number"
             min={1}
-            className="w-20"
+            className="w-32"
             value={amount}
             onChange={(e) => set({ timeout: { ...timeout, afterMs: Math.max(1, Number(e.target.value) || 1) * unit.ms } })}
             disabled={readOnly}
@@ -145,13 +134,8 @@ export default function ApprovalPanel({ config, set, readOnly }) {
         </div>
       )}
 
-      <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
-        <input
-          type="checkbox"
-          disabled={readOnly}
-          checked={config.showInput !== false}
-          onChange={(e) => set({ showInput: e.target.checked })}
-        />
+      <label className="flex items-center gap-2 text-sm text-fg">
+        <Checkbox disabled={readOnly} checked={config.showInput !== false} onChange={(e) => set({ showInput: e.target.checked })} />
         Show the input to the approver
       </label>
     </>

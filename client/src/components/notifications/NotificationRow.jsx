@@ -23,7 +23,7 @@ export default function NotificationRow({ n, onOpen, compact = false }) {
       onClick={() => onOpen(n)}
       className={cx('flex w-full items-start gap-3 px-3 py-2.5 text-left transition-colors hover:bg-bg-subtle', unread && 'bg-accent-subtle/40')}
     >
-      <span className={cx('mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full', TONE[meta.tone] || TONE.neutral)} title={meta.label}>
+      <span className={cx('mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full', TONE[meta.tone] || TONE.neutral)} aria-label={meta.label}>
         <Icon className="h-3.5 w-3.5" aria-hidden="true" />
       </span>
       <span className="min-w-0 flex-1">

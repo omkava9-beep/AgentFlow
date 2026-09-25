@@ -12,10 +12,10 @@ export default function LegacyRedirect({ to }) {
   const { pathname, search } = useLocation();
   const { loaded, workspaces, error } = useEnsureWorkspaces();
 
-  if (error) return <p className="p-6 text-sm text-red-500">{error}</p>;
+  if (error) return <p className="p-6 text-sm text-danger">{error}</p>;
   if (!loaded) return <div role="status" aria-label="Loading" className="p-6"><Skeleton className="h-6 w-40" /></div>;
 
   const target = defaultWorkspace(workspaces);
-  if (!target) return <p className="p-6 text-sm text-slate-500 dark:text-slate-400">You don't belong to any workspace.</p>;
+  if (!target) return <p className="p-6 text-sm text-muted">You don't belong to any workspace.</p>;
   return <Navigate to={`${workspacePath(target.slug, to || pathname)}${to ? '' : search}`} replace />;
 }

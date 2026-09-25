@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
+import { Repeat2, RotateCcw } from 'lucide-react';
+import { Checkbox } from '../ui/Form';
 import { useNavigate } from 'react-router-dom';
 import { rerunRun, retryRun, getRetryPlan } from '../../api/runs';
 import { apiErrorMessage } from '../../api/client';
 import { useCan } from '../../hooks/useCan';
 import { useWorkspacePath } from '../../hooks/useWorkspacePath';
-import { Button } from '../ui';
+import { Button, Badge, Tooltip, Popover, PopoverTrigger, PopoverContent } from '../ui';
 
 const TERMINAL = ['success', 'failed', 'cancelled'];
 
@@ -23,7 +25,6 @@ export default function RunOpsActions({ run, labelOf = (id) => id }) {
   const [open, setOpen] = useState(false);
   const [plan, setPlan] = useState(null);
   const [selected, setSelected] = useState(null);
-  const popover = useRef(null);
 
   const terminal = TERMINAL.includes(run.status);
   const isChild = Boolean(run.parentRunId);
@@ -37,13 +38,6 @@ export default function RunOpsActions({ run, labelOf = (id) => id }) {
     ...(plan?.defaultSet || []),
     ...(run.nodeResults || []).filter((r) => r.status === 'failed').map((r) => r.nodeId),
   ])];
-
-  useEffect(() => {
-    if (!open) return undefined;
-    const onDoc = (e) => { if (popover.current && !popover.current.contains(e.target)) setOpen(false); };
-    document.addEventListener('mousedown', onDoc);
-    return () => document.removeEventListener('mousedown', onDoc);
-  }, [open]);
 
   async function openRetry() {
     setError('');
@@ -100,59 +94,57 @@ export default function RunOpsActions({ run, labelOf = (id) => id }) {
   if (!canRun || !terminal || isChild) return null;
 
   return (
-    <div className="relative flex items-center gap-2">
-      <Button
-        variant="secondary"
-        className="!px-3 !py-1 text-xs"
-        onClick={doRerun}
-        disabled={Boolean(busy) || !hasGraph}
-        title={hasGraph ? 'Run again with the same input on the same graph' : 'This run predates versioning, so its graph is unknown'}
-      >
-        {busy === 'rerun' ? 'Starting…' : '↻ Re-run'}
-      </Button>
+    <div className="flex items-center gap-2">
+      <Tooltip content={hasGraph ? 'Run again with the same input on the same graph' : 'This run predates versioning, so its graph is unknown'}>
+        <span className="inline-flex">
+          <Button size="sm" variant="secondary" icon={Repeat2} onClick={doRerun} loading={busy === 'rerun'} disabled={Boolean(busy) || !hasGraph}>
+            Re-run
+          </Button>
+        </span>
+      </Tooltip>
       {canRetry && (
-        <Button variant="secondary" className="!px-3 !py-1 text-xs" onClick={openRetry} disabled={Boolean(busy)}>
-          ⟲ Retry from failed
-        </Button>
+        <Popover open={open} onOpenChange={(v) => (v ? openRetry() : setOpen(false))}>
+          <PopoverTrigger asChild>
+            <Button size="sm" variant="secondary" icon={RotateCcw} disabled={Boolean(busy)}>Retry from failed</Button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-80 text-xs">
+            <p className="mb-1 text-sm font-semibold text-fg">Retry from</p>
+            <p className="mb-3 text-subtle">Failed nodes and everything downstream re-execute; the rest is reused as-is.</p>
+            {!plan ? (
+              <p className="text-subtle">Planning…</p>
+            ) : !plan.retryable && !candidates.length ? (
+              <p className="text-muted">{plan.reason}</p>
+            ) : (
+              <>
+                <div className="mb-3 space-y-1.5">
+                  {candidates.map((id) => (
+                    <div key={id} className="flex items-center gap-2">
+                      <Checkbox size="sm" checked={selected?.includes(id)} onCheckedChange={() => toggle(id)} label={labelOf(id)} />
+                      {(run.nodeResults || []).find((r) => r.nodeId === id)?.handled && <Badge tone="warning" size="xs">Handled</Badge>}
+                    </div>
+                  ))}
+                </div>
+                <div className="space-y-1 rounded-control border border-default bg-bg-subtle p-2">
+                  <p className="text-muted">
+                    <span className="font-medium text-fg">Re-executes:</span>{' '}
+                    {plan.reexecuted?.length ? plan.reexecuted.map(labelOf).join(', ') : '—'}
+                  </p>
+                  <p className="text-muted">
+                    <span className="font-medium text-fg">Reused (not run again):</span>{' '}
+                    {plan.reused?.length ? plan.reused.map(labelOf).join(', ') : '—'}
+                  </p>
+                </div>
+                <div className="mt-3 flex justify-end gap-2">
+                  <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
+                  <Button size="sm" onClick={doRetry} loading={busy === 'retry'} disabled={!selected?.length || Boolean(busy)}>Retry</Button>
+                </div>
+              </>
+            )}
+            {error && <p className="mt-2 text-danger">{error}</p>}
+          </PopoverContent>
+        </Popover>
       )}
-      {error && <span className="text-xs text-red-500">{error}</span>}
-
-      {open && (
-        <div ref={popover} className="absolute left-0 top-9 z-30 w-80 rounded-lg border border-slate-200 bg-white p-3 text-xs shadow-lg dark:border-slate-700 dark:bg-slate-900">
-          <p className="mb-2 font-semibold text-slate-700 dark:text-slate-200">Retry from</p>
-          {!plan ? (
-            <p className="text-slate-400">Planning…</p>
-          ) : !plan.retryable && !candidates.length ? (
-            <p className="text-slate-500">{plan.reason}</p>
-          ) : (
-            <>
-              <div className="mb-2 space-y-1">
-                {candidates.map((id) => (
-                  <label key={id} className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
-                    <input type="checkbox" checked={selected?.includes(id)} onChange={() => toggle(id)} />
-                    {labelOf(id)}
-                    {(run.nodeResults || []).find((r) => r.nodeId === id)?.handled && <span className="text-[10px] text-amber-600">handled</span>}
-                  </label>
-                ))}
-              </div>
-              <p className="text-slate-500 dark:text-slate-400">
-                <span className="font-medium text-slate-700 dark:text-slate-200">Re-executes:</span>{' '}
-                {plan.reexecuted?.length ? plan.reexecuted.map(labelOf).join(', ') : '—'}
-              </p>
-              <p className="mt-1 text-slate-500 dark:text-slate-400">
-                <span className="font-medium text-slate-700 dark:text-slate-200">Reused (not run again):</span>{' '}
-                {plan.reused?.length ? plan.reused.map(labelOf).join(', ') : '—'}
-              </p>
-              <div className="mt-3 flex justify-end gap-2">
-                <Button variant="secondary" className="!px-2 !py-1 text-xs" onClick={() => setOpen(false)}>Cancel</Button>
-                <Button className="!px-2 !py-1 text-xs" onClick={doRetry} disabled={!selected?.length || Boolean(busy)}>
-                  {busy === 'retry' ? 'Starting…' : 'Retry'}
-                </Button>
-              </div>
-            </>
-          )}
-        </div>
-      )}
+      {error && !open && <span className="text-xs text-danger">{error}</span>}
     </div>
   );
 }

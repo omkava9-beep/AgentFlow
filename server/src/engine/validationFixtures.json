@@ -1,5 +1,5 @@
 {
- "_comment": "spec/30 \u00a73: one fixture set run against BOTH validators - client/src/utils/validateGraph.js (check:logic) and server/src/engine/validateGraph.js (check:versions). Ids are compared as sets.",
+ "_comment": "spec/30 §3: one fixture set run against BOTH validators - client/src/utils/validateGraph.js (check:logic) and server/src/engine/validateGraph.js (check:versions). Ids are compared as sets.",
  "cases": [
   {
    "name": "empty canvas",
@@ -2177,6 +2177,122 @@
     "warnings": [
      "mcp-tool-gone:t2"
     ],
+    "info": []
+   }
+  },
+  {
+   "name": "disabled node: its own problems become info, and a note says it passes through",
+   "input": {
+    "nodes": [
+     {
+      "id": "s",
+      "type": "start",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "s"
+       }
+      }
+     },
+     {
+      "id": "c",
+      "type": "condition",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "c",
+        "expression": "",
+        "disabled": true
+       }
+      }
+     },
+     {
+      "id": "e",
+      "type": "end",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "e"
+       }
+      }
+     }
+    ],
+    "edges": [
+     {
+      "id": "a",
+      "source": "s",
+      "target": "c"
+     },
+     {
+      "id": "b",
+      "source": "c",
+      "target": "e",
+      "sourceHandle": "true"
+     }
+    ]
+   },
+   "expect": {
+    "errors": [],
+    "warnings": [],
+    "info": [
+     "disabled:cond-empty:c",
+     "disabled:cond-branch:c",
+     "node-disabled:c"
+    ]
+   }
+  },
+  {
+   "name": "disabled Start is ignored (Start and End can't be disabled)",
+   "input": {
+    "nodes": [
+     {
+      "id": "s",
+      "type": "start",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "s",
+        "disabled": true
+       }
+      }
+     },
+     {
+      "id": "e",
+      "type": "end",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "e"
+       }
+      }
+     }
+    ],
+    "edges": [
+     {
+      "id": "a",
+      "source": "s",
+      "target": "e"
+     }
+    ]
+   },
+   "expect": {
+    "errors": [],
+    "warnings": [],
     "info": []
    }
   }

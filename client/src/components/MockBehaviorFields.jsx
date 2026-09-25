@@ -1,3 +1,5 @@
+import { NumberInput, Slider } from './ui/Form';
+
 /**
  * Retry and failure-injection controls for a Tool node (spec/17, spec/26). Both
  * fields are *overrides*: unset means "use the server default", which is shown
@@ -25,37 +27,33 @@ export default function MockBehaviorFields({ overrides = {}, defaults, onChange,
   }
 
   return (
-    <div className="space-y-4 rounded-lg border border-slate-200 p-3 dark:border-slate-800">
-      <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Retries &amp; failure injection</p>
+    <div className="space-y-4 rounded-card border border-default p-3">
+      <p className="text-2xs font-medium uppercase tracking-wider text-subtle">Retries &amp; failure injection</p>
 
       {mode === 'live' ? (
-        <p className="text-xs text-slate-400">
+        <p className="text-xs text-subtle">
           Failure injection applies to sandbox calls only — this node calls the real service, which fails on its own.
           {hasFailureOverride && ' The stored override is kept and applies if it runs in the sandbox.'}
         </p>
       ) : (
         <div>
-          <div className="mb-1 flex items-baseline justify-between">
-            <label htmlFor="failure-rate" className="text-sm font-medium text-slate-700 dark:text-slate-300">
-              Simulated failure rate
-            </label>
-            <span className="text-xs tabular-nums text-slate-500 dark:text-slate-400">
+          <div className="mb-1.5 flex items-baseline justify-between">
+            <span id="failure-rate-label" className="text-sm font-medium text-fg">Simulated failure rate</span>
+            <span className="text-xs tabular-nums text-muted">
               {failurePercent}%
-              {!hasFailureOverride && <span className="text-slate-400"> (server default)</span>}
+              {!hasFailureOverride && <span className="text-subtle"> (server default)</span>}
             </span>
           </div>
-          <input
-            id="failure-rate"
-            type="range"
-            min="0"
-            max="100"
-            step="5"
+          <Slider
+            aria-label="Simulated failure rate"
+            min={0}
+            max={100}
+            step={5}
             value={failurePercent}
-            onChange={(e) => patch({ failureRate: Number(e.target.value) / 100 })}
-            className="w-full accent-brand-500"
+            onChange={(v) => patch({ failureRate: v / 100 })}
           />
-          <div className="mt-1 flex items-center justify-between">
-            <p className="text-xs text-slate-400">
+          <div className="mt-1.5 flex items-center justify-between gap-2">
+            <p className="text-xs text-subtle">
               {failurePercent === 100
                 ? 'Always fails — exhausts retries, then fails the run.'
                 : failurePercent === 0
@@ -63,47 +61,33 @@ export default function MockBehaviorFields({ overrides = {}, defaults, onChange,
                   : `~${failurePercent}% of sandbox calls simulate a failure and retry.`}
             </p>
             {hasFailureOverride && (
-              <button
-                type="button"
-                onClick={() => clear('failureRate')}
-                className="shrink-0 text-xs text-brand-600 hover:underline dark:text-brand-400"
-              >
+              <button type="button" onClick={() => clear('failureRate')} className="shrink-0 text-xs font-medium text-accent hover:underline">
                 Use default ({defaultPercent}%)
               </button>
             )}
           </div>
-          <p className="mt-1 text-[11px] text-slate-400">Sandbox calls only — never applied to live calls.</p>
+          <p className="mt-1 text-2xs text-subtle">Sandbox calls only — never applied to live calls.</p>
         </div>
       )}
 
       <div>
-        <div className="mb-1 flex items-baseline justify-between">
-          <label htmlFor="max-attempts" className="text-sm font-medium text-slate-700 dark:text-slate-300">
-            Max attempts
-          </label>
+        <div className="mb-1.5 flex items-baseline justify-between">
+          <label htmlFor="max-attempts" className="text-sm font-medium text-fg">Max attempts</label>
           {hasAttemptsOverride && (
-            <button
-              type="button"
-              onClick={() => clear('maxAttempts')}
-              className="text-xs text-brand-600 hover:underline dark:text-brand-400"
-            >
+            <button type="button" onClick={() => clear('maxAttempts')} className="text-xs font-medium text-accent hover:underline">
               Use default ({defaults?.maxAttempts ?? 3})
             </button>
           )}
         </div>
-        <input
+        <NumberInput
           id="max-attempts"
-          type="number"
-          min="1"
-          max="10"
+          min={1}
+          max={10}
           value={hasAttemptsOverride ? overrides.maxAttempts : ''}
-          placeholder={`server default (${defaults?.maxAttempts ?? 3})`}
-          onChange={(e) =>
-            e.target.value === '' ? clear('maxAttempts') : patch({ maxAttempts: Number(e.target.value) })
-          }
-          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+          placeholder={`default (${defaults?.maxAttempts ?? 3})`}
+          onValueChange={(v) => (v === '' ? clear('maxAttempts') : patch({ maxAttempts: v }))}
         />
-        <p className="mt-1 text-xs text-slate-400">Applies to live and sandbox calls. Retries back off exponentially.</p>
+        <p className="mt-1 text-xs text-subtle">Applies to live and sandbox calls. Retries back off exponentially.</p>
       </div>
     </div>
   );

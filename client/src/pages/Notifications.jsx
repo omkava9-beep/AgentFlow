@@ -1,20 +1,36 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Bell, CheckCheck, BellOff } from 'lucide-react';
 import { listNotifications } from '../api/notifications';
 import { useNotificationStore } from '../store/notificationStore';
 import NotificationRow from '../components/notifications/NotificationRow';
-import { Button, Card } from '../components/ui';
-import { SkeletonTable } from '../components/ui/Skeleton';
-import EmptyState from '../components/ui/EmptyState';
+import { KIND_META } from '../components/notifications/notificationKinds';
+import { PageHeader, Button, Card, Segmented, Select, EmptyState, SkeletonTable } from '../components/ui';
+
+const KIND_FILTERS = [
+  { value: '', label: 'All kinds' },
+  ...Object.entries(KIND_META).map(([value, meta]) => ({ value, label: meta.label, icon: meta.icon })),
+];
+
+/** "Today" / "Yesterday" / "Earlier" by local calendar day. */
+function groupOf(date) {
+  const d = new Date(date);
+  const start = new Date(); start.setHours(0, 0, 0, 0);
+  if (d >= start) return 'Today';
+  if (d >= new Date(start.getTime() - 86400000)) return 'Yesterday';
+  return 'Earlier';
+}
 
 /** Every notification across your workspaces, paginated (spec/29 UI). */
 export default function Notifications() {
   const [items, setItems] = useState([]);
   const [cursor, setCursor] = useState(null);
-  const [unreadOnly, setUnreadOnly] = useState(false);
+  const [filter, setFilter] = useState('all');
+  const [kind, setKind] = useState('');
   const [loading, setLoading] = useState(true);
   const { markRead, markAll, unreadCount } = useNotificationStore();
   const navigate = useNavigate();
+  const unreadOnly = filter === 'unread';
 
   const load = useCallback(async (before) => {
     setLoading(true);
@@ -35,20 +51,28 @@ export default function Notifications() {
     if (n.link) navigate(n.link);
   }
 
+  const shown = kind ? items.filter((n) => n.kind === kind) : items;
+  const groups = useMemo(() => {
+    const out = [];
+    for (const n of shown) {
+      const g = groupOf(n.lastAt || n.createdAt);
+      if (!out.length || out[out.length - 1].label !== g) out.push({ label: g, items: [] });
+      out[out.length - 1].items.push(n);
+    }
+    return out;
+  }, [shown]);
+
   return (
     <div className="mx-auto max-w-3xl">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">Notifications</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">Mentions, replies, failed runs and invites from all your workspaces.</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-            <input type="checkbox" checked={unreadOnly} onChange={(e) => setUnreadOnly(e.target.checked)} />
-            Unread only
-          </label>
+      <PageHeader
+        icon={Bell}
+        title="Notifications"
+        description="Mentions, replies, failed runs and invites from all your workspaces."
+        actions={(
           <Button
+            size="sm"
             variant="secondary"
+            icon={CheckCheck}
             disabled={!unreadCount}
             onClick={async () => {
               await markAll();
@@ -57,24 +81,39 @@ export default function Notifications() {
           >
             Mark all read
           </Button>
-        </div>
+        )}
+      />
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <Segmented
+          aria-label="Show"
+          value={filter}
+          onChange={setFilter}
+          items={[{ value: 'all', label: 'All' }, { value: 'unread', label: `Unread${unreadCount ? ` · ${unreadCount}` : ''}` }]}
+        />
+        <div className="w-48"><Select size="sm" aria-label="Kind" value={kind} onValueChange={setKind} options={KIND_FILTERS} /></div>
       </div>
+
       {loading && items.length === 0 && <SkeletonTable rows={5} columns={2} />}
-      {!loading && items.length === 0 && (
+      {!loading && shown.length === 0 && (
         <EmptyState
-          icon="🔔"
-          title={unreadOnly ? 'No unread notifications' : 'Nothing here yet'}
-          body={unreadOnly ? undefined : 'Mentions, replies, failed runs you watch and approvals waiting on you land here.'}
+          icon={unreadOnly ? BellOff : Bell}
+          title={unreadOnly ? 'You’re all caught up' : kind ? 'Nothing of this kind' : 'Nothing here yet'}
+          body={unreadOnly || kind ? undefined : 'Mentions, replies, failed runs you watch and approvals waiting on you land here.'}
         />
       )}
-      <Card className={`divide-y divide-slate-100 overflow-hidden p-0 dark:divide-slate-800 ${items.length ? '' : 'hidden'}`}>
-        {items.map((n) => <NotificationRow key={n.id} n={n} onOpen={open} />)}
-      </Card>
+      <div className="space-y-5">
+        {groups.map((g) => (
+          <section key={g.label}>
+            <h2 className="mb-2 text-xs font-medium text-subtle">{g.label}</h2>
+            <Card className="divide-y divide-default overflow-hidden">
+              {g.items.map((n) => <NotificationRow key={n.id} n={n} onOpen={open} />)}
+            </Card>
+          </section>
+        ))}
+      </div>
       {cursor && (
         <div className="mt-4 text-center">
-          <Button variant="secondary" disabled={loading} onClick={() => load(cursor)}>
-            {loading ? 'Loading…' : 'Load more'}
-          </Button>
+          <Button size="sm" variant="secondary" loading={loading} onClick={() => load(cursor)}>Load more</Button>
         </div>
       )}
     </div>

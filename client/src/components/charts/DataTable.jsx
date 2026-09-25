@@ -5,9 +5,9 @@
  */
 export default function DataTable({ columns, rows }) {
   return (
-    <div className="max-h-64 overflow-auto rounded-lg border border-slate-200 dark:border-slate-800">
+    <div className="max-h-64 overflow-auto rounded-lg border border-default">
       <table className="w-full text-left text-xs">
-        <thead className="sticky top-0 bg-slate-50 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+        <thead className="sticky top-0 bg-bg-subtle text-subtle">
           <tr>
             {columns.map((c) => (
               <th key={c.key} scope="col" className={`px-3 py-2 font-medium ${c.numeric ? 'text-right' : ''}`}>
@@ -16,13 +16,13 @@ export default function DataTable({ columns, rows }) {
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+        <tbody className="divide-y divide-default">
           {rows.map((row, i) => (
             <tr key={i}>
               {columns.map((c) => (
                 <td
                   key={c.key}
-                  className={`px-3 py-1.5 text-slate-600 dark:text-slate-300 ${c.numeric ? 'text-right tabular-nums' : ''}`}
+                  className={`px-3 py-1.5 text-muted ${c.numeric ? 'text-right tabular-nums' : ''}`}
                 >
                   {c.format ? c.format(row[c.key]) : row[c.key]}
                 </td>

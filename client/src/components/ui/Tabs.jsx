@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import { useRef } from 'react';
+import * as ToggleGroup from '@radix-ui/react-toggle-group';
 import { cx } from './cx';
 
 /**
@@ -66,31 +67,34 @@ export default function Tabs({ items, value, onChange, className = '', size = 'm
   );
 }
 
-/** Compact segmented control for 2-4 options (filters, view toggles). */
-export function Segmented({ items, value, onChange, size = 'sm', className = '' }) {
+/** Compact segmented control for 2-4 options (filters, view toggles), on Radix ToggleGroup. */
+export function Segmented({ items, value, onChange, size = 'sm', className = '', 'aria-label': ariaLabel }) {
   return (
-    <div role="radiogroup" className={cx('inline-flex rounded-control border border-default bg-bg-subtle p-0.5', className)}>
+    <ToggleGroup.Root
+      type="single"
+      value={value}
+      onValueChange={(v) => { if (v) onChange(v); }}
+      aria-label={ariaLabel}
+      className={cx('inline-flex rounded-control border border-default bg-bg-subtle p-0.5', className)}
+    >
       {items.map((item) => {
-        const active = item.value === value;
         const Icon = item.icon;
         return (
-          <button
+          <ToggleGroup.Item
             key={item.value}
-            type="button"
-            role="radio"
-            aria-checked={active}
-            onClick={() => onChange(item.value)}
+            value={item.value}
+            disabled={item.disabled}
             className={cx(
-              'inline-flex items-center gap-1.5 rounded-[5px] font-medium transition-colors',
+              'inline-flex items-center gap-1.5 rounded-[5px] font-medium text-subtle transition-colors hover:text-fg disabled:opacity-50',
+              'data-[state=on]:bg-surface data-[state=on]:text-fg data-[state=on]:shadow-sm',
               size === 'sm' ? 'h-6 px-2 text-xs' : 'h-7 px-2.5 text-sm',
-              active ? 'bg-surface text-fg shadow-sm' : 'text-subtle hover:text-fg',
             )}
           >
             {Icon && <Icon className="h-3.5 w-3.5" aria-hidden="true" />}
             {item.label}
-          </button>
+          </ToggleGroup.Item>
         );
       })}
-    </div>
+    </ToggleGroup.Root>
   );
 }

@@ -7,6 +7,8 @@ import LegacyRedirect from './components/LegacyRedirect';
 import WorkspaceFallback from './components/WorkspaceFallback';
 import Toaster from './components/Toaster';
 import ConfirmHost from './components/ui/ConfirmDialog';
+import { TooltipProvider } from './components/ui/Tooltip';
+import TitleTooltips from './components/ui/TitleTooltips';
 import { RouteErrorBoundary } from './components/ui/ErrorBoundary';
 import NotFound from './pages/NotFound';
 import { setNavigate } from './navigation';
@@ -46,11 +48,12 @@ function Root() {
   }, [navigate]);
 
   return (
-    <>
+    <TooltipProvider delayDuration={300} skipDelayDuration={200}>
       <Outlet />
       <Toaster />
       <ConfirmHost />
-    </>
+      <TitleTooltips />
+    </TooltipProvider>
   );
 }
 

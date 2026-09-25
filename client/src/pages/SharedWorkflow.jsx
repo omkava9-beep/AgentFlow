@@ -68,7 +68,7 @@ export default function SharedWorkflow() {
             <Wordmark className="text-sm" />
             <span className="h-4 w-px bg-[rgb(var(--border))]" aria-hidden="true" />
             <span className="truncate text-sm font-medium text-fg">{workflow.name}</span>
-            <span className="shrink-0 rounded-full bg-bg-subtle px-2 py-0.5 text-2xs font-medium text-muted ring-1 ring-inset ring-zinc-900/5 dark:ring-white/10">
+            <span className="shrink-0 rounded-full bg-bg-subtle px-2 py-0.5 text-2xs font-medium text-muted ring-1 ring-inset ring-[rgb(var(--border))] dark:ring-white/10">
               Read-only
             </span>
           </div>
