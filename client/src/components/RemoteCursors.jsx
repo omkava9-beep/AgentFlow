@@ -1,3 +1,4 @@
+import { Lock } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { usePresence, cursorVisible } from '../collab/usePresence';
 import { useWorkflowStore } from '../store/workflowStore';
@@ -42,7 +43,7 @@ export default function RemoteCursors({ viewport, width, height }) {
           className="absolute -translate-y-full whitespace-nowrap rounded-md px-1.5 py-0.5 text-[10px] font-semibold text-white shadow"
           style={{ left: pos.left, top: pos.top - 4, backgroundColor: color }}
         >
-          🔒 {name}
+          <Lock className="mr-0.5 inline h-2.5 w-2.5 align-[-1px]" aria-hidden="true" />{name}
         </span>
       ))}
 

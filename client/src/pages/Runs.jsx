@@ -15,6 +15,9 @@ import { ErrorText } from '../components/ui.jsx';
 import TriggerBadge from '../components/TriggerBadge';
 import VersionBadge from '../components/versions/VersionBadge';
 import { RelativeTime, Duration, NodeProgress, LineageIcons, TriggeredBy } from '../components/runs/RunBits';
+import { useMediaQuery } from '../hooks/useMediaQuery';
+
+const NARROW_HIDDEN = new Set(['version', 'by']);
 import { shortId } from '../utils/runIds';
 
 const STATUSES = ['success', 'failed', 'running', 'waiting', 'cancelled', 'pending'];
@@ -190,6 +193,9 @@ export default function Runs({ fixedWorkflowId = null }) {
   ];
   const activeFilters = ['workflowId', 'status', 'trigger', 'version', 'range', 'q'].filter((k) => params.get(k) && !(k === 'workflowId' && fixedWorkflowId));
 
+  // Below 1280px the table would scroll sideways; version and who-started-it
+  // are the columns you can most easily do without (both show in the run).
+  const wide = useMediaQuery('(min-width: 1280px)');
   const columns = [
     { key: 'status', header: 'Status', width: 128, cell: (r) => <StatusBadge status={r.failReason === 'interrupted' ? 'interrupted' : r.status} /> },
     {
@@ -215,7 +221,7 @@ export default function Runs({ fixedWorkflowId = null }) {
     { key: 'duration', header: 'Duration', align: 'right', className: 'whitespace-nowrap', cell: (r) => <Duration ms={r.durationMs} running={['running', 'pending'].includes(r.status)} startedAt={r.startedAt} /> },
     { key: 'nodes', header: 'Nodes', cell: (r) => <NodeProgress counts={r.nodeCounts} maxAttempts={r.maxAttempts} /> },
     { key: 'by', header: '', width: 44, align: 'right', cell: (r) => <TriggeredBy run={r} /> },
-  ];
+  ].filter((c) => wide || !NARROW_HIDDEN.has(c.key));
 
   const filters = (
     <div className="mb-4 space-y-3">

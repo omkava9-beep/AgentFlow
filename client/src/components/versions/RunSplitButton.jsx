@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, Loader2, Play, Rocket } from 'lucide-react';
+import { Tooltip } from '../ui/index';
 
 /**
  * spec/30: "▶ Test run (draft)" is the default; "Run published vN" sits in the
@@ -23,16 +24,17 @@ export default function RunSplitButton({ onRun, running, testBlocked, testBlocke
 
   return (
     <div ref={ref} className="relative flex">
-      <button
+      <Tooltip content={quotaBlocked ? quotaReason : testBlockedReason || 'Run the current draft as a test'}>
+        <button aria-label={quotaBlocked ? quotaReason : testBlockedReason || 'Run the current draft as a test'}
         type="button"
         className={`${base} rounded-l-control px-3`}
         onClick={() => onRun('draft')}
         disabled={testDisabled}
-        title={quotaBlocked ? quotaReason : testBlockedReason || 'Run the current draft as a test'}
       >
         {running ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <Play className="h-3.5 w-3.5 text-success" aria-hidden="true" />}
         {running ? 'Starting…' : 'Test run'}
       </button>
+      </Tooltip>
       <button
         type="button"
         aria-label="More run options"
@@ -52,16 +54,17 @@ export default function RunSplitButton({ onRun, running, testBlocked, testBlocke
           >
             <Play className="h-4 w-4 text-subtle" aria-hidden="true" /> Test run (draft)
           </button>
-          <button
+          <Tooltip content={!publishedVersion ? 'Publish a version first' : quotaBlocked ? quotaReason : undefined}>
+            <button aria-label={!publishedVersion ? 'Publish a version first' : quotaBlocked ? quotaReason : undefined}
             type="button"
             className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-fg hover:bg-bg-subtle disabled:cursor-not-allowed disabled:opacity-50"
             onClick={() => { setOpen(false); onRun('published'); }}
             disabled={publishedDisabled}
-            title={!publishedVersion ? 'Publish a version first' : quotaBlocked ? quotaReason : undefined}
           >
             <Rocket className="h-4 w-4 text-subtle" aria-hidden="true" />
             {publishedVersion ? `Run published v${publishedVersion}` : 'Run published (none yet)'}
           </button>
+          </Tooltip>
         </div>
       )}
     </div>

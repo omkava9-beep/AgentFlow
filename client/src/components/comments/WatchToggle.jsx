@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Bell, BellOff } from 'lucide-react';
 import { getWatch, watchWorkflow, unwatchWorkflow } from '../../api/comments';
+import { Tooltip } from '../ui/index';
 
 /** The Builder toolbar's watch toggle (spec/29 §5): failed runs notify watchers. */
 export default function WatchToggle({ workflowId }) {
@@ -14,7 +15,8 @@ export default function WatchToggle({ workflowId }) {
 
   if (watching === null) return null;
   return (
-    <button
+    <Tooltip content={watching ? 'You get a notification when a run of this workflow fails' : 'Get notified when a run fails'}>
+      <button aria-label={watching ? 'You get a notification when a run of this workflow fails' : 'Get notified when a run fails'}
       type="button"
       data-testid="watch-toggle"
       onClick={async () => {
@@ -26,7 +28,6 @@ export default function WatchToggle({ workflowId }) {
           setWatching(!next);
         }
       }}
-      title={watching ? 'You get a notification when a run of this workflow fails' : 'Get notified when a run fails'}
       aria-pressed={watching}
       className={`inline-flex h-8 w-8 items-center justify-center rounded-control transition-colors ${
         watching ? 'bg-accent-subtle text-accent-subtle-fg' : 'text-muted hover:bg-bg-subtle hover:text-fg'
@@ -37,5 +38,6 @@ export default function WatchToggle({ workflowId }) {
       {watching ? <Bell className="h-4 w-4" aria-hidden="true" /> : <BellOff className="h-4 w-4" aria-hidden="true" />}
       <span className="sr-only">{watching ? 'Watching' : 'Watch'}</span>
     </button>
+    </Tooltip>
   );
 }

@@ -1,3 +1,5 @@
+import { Tooltip } from '../ui/index';
+import { ArrowDown, ArrowUp, X } from 'lucide-react';
 /**
  * Key → template rows, shared by Transform's mappings and Sub-workflow's
  * input mapping (spec/31 §1, §6). Keys may be dotted paths.
@@ -21,9 +23,15 @@ export default function MappingTable({ rows = [], onChange, keyPlaceholder = 'fi
           <input className={input} value={row.key || ''} placeholder={keyPlaceholder} onChange={(e) => update(i, { key: e.target.value })} aria-label="Key" />
           <span className="text-xs text-subtle">=</span>
           <input className={input} value={row.value || ''} placeholder={valuePlaceholder} onChange={(e) => update(i, { value: e.target.value })} aria-label="Value" />
-          <button type="button" onClick={() => move(i, -1)} className="px-0.5 text-xs text-subtle hover:text-muted" title="Move up">↑</button>
-          <button type="button" onClick={() => move(i, 1)} className="px-0.5 text-xs text-subtle hover:text-muted" title="Move down">↓</button>
-          <button type="button" onClick={() => remove(i)} className="px-0.5 text-xs text-danger hover:text-danger" title="Remove">✕</button>
+          <Tooltip content={"Move up"}>
+            <button aria-label={"Move up"} type="button" onClick={() => move(i, -1)} className="rounded p-0.5 text-subtle hover:bg-bg-subtle hover:text-fg"><ArrowUp className="h-3.5 w-3.5" aria-hidden="true" /></button>
+          </Tooltip>
+          <Tooltip content={"Move down"}>
+            <button aria-label={"Move down"} type="button" onClick={() => move(i, 1)} className="rounded p-0.5 text-subtle hover:bg-bg-subtle hover:text-fg"><ArrowDown className="h-3.5 w-3.5" aria-hidden="true" /></button>
+          </Tooltip>
+          <Tooltip content={"Remove"}>
+            <button aria-label={"Remove"} type="button" onClick={() => remove(i)} className="rounded p-0.5 text-subtle hover:bg-danger-subtle hover:text-danger"><X className="h-3.5 w-3.5" aria-hidden="true" /></button>
+          </Tooltip>
         </div>
       ))}
       <button type="button" onClick={() => onChange([...rows, { key: '', value: '' }])} className="text-xs font-medium text-accent hover:underline">

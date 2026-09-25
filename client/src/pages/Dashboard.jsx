@@ -26,6 +26,7 @@ import { useIntegrationStore } from '../store/integrationStore';
 import { useToastStore } from '../store/toastStore';
 import { confirm } from '../components/ui/confirm';
 import { formatRelativeTime } from '../utils/time';
+import { useMediaQuery } from '../hooks/useMediaQuery';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 
 const VIEW_KEY = 'agentflow:workflows-view';
@@ -34,16 +35,6 @@ const VIEW_KEY = 'agentflow:workflows-view';
  * A row's leading mark: the workflow's main integration, so rows differ at a
  * glance (a Stripe flow shows Stripe). Falls back to a neutral workflow glyph.
  */
-function useMediaQuery(query) {
-  const [matches, setMatches] = useState(() => (typeof window !== 'undefined' ? window.matchMedia(query).matches : true));
-  useEffect(() => {
-    const mq = window.matchMedia(query);
-    const on = () => setMatches(mq.matches);
-    mq.addEventListener('change', on);
-    return () => mq.removeEventListener('change', on);
-  }, [query]);
-  return matches;
-}
 
 /** "Alice · 2m ago" - who last changed it, and when. */
 function UpdatedBy({ workflow }) {

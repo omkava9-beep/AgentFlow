@@ -14,6 +14,7 @@ import { formatDayLong, formatDuration, formatPercent } from '../utils/format';
 import { useWorkspacePath } from '../hooks/useWorkspacePath';
 import { useWorkspaceWorkflows } from '../hooks/useWorkspaceWorkflows';
 import { on } from '../realtime/socket';
+import { useIntegrationStore } from '../store/integrationStore';
 import NodeStatsTable from '../components/analytics/NodeStatsTable';
 
 // spec/35 §5: a finishing run refetches the summary - debounced, so a
@@ -42,6 +43,16 @@ export default function Analytics() {
   const { workflows } = useWorkspaceWorkflows();
   const [days, setDays] = useState(30);
   const [data, setData] = useState(null);
+  const catalog = useIntegrationStore((st) => st.catalog);
+  const loadCatalog = useIntegrationStore((st) => st.loadCatalog);
+  useEffect(() => { loadCatalog().catch(() => {}); }, [loadCatalog]);
+  // 'slack.post_message' → 'Slack · Post message', from the catalogue when it's loaded.
+  const actionLabel = (entry) => {
+    const [integrationId, actionId] = String(entry.type || '').split('.');
+    const manifest = catalog?.find((i) => i.id === (entry.integration || integrationId));
+    const action = manifest?.actions?.find((a) => a.id === (entry.action || actionId));
+    return manifest ? `${manifest.name} · ${action?.name || actionId}` : entry.type;
+  };
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showTable, setShowTable] = useState(false);
@@ -180,7 +191,7 @@ export default function Analytics() {
 
             <ChartCard title="Integrations used" subtitle="Most-used integration actions">
               <CategoryBars
-                data={data.topToolTypes.map((n) => ({ label: n.type, count: n.count }))}
+                data={data.topToolTypes.map((n) => ({ label: actionLabel(n), count: n.count }))}
                 emptyMessage="No integration nodes configured yet."
               />
             </ChartCard>

@@ -1,9 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import {
-  X, MoreHorizontal, Settings2, SlidersHorizontal, SquareTerminal, BookOpen, CopyPlus, Copy, EyeOff, Eye, Trash2,
-  MessageSquarePlus, Hash, PencilLine, AlertTriangle, AlertCircle, Info, ExternalLink, GripVertical,
-} from 'lucide-react';
+import { AlertCircle, AlertTriangle, BookOpen, Copy, CopyPlus, ExternalLink, Eye, EyeOff, GripVertical, Hash, Info, MessageSquarePlus, MoreHorizontal, PencilLine, Settings2, SlidersHorizontal, SquareTerminal, Trash2, X, Zap } from 'lucide-react';
 import { Checkbox, Switch, NumberInput, Field, Input, Textarea } from './ui/Form';
 import NodeTypeIcon from './ui/NodeTypeIcon';
 import Tabs from './ui/Tabs';
@@ -291,7 +288,7 @@ function SettingsFields({ node, set, readOnly }) {
     return (
       <p className="text-sm text-muted">
         The Start node has nothing to configure. What starts a run — a schedule, a webhook or an event — is set in the
-        <span className="font-medium text-fg"> Triggers</span> panel (the ⚡ button on the left rail).
+        <span className="font-medium text-fg"> Triggers</span> panel (the <Zap className="inline h-3.5 w-3.5 align-[-2px]" aria-label="lightning" /> button on the left rail).
       </p>
     );
   }

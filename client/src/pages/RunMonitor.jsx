@@ -45,8 +45,8 @@ function logTone(line) {
 }
 
 /** One node's result in the side panel. */
-function NodeResultRow({ r, node, labelOf, wp, catalog }) {
-  const [showOutput, setShowOutput] = useState(false);
+function NodeResultRow({ r, node, labelOf, wp, catalog, defaultOpen = false }) {
+  const [showOutput, setShowOutput] = useState(defaultOpen);
   const config = node?.data?.config || {};
   const integration = r.integration || config.integration;
   const manifest = integration ? catalog?.find((i) => i.id === integration) : null;
@@ -285,7 +285,17 @@ export default function RunMonitor() {
                 )}
                 <ul className="space-y-2">
                   {results.map((r) => (
-                    <NodeResultRow key={r.nodeId} r={r} node={nodesById.get(r.nodeId)} labelOf={labelOf} wp={wp} catalog={catalog} />
+                    <NodeResultRow
+                      key={r.nodeId}
+                      r={r}
+                      node={nodesById.get(r.nodeId)}
+                      labelOf={labelOf}
+                      wp={wp}
+                      catalog={catalog}
+                      // The run's result is what you came for: the End node's output
+                      // opens by default, and every output does on a small run.
+                      defaultOpen={nodesById.get(r.nodeId)?.type === 'end' || results.length <= 4}
+                    />
                   ))}
                 </ul>
               </>

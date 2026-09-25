@@ -1,3 +1,4 @@
+import { AlertTriangle } from 'lucide-react';
 import { Component } from 'react';
 import { Link, isRouteErrorResponse, useRouteError } from 'react-router-dom';
 
@@ -11,9 +12,9 @@ function Fallback({ error, errorId, compact = false, onRetry }) {
       data-testid="error-boundary"
       className={`mx-auto flex max-w-lg flex-col items-center text-center ${compact ? 'p-4' : 'p-10'}`}
     >
-      <span className="mb-3 text-3xl" aria-hidden="true">⚠️</span>
-      <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Something went wrong</h2>
-      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+      <span className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-danger-subtle text-danger" aria-hidden="true"><AlertTriangle className="h-5 w-5" /></span>
+      <h2 className="text-base font-semibold text-fg">Something went wrong</h2>
+      <p className="mt-1 text-sm text-muted">
         {compact ? 'This panel crashed; the rest of the page still works.' : 'This page hit an unexpected error.'} Error id{' '}
         <span className="font-mono">{errorId}</span>.
       </p>

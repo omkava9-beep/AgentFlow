@@ -1,3 +1,4 @@
+import { X } from 'lucide-react';
 import { useState } from 'react';
 import { formatRelativeTime } from '../../utils/time';
 import { decodeMentions } from '../../utils/mentions';
@@ -39,7 +40,7 @@ export default function ThreadPopover({ thread, api, onClose, style }) {
               {resolved ? 'Reopen' : 'Resolve'}
             </button>
           )}
-          <button type="button" onClick={onClose} aria-label="Close" className="rounded-md px-1.5 text-subtle hover:bg-bg-subtle">✕</button>
+          <button type="button" onClick={onClose} aria-label="Close" className="rounded-md p-1 text-subtle hover:bg-bg-subtle hover:text-fg"><X className="h-3.5 w-3.5" aria-hidden="true" /></button>
         </div>
       </div>
       <div className="max-h-72 space-y-3 overflow-y-auto px-3 py-2.5">

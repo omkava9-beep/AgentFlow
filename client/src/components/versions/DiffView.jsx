@@ -1,3 +1,4 @@
+import { X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import Select from '../ui/Select';
 import { Checkbox } from '../ui/Form';
@@ -151,7 +152,7 @@ export default function DiffView({ workflowId, from, to, onChangeRange, onClose 
           <div className="absolute right-3 top-3 z-10 w-80 rounded-xl border border-warning/30 bg-surface p-3 text-xs shadow-lg">
             <div className="mb-2 flex items-center justify-between">
               <span className="font-semibold">“{inspect.label}” changed</span>
-              <button type="button" onClick={() => setInspect(null)} className="text-subtle">✕</button>
+              <button type="button" onClick={() => setInspect(null)} aria-label="Close" className="rounded p-0.5 text-subtle hover:bg-bg-subtle hover:text-fg"><X className="h-3.5 w-3.5" aria-hidden="true" /></button>
             </div>
             {inspect.rows.map((r) => (
               <div key={r.path} className="mb-2">

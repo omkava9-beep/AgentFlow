@@ -1,3 +1,4 @@
+import { Lock } from 'lucide-react';
 import { useCan } from '../../hooks/useCan';
 
 /**
@@ -32,7 +33,7 @@ export default function CodePanel({ config, set }) {
       </label>
       {!canAuthor && (
         <p className="text-xs text-muted">
-          🔒 Read-only — editing code needs the <code>code:author</code> permission (owner or admin). You can still run it.
+          <Lock className="mr-1 inline h-3 w-3 align-[-2px]" aria-hidden="true" />Read-only — editing code needs the <code>code:author</code> permission (owner or admin). You can still run it.
         </p>
       )}
       <p className="text-xs text-subtle">

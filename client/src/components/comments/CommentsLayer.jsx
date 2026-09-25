@@ -11,6 +11,7 @@ import ThreadPopover from './ThreadPopover';
 import ThreadListPanel from './ThreadListPanel';
 import MentionComposer from './MentionComposer';
 import { useCanvasUi } from '../canvas/canvasUiStore';
+import { Tooltip } from '../ui/index';
 
 const DEFAULT_NODE_WIDTH = 180;
 const POPOVER_WIDTH = 330;
@@ -175,27 +176,29 @@ export default function CommentsLayer({ workflowId, nodes, viewport, flowRef, wi
   const controls = (
     <div className="pointer-events-auto flex items-center divide-x divide-[rgb(var(--border))] overflow-hidden rounded-control border border-default bg-surface shadow-sm">
       {canComment && (
-        <button
+        <Tooltip content={"Comment mode (C): click a node or an empty spot to start a thread"}>
+          <button aria-label={"Comment mode (C): click a node or an empty spot to start a thread"}
           type="button"
           data-testid="comment-mode"
           onClick={() => { setMode((m) => !m); setDraft(null); setRepinning(null); }}
-          title="Comment mode (C): click a node or an empty spot to start a thread"
           aria-pressed={mode}
           className={`${segment} ${mode ? 'bg-accent text-accent-fg' : 'text-fg hover:bg-bg-subtle'}`}
         >
           <MessageSquarePlus className="h-3.5 w-3.5" aria-hidden="true" /> <span className="hidden xl:inline">Comment</span>
         </button>
+        </Tooltip>
       )}
-      <button
+      <Tooltip content={"All comment threads on this workflow"}>
+        <button aria-label={"All comment threads on this workflow"}
         type="button"
         data-testid="thread-list-toggle"
         onClick={() => setListOpen((v) => !v)}
-        title="All comment threads on this workflow"
         aria-pressed={listOpen}
         className={`${segment} ${listOpen ? 'bg-bg-subtle' : ''} text-fg hover:bg-bg-subtle`}
       >
         Threads{openCount ? ` · ${openCount}` : ''}
       </button>
+      </Tooltip>
       <label className={`${segment} cursor-pointer text-muted hover:bg-bg-subtle`} title="Show resolved threads on the canvas">
         <Checkbox checked={showResolved} onChange={(e) => setShowResolved(e.target.checked)} />
         Resolved
@@ -227,14 +230,14 @@ export default function CommentsLayer({ workflowId, nodes, viewport, flowRef, wi
         const s = toScreen(point);
         const resolved = Boolean(thread.resolvedAt);
         return (
-          <button
+          <Tooltip content={`${thread.comments[0]?.author?.name || ''}: ${thread.replyCount} repl${thread.replyCount === 1 ? 'y' : 'ies'}`}>
+            <button aria-label={`${thread.comments[0]?.author?.name || ''}: ${thread.replyCount} repl${thread.replyCount === 1 ? 'y' : 'ies'}`}
             key={thread.id}
             type="button"
             data-testid="comment-pin"
             data-thread-id={thread.id}
             onClick={(e) => { e.stopPropagation(); setActiveId(thread.id === activeId ? null : thread.id); setDraft(null); }}
             style={{ left: s.left - 12, top: s.top - 12 }}
-            title={`${thread.comments[0]?.author?.name || ''}: ${thread.replyCount} repl${thread.replyCount === 1 ? 'y' : 'ies'}`}
             className={`pointer-events-auto absolute flex h-6 min-w-6 items-center justify-center gap-0.5 rounded-full rounded-bl-none border-2 border-white px-1 text-[10px] font-bold text-white shadow-md ${
               resolved ? 'bg-surface-sunken' : 'bg-accent'
             } ${thread.id === activeId ? 'ring-2 ring-accent/40' : ''}`}
@@ -242,6 +245,7 @@ export default function CommentsLayer({ workflowId, nodes, viewport, flowRef, wi
             {(thread.comments[0]?.author?.name || '?').slice(0, 1).toUpperCase()}
             {thread.replyCount > 0 && <span className="font-medium">{thread.replyCount}</span>}
           </button>
+          </Tooltip>
         );
       })}
 

@@ -1,4 +1,6 @@
+import { X } from 'lucide-react';
 import { useWorkflowStore } from '../store/workflowStore';
+import { Tooltip } from './ui/index';
 
 /**
  * Candidate list editor for a handoff agent (spec/16). The candidate names are
@@ -45,14 +47,15 @@ export default function HandoffCandidates({ nodeId }) {
               onChange={(e) => renameHandoffCandidate(nodeId, index, e.target.value)}
               className="min-w-0 flex-1 rounded border border-default bg-surface px-2 py-1 text-xs text-fg focus:border-accent focus:outline-none"
             />
-            <button
+            <Tooltip content={"Remove candidate"}>
+              <button aria-label={"Remove candidate"}
               type="button"
               onClick={() => removeHandoffCandidate(nodeId, index)}
-              title="Remove candidate"
               className="shrink-0 px-1 text-subtle hover:text-danger"
             >
-              ✕
+              <X className="h-3.5 w-3.5" aria-hidden="true" />
             </button>
+            </Tooltip>
           </div>
         );
       })}

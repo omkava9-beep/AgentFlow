@@ -1,4 +1,4 @@
-import { useWorkspaceStore } from '../store/workspaceStore';
+import { useWorkspaceStore, defaultWorkspace } from '../store/workspaceStore';
 
 /**
  * The client's only view of the permission matrix (spec/23). The server sends
@@ -28,7 +28,9 @@ export function can(workspace, action) {
 
 /** `useCan('workflow:edit')` for the current workspace. */
 export function useCan(action) {
-  const current = useWorkspaceStore((s) => s.current);
+  // Outside a workspace route (Outbox, Notifications) the nav points at the
+  // default workspace, so its permissions decide what the nav shows.
+  const current = useWorkspaceStore((s) => s.current || defaultWorkspace(s.workspaces));
   return can(current, action);
 }
 

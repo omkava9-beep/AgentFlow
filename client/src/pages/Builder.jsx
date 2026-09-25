@@ -51,6 +51,7 @@ import { useCanvasActions } from '../components/canvas/useCanvasActions';
 import { useCanvasUi } from '../components/canvas/canvasUiStore';
 import { useBreadcrumb } from '../store/breadcrumbStore';
 import { useLatestRun } from '../components/canvas/useLatestRun';
+import { Tooltip } from '../components/ui/index';
 
 const ERROR_EDGE_STYLE = { stroke: '#ef4444', strokeWidth: 1.5, strokeDasharray: '6 4' };
 const SELECTED_EDGE_STYLE = { stroke: '#6366f1', strokeWidth: 2.5 };
@@ -702,14 +703,15 @@ function NameInput({ name, readOnly, onChange }) {
 
 function IconAction({ onClick, disabled, title, icon: Icon }) {
   return (
-    <button
+    <Tooltip content={title}>
+      <button
       onClick={onClick}
       disabled={disabled}
-      title={title}
       aria-label={title}
       className="inline-flex h-7 w-7 items-center justify-center rounded-[5px] text-muted transition-colors hover:bg-bg-subtle hover:text-fg disabled:cursor-not-allowed disabled:opacity-30"
     >
       <Icon className="h-4 w-4" aria-hidden="true" />
     </button>
+    </Tooltip>
   );
 }

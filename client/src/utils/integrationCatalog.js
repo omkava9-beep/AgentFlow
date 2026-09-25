@@ -17,40 +17,6 @@ export const CATEGORY_LABELS = {
   other: 'Other',
 };
 
-const ICONS = {
-  builtin: '🔧',
-  slack: '💬',
-  discord: '🎮',
-  teams: '👥',
-  email: '✉️',
-  smtp: '✉️',
-  twilio: '📱',
-  sms: '📱',
-  github: '🐙',
-  jira: '🧩',
-  linear: '📐',
-  sheets: '📊',
-  'google-sheets': '📊',
-  notion: '📓',
-  airtable: '🗂️',
-  database: '🗄️',
-  stripe: '💳',
-  hubspot: '🧲',
-  http: '🌐',
-  webhook: '🪝',
-  'outbound-webhook': '🪝',
-  rss: '📰',
-  ai: '🧠',
-  llm: '🧠',
-  knowledge: '📚',
-  'knowledge-base': '📚',
-  mcp: '🔌',
-};
-
-/** Emoji for a manifest's `icon` (or id). Unknown icons fall back to the generic tool glyph. */
-export function integrationIcon(iconOrId) {
-  return ICONS[iconOrId] || '🔧';
-}
 
 export const categoryLabel = (category) => CATEGORY_LABELS[category] || category || 'Other';
 

@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { Compass, LayoutDashboard } from 'lucide-react';
 import { useWorkspaceStore, workspacePath, defaultWorkspace } from '../store/workspaceStore';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { useBreadcrumb } from '../store/breadcrumbStore';
 import { Button } from '../components/ui/index';
 
 /**
@@ -9,6 +10,7 @@ import { Button } from '../components/ui/index';
  * which hid broken links rather than surfacing them.
  */
 export default function NotFound() {
+  useBreadcrumb('Page not found');
   const slug = useWorkspaceStore((s) => s.current?.slug || defaultWorkspace(s.workspaces)?.slug);
   useDocumentTitle('Page not found');
   return (

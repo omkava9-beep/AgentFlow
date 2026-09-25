@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
-import { X } from 'lucide-react';
+import { AlertTriangle, X } from 'lucide-react';
 import { listVersions, restoreVersion, rollbackVersion } from '../../api/workflows';
 import { apiErrorMessage } from '../../api/client';
 import { on } from '../../realtime/socket';
 import { useToastStore } from '../../store/toastStore';
+import { Tooltip } from '../ui/index';
 import { useCan } from '../../hooks/useCan';
 
 const when = (iso) => (iso ? new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '');
@@ -68,7 +69,11 @@ export default function VersionsDrawer({ workflowId, onView, onCompare, onClose,
                 <span className="font-semibold text-fg">v{v.version}</span>
                 {v.isLive && <span className="rounded-full bg-success-subtle px-2 py-0.5 text-[10px] font-bold uppercase text-success-subtle-fg">Live</span>}
                 {v.rolledBackFrom && <span className="text-[11px] text-muted">rollback of v{v.rolledBackFrom}</span>}
-                {v.warningsCount > 0 && <span className="text-[11px] text-warning" title={v.warnings.map((w) => w.message).join('\n')}>⚠ {v.warningsCount}</span>}
+                {v.warningsCount > 0 && (
+                  <Tooltip content={v.warnings.map((w) => w.message).join(' · ')}>
+                    <span className="inline-flex items-center gap-0.5 text-2xs text-warning"><AlertTriangle className="h-3 w-3" aria-hidden="true" />{v.warningsCount}</span>
+                  </Tooltip>
+                )}
                 <span className="ml-auto text-[11px] text-subtle">{v.nodeCount} nodes</span>
               </div>
               {v.message && <p className="mt-1 text-muted">{v.message}</p>}

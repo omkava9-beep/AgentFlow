@@ -84,7 +84,7 @@ function crumbsFor(pathname, slug, label) {
   if (pathname.startsWith('/outbox')) return ['Outbox'];
   if (pathname.startsWith('/notifications')) return ['Notifications'];
   const hit = SECTION_LABELS.find(([re]) => re.test(rest));
-  if (!hit) return [];
+  if (!hit) return label ? [label] : [];
   const crumbs = hit.slice(1);
   if (!label) return crumbs;
   // The page named itself (useBreadcrumb): show that instead of the generic tail.
@@ -107,7 +107,7 @@ function NavItem({ item, to, collapsed, count, onNavigate }) {
           collapsed && 'justify-center px-0',
           isActive || extra
             ? 'bg-surface font-medium text-fg shadow-sm ring-1 ring-[rgb(var(--border))]  dark:ring-white/5'
-            : 'text-muted hover:bg-zinc-900/[0.04] hover:text-fg dark:hover:bg-white/[0.04]',
+            : 'text-muted hover:bg-bg-subtle hover:text-fg',
         )
       }
     >
@@ -203,7 +203,7 @@ function Sidebar({ slug, collapsed, onToggle, onNavigate, mobile = false }) {
               title={user.name || user.email}
               testId="user-menu"
               buttonClassName={cx(
-                'flex min-w-0 items-center gap-2 rounded-md p-1 text-left transition-colors hover:bg-zinc-900/[0.04] dark:hover:bg-white/[0.04]',
+                'flex min-w-0 items-center gap-2 rounded-md p-1 text-left transition-colors hover:bg-bg-subtle',
                 collapsed ? 'justify-center' : 'flex-1',
               )}
               label={
@@ -272,10 +272,10 @@ function TopBar({ slug, onOpenMobileNav }) {
       </nav>
       <div className="ml-auto flex shrink-0 items-center gap-1.5">
         {user && slug && (
-          <button
+          <Tooltip content={"Search and commands (⌘K)"}>
+            <button aria-label={"Search and commands (⌘K)"}
             type="button"
             onClick={openPalette}
-            title="Search and commands (⌘K)"
             data-testid="open-palette"
             className="flex h-8 items-center gap-2 rounded-control border border-default bg-surface pl-2.5 pr-1.5 text-sm text-subtle shadow-sm transition-colors hover:border-strong hover:text-fg"
           >
@@ -283,6 +283,7 @@ function TopBar({ slug, onOpenMobileNav }) {
             <span className="hidden w-40 text-left md:inline">Search…</span>
             <Kbd className="hidden md:inline-flex">⌘K</Kbd>
           </button>
+          </Tooltip>
         )}
         <IconButton icon={theme === 'dark' ? Sun : Moon} label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'} onClick={toggle} data-testid="theme-toggle" />
         {user && <NotificationBell />}
