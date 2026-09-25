@@ -14,11 +14,15 @@ import { PermanentFailure } from '../queue/errors.js';
  * The endpoint is operator configuration (OPENAI_BASE_URL), never a tenant
  * value, so it doesn't go through safeRequest the way integration calls do.
  */
+const PROVIDER_LABELS = { openai: 'OpenAI', openrouter: 'OpenRouter' };
+
 export class OpenAIAgentProvider {
-  constructor({ apiKey, baseURL = null, requestOptions = {}, client = null, name = 'openai' }) {
+  constructor({ apiKey, baseURL = null, requestOptions = {}, client = null, name = 'openai', defaultHeaders = null }) {
     this.providerName = name;
     this.apiKey = apiKey;
     this.baseURL = baseURL;
+    // e.g. OpenRouter's optional HTTP-Referer / X-Title attribution headers.
+    this.defaultHeaders = defaultHeaders;
     this.requestOptions = requestOptions;
     // Test seam: check scripts pass a stub with the SDK's chat.completions shape.
     this.client = client;
@@ -30,6 +34,7 @@ export class OpenAIAgentProvider {
       this.client = new OpenAI({
         apiKey: this.apiKey,
         ...(this.baseURL && { baseURL: this.baseURL }),
+        ...(this.defaultHeaders && { defaultHeaders: this.defaultHeaders }),
         // The job queue retries with backoff and shows each attempt in the run
         // monitor (spec/35); SDK-internal retries would hide them.
         maxRetries: 0,
@@ -106,7 +111,7 @@ export class OpenAIAgentProvider {
     const choice = res.choices?.[0];
     this.#assertUsable(choice);
     return this.#finalFrom(agentConfig, choice.message, [
-      `[llm-agent] ${agentConfig.label} called ${this.providerName === 'opencode' ? 'OpenCode' : 'OpenAI'} (${res.model || this.requestOptions.model})`,
+      `[llm-agent] ${agentConfig.label} called ${PROVIDER_LABELS[this.providerName] || this.providerName} (${res.model || this.requestOptions.model})`,
     ]);
   }
 

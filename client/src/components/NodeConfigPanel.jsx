@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import NodeTypeIcon from './ui/NodeTypeIcon';
+import { X } from 'lucide-react';
 import { useWorkflowStore } from '../store/workflowStore';
 import { useIntegrationStore } from '../store/integrationStore';
 import { TextField, TextArea, Button } from './ui';
@@ -42,14 +44,15 @@ export default function NodeConfigPanel({ readOnly = false }) {
   }
 
   return (
-    <div data-testid="node-config-panel" className="h-full w-80 shrink-0 overflow-y-auto border-l border-slate-200/80 bg-white/90 p-4 shadow-lg backdrop-blur-md dark:border-slate-800/80 dark:bg-slate-900/85">
-      <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
-          Configure {node.type}
+    <div data-testid="node-config-panel" className="h-full w-[340px] shrink-0 overflow-y-auto border-l border-default bg-surface p-4">
+      <div className="-mx-4 -mt-4 mb-4 flex items-center gap-2.5 border-b border-default px-4 py-3">
+        <NodeTypeIcon type={node.type} size="md" />
+        <h3 className="min-w-0 flex-1 truncate text-sm font-semibold text-fg">
+          <span className="sr-only">Configure </span>
+          <span className="text-2xs font-medium uppercase tracking-wider text-subtle">Configure {node.type}</span>
+          <span className="block truncate">{node.data?.config?.label || node.type}</span>
         </h3>
-        <button onClick={() => selectNode(null)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
-          ✕
-        </button>
+        <button onClick={() => selectNode(null)} aria-label="Close panel" className="rounded-control p-1 text-subtle hover:bg-bg-subtle hover:text-fg"><X className="h-4 w-4" aria-hidden="true" /></button>
       </div>
 
       <div className="space-y-4">

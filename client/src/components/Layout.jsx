@@ -1,64 +1,134 @@
+import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation, useMatch, useNavigate } from 'react-router-dom';
-import ThemeToggle from './ThemeToggle';
-import { Wordmark } from './Logo';
+import {
+  Workflow, LayoutTemplate, PlayCircle, UserCheck, BarChart3, Blocks, KeyRound, BookOpen, Settings, Activity,
+  Search, PanelLeftClose, PanelLeftOpen, Menu as MenuIcon, X, User, Inbox, Keyboard, LogOut, Sun, Moon, ChevronRight,
+} from 'lucide-react';
+import Logo from './Logo';
 import WorkspaceSwitcher from './WorkspaceSwitcher';
 import NotificationBell from './notifications/NotificationBell';
 import CommandPalette from './CommandPalette';
-import { Menu, MenuLink, MenuButton, MenuSeparator, MenuHeading } from './ui/Menu';
+import { Menu, MenuLink, MenuButton, MenuSeparator } from './ui/Menu';
+import Avatar from './ui/Avatar';
+import Kbd from './ui/Kbd';
+import { IconButton } from './ui/Button';
+import Tooltip from './ui/Tooltip';
+import { cx } from './ui/cx';
 import { useAuthStore } from '../store/authStore';
+import { useThemeStore } from '../store/themeStore';
 import { useWorkspaceStore, workspacePath, defaultWorkspace } from '../store/workspaceStore';
 import { usePaletteStore } from '../store/paletteStore';
-import ApprovalsNavLink from './ApprovalsNavLink';
+import { usePendingApprovals } from '../hooks/usePendingApprovals';
+import { useCan } from '../hooks/useCan';
 
-const navLinkClass = ({ isActive }) =>
-  `whitespace-nowrap rounded-lg px-2.5 py-1.5 text-sm font-medium transition ${
-    isActive
-      ? 'bg-gradient-to-br from-brand-500 to-purple-600 text-white shadow-sm shadow-brand-500/30'
-      : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
-  }`;
+const COLLAPSE_KEY = 'agentflow:sidebar-collapsed';
 
-const menuTriggerClass = (active) =>
-  `flex items-center gap-1 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-sm font-medium transition ${
-    active
-      ? 'bg-gradient-to-br from-brand-500 to-purple-600 text-white shadow-sm shadow-brand-500/30'
-      : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
-  }`;
-
-const iconButtonClass = 'rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800';
-
-// Grouped under one "Integrations" menu so the header fits at 1280px (spec/36).
-const INTEGRATION_PAGES = [
-  { path: '/integrations', label: 'Integrations' },
-  { path: '/connections', label: 'Connections' },
-  { path: '/knowledge', label: 'Knowledge base' },
-];
-// Shown inline from xl (1280px) up; folded into "More" below that.
-const SECONDARY_PAGES = [
-  { path: '/analytics', label: 'Analytics' },
-  { path: '/templates', label: 'Templates' },
-];
-
-function initialsOf(user) {
-  const source = (user?.name || user?.email || '?').trim();
-  const parts = source.split(/[\s@._-]+/).filter(Boolean);
-  return ((parts[0]?.[0] || '?') + (parts[1]?.[0] || '')).toUpperCase();
+function readCollapsed() {
+  try { return localStorage.getItem(COLLAPSE_KEY) === '1'; } catch { return false; }
 }
 
-export default function Layout() {
-  const { user, logout } = useAuthStore();
-  // Layout sits above `/w/:slug`, so it reads the resolved workspace from the
-  // store rather than route params. Pages outside /w/:slug (the Outbox) have no
-  // current workspace; point the nav at the default one rather than hiding it.
-  const slug = useWorkspaceStore((s) => s.current?.slug || defaultWorkspace(s.workspaces)?.slug);
-  const navigate = useNavigate();
-  const location = useLocation();
-  const openPalette = usePaletteStore((s) => s.openPalette);
-  // The Builder is a canvas app: it gets the full window width and no page
-  // padding, so its toolbar and side panels never fight over 1152px.
-  const fullBleed = Boolean(useMatch('/w/:slug/workflows/:id'));
+// Sidebar sections. `match` lists extra path prefixes that count as "in" the
+// item (a workflow's builder and history both live under Workflows).
+const SECTIONS = [
+  {
+    label: 'Build',
+    items: [
+      { path: '/dashboard', label: 'Workflows', icon: Workflow, match: ['/workflows'] },
+      { path: '/templates', label: 'Templates', icon: LayoutTemplate },
+    ],
+  },
+  {
+    label: 'Operate',
+    items: [
+      { path: '/runs', label: 'Runs', icon: PlayCircle },
+      { path: '/approvals', label: 'Approvals', icon: UserCheck, badge: 'approvals', can: 'runs:approve' },
+      { path: '/analytics', label: 'Analytics', icon: BarChart3 },
+    ],
+  },
+  {
+    label: 'Connect',
+    items: [
+      { path: '/integrations', label: 'Integrations', icon: Blocks },
+      { path: '/connections', label: 'Connections', icon: KeyRound },
+      { path: '/knowledge', label: 'Knowledge base', icon: BookOpen },
+    ],
+  },
+];
 
+const FOOTER_ITEMS = [
+  { path: '/settings', label: 'Settings', icon: Settings },
+  { path: '/status', label: 'Status', icon: Activity },
+];
+
+// Top-bar breadcrumb label for the section a path is in.
+const SECTION_LABELS = [
+  [/^\/workflows\/[^/]+\/runs/, 'Workflows', 'Run history'],
+  [/^\/workflows\//, 'Workflows', 'Builder'],
+  [/^\/dashboard/, 'Workflows'],
+  [/^\/runs\/[^/]+/, 'Runs', 'Run'],
+  [/^\/runs/, 'Runs'],
+  [/^\/approvals/, 'Approvals'],
+  [/^\/analytics/, 'Analytics'],
+  [/^\/templates/, 'Templates'],
+  [/^\/integrations\/[^/]+/, 'Integrations', 'Detail'],
+  [/^\/integrations/, 'Integrations'],
+  [/^\/connections/, 'Connections'],
+  [/^\/knowledge/, 'Knowledge base'],
+  [/^\/settings/, 'Settings'],
+  [/^\/status/, 'Status'],
+];
+
+function crumbsFor(pathname, slug) {
+  const rest = slug ? pathname.replace(new RegExp(`^/w/${slug}`), '') : pathname;
+  if (pathname.startsWith('/outbox')) return ['Outbox'];
+  if (pathname.startsWith('/notifications')) return ['Notifications'];
+  const hit = SECTION_LABELS.find(([re]) => re.test(rest));
+  return hit ? hit.slice(1) : [];
+}
+
+function NavItem({ item, to, collapsed, count, onNavigate }) {
+  const location = useLocation();
+  const Icon = item.icon;
+  const extra = (item.match || []).some((m) => location.pathname.includes(m));
+  const link = (
+    <NavLink
+      to={to}
+      onClick={onNavigate}
+      className={({ isActive }) =>
+        cx(
+          'group flex h-8 items-center gap-2.5 rounded-md px-2 text-sm transition-colors',
+          collapsed && 'justify-center px-0',
+          isActive || extra
+            ? 'bg-surface font-medium text-fg shadow-sm ring-1 ring-zinc-900/5 dark:bg-zinc-800/80 dark:ring-white/5'
+            : 'text-muted hover:bg-zinc-900/[0.04] hover:text-fg dark:hover:bg-white/[0.04]',
+        )
+      }
+    >
+      <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+      {!collapsed && <span className="truncate">{item.label}</span>}
+      {count > 0 && (
+        collapsed
+          ? <span className="absolute right-1.5 top-1 h-2 w-2 rounded-full bg-warning" aria-label={`${count} waiting`} />
+          : <span className="ml-auto rounded-full bg-warning-subtle px-1.5 text-2xs font-semibold tabular-nums text-warning-subtle-fg" title={`${count} waiting on you`}>{count}</span>
+      )}
+    </NavLink>
+  );
+  return (
+    <li className="relative">
+      {collapsed ? <Tooltip content={item.label} side="right">{link}</Tooltip> : link}
+    </li>
+  );
+}
+
+function Sidebar({ slug, collapsed, onToggle, onNavigate, mobile = false }) {
+  const { user, logout } = useAuthStore();
+  const { theme, toggle: toggleTheme } = useThemeStore();
+  const canApprove = useCan('runs:approve');
+  // Rendered only for approvers, so non-approvers never poll for a count.
+  const approvals = usePendingApprovals();
+  const navigate = useNavigate();
   const wp = (path) => workspacePath(slug, path);
-  const inSection = (pages) => pages.some((p) => location.pathname.startsWith(wp(p.path)));
+  const permitted = (item) => !item.can || (item.can === 'runs:approve' ? canApprove : true);
 
   function handleLogout() {
     logout();
@@ -66,109 +136,202 @@ export default function Layout() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-20 h-[57px] border-b border-slate-200/80 bg-white/70 backdrop-blur-md dark:border-slate-800/80 dark:bg-slate-950/70">
-        <div className={`mx-auto flex h-14 items-center justify-between gap-3 px-4 ${fullBleed ? 'max-w-none' : 'max-w-6xl'}`}>
-          <div className="flex min-w-0 items-center gap-3">
-            <Wordmark className="shrink-0 text-lg" />
-            <WorkspaceSwitcher />
-            {slug && (
-              <nav className="flex items-center gap-0.5" aria-label="Main">
-                {/* Below lg everything folds into one menu. */}
-                <div className="lg:hidden">
-                  <Menu label={<>Menu <span className="text-xs">▾</span></>} buttonClassName={menuTriggerClass(false)} panelClassName="w-56">
-                    <MenuLink to={wp('/dashboard')}>Dashboard</MenuLink>
-                    <MenuLink to={wp('/runs')}>Runs</MenuLink>
-                    {/* Rendered only while the menu is open, so its live count
-                        doesn't double the inline link's polling. */}
-                    <div data-menu-close>
-                      <ApprovalsNavLink
-                        to={wp('/approvals')}
-                        className={({ isActive }) => `block px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800 ${isActive ? 'font-semibold text-brand-600 dark:text-brand-400' : 'text-slate-700 dark:text-slate-200'}`}
-                      />
-                    </div>
-                    {SECONDARY_PAGES.map((p) => <MenuLink key={p.path} to={wp(p.path)}>{p.label}</MenuLink>)}
-                    <MenuSeparator />
-                    {INTEGRATION_PAGES.map((p) => <MenuLink key={p.path} to={wp(p.path)}>{p.label}</MenuLink>)}
-                  </Menu>
-                </div>
+    <aside
+      data-testid="app-sidebar"
+      className={cx(
+        'flex h-full shrink-0 flex-col border-r border-default bg-bg-subtle/60 dark:bg-zinc-950',
+        collapsed ? 'w-16' : 'w-[var(--sidebar-w)]',
+      )}
+    >
+      <div className={cx('flex h-[var(--topbar-h)] shrink-0 items-center gap-2 px-3', collapsed && 'justify-center px-0')}>
+        <Logo className="h-6 w-6 shrink-0" />
+        {!collapsed && <span className="text-sm font-semibold tracking-tight text-fg">AgentFlow</span>}
+        {mobile && (
+          <IconButton icon={X} label="Close menu" size="sm" className="ml-auto" onClick={onNavigate} tooltip={false} />
+        )}
+      </div>
 
-                <div className="hidden items-center gap-0.5 lg:flex">
-                  <NavLink to={wp('/dashboard')} className={navLinkClass}>Dashboard</NavLink>
-                  <NavLink to={wp('/runs')} className={navLinkClass}>Runs</NavLink>
-                  <ApprovalsNavLink to={wp('/approvals')} className={navLinkClass} />
-                  {SECONDARY_PAGES.map((p) => (
-                    <NavLink key={p.path} to={wp(p.path)} className={(s) => `${navLinkClass(s)} hidden xl:block`}>{p.label}</NavLink>
-                  ))}
-                  <Menu
-                    label={<>Integrations <span className="text-xs">▾</span></>}
-                    buttonClassName={menuTriggerClass(inSection(INTEGRATION_PAGES))}
-                    testId="nav-integrations"
-                  >
-                    {INTEGRATION_PAGES.map((p) => <MenuLink key={p.path} to={wp(p.path)}>{p.label}</MenuLink>)}
-                  </Menu>
-                  <div className="xl:hidden">
-                    <Menu label={<>More <span className="text-xs">▾</span></>} buttonClassName={menuTriggerClass(inSection(SECONDARY_PAGES))}>
-                      {SECONDARY_PAGES.map((p) => <MenuLink key={p.path} to={wp(p.path)}>{p.label}</MenuLink>)}
-                    </Menu>
-                  </div>
-                </div>
-              </nav>
+      <div className={cx('px-3 pb-2', collapsed && 'px-2')}>
+        <WorkspaceSwitcher compact={collapsed} />
+      </div>
+
+      <nav aria-label="Main" className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
+        {slug && SECTIONS.map((section) => {
+          const items = section.items.filter(permitted);
+          if (!items.length) return null;
+          return (
+            <div key={section.label} className="mt-4 first:mt-2">
+              {!collapsed && <p className="mb-1 px-2 text-2xs font-medium uppercase tracking-wider text-subtle">{section.label}</p>}
+              {collapsed && <div className="mx-auto mb-2 h-px w-6 bg-[rgb(var(--border))]" />}
+              <ul className="space-y-0.5">
+                {items.map((item) => (
+                  <NavItem
+                    key={item.path}
+                    item={item}
+                    to={wp(item.path)}
+                    collapsed={collapsed}
+                    onNavigate={onNavigate}
+                    count={item.badge === 'approvals' ? approvals.items?.length || 0 : 0}
+                  />
+                ))}
+              </ul>
+            </div>
+          );
+        })}
+      </nav>
+
+      <div className="border-t border-default px-3 py-2">
+        {slug && (
+          <ul className="space-y-0.5">
+            {FOOTER_ITEMS.map((item) => (
+              <NavItem key={item.path} item={item} to={wp(item.path)} collapsed={collapsed} onNavigate={onNavigate} />
+            ))}
+          </ul>
+        )}
+        {user && (
+          <div className={cx('mt-2 flex items-center gap-1', collapsed && 'flex-col')}>
+            <Menu
+              align="left"
+              up
+              title={user.name || user.email}
+              testId="user-menu"
+              buttonClassName={cx(
+                'flex min-w-0 items-center gap-2 rounded-md p-1 text-left transition-colors hover:bg-zinc-900/[0.04] dark:hover:bg-white/[0.04]',
+                collapsed ? 'justify-center' : 'flex-1',
+              )}
+              label={
+                <>
+                  <Avatar name={user.name} email={user.email} seed={user.id} size="sm" />
+                  {!collapsed && (
+                    <span className="min-w-0">
+                      <span className="block truncate text-xs font-medium text-fg">{user.name || user.email}</span>
+                      {user.name && <span className="block truncate text-2xs text-subtle">{user.email}</span>}
+                    </span>
+                  )}
+                </>
+              }
+              panelClassName="w-60"
+            >
+              <div className="px-2 pb-1.5 pt-1">
+                <p className="truncate text-sm font-medium text-fg">{user.name || user.email}</p>
+                {user.name && <p className="truncate text-xs text-subtle">{user.email}</p>}
+              </div>
+              <MenuSeparator />
+              {slug && <MenuLink to={wp('/settings/profile')}><User /> Profile</MenuLink>}
+              {slug && <MenuLink to={wp('/settings')}><Settings /> Workspace settings</MenuLink>}
+              <MenuLink to="/outbox"><Inbox /> Outbox</MenuLink>
+              <MenuButton onClick={() => usePaletteStore.getState().openShortcuts()}><Keyboard /> Keyboard shortcuts</MenuButton>
+              <MenuButton onClick={toggleTheme}>{theme === 'dark' ? <Sun /> : <Moon />} {theme === 'dark' ? 'Light theme' : 'Dark theme'}</MenuButton>
+              <MenuSeparator />
+              <MenuButton onClick={handleLogout}><LogOut /> Log out</MenuButton>
+            </Menu>
+            {!mobile && (
+              <IconButton
+                icon={collapsed ? PanelLeftOpen : PanelLeftClose}
+                label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                size="sm"
+                onClick={onToggle}
+              />
             )}
           </div>
+        )}
+      </div>
+    </aside>
+  );
+}
 
-          <div className="flex shrink-0 items-center gap-2">
-            {user && slug && (
-              <button
-                type="button"
-                onClick={openPalette}
-                title="Search and commands (⌘K)"
-                data-testid="open-palette"
-                className={`${iconButtonClass} flex items-center gap-2`}
-              >
-                <span aria-hidden="true">⌕</span>
-                <span className="hidden text-slate-400 xl:inline">Search</span>
-                <kbd className="hidden rounded border border-slate-200 px-1 font-mono text-[10px] text-slate-400 dark:border-slate-700 xl:inline">⌘K</kbd>
-              </button>
-            )}
-            <ThemeToggle />
-            {user && (
-              <>
-                <NotificationBell />
-                <Menu
-                  align="right"
-                  title={user.name || user.email}
-                  testId="user-menu"
-                  label={
-                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-purple-600 text-xs font-bold text-white">
-                      {initialsOf(user)}
-                    </span>
-                  }
-                  buttonClassName="rounded-full ring-offset-2 transition hover:ring-2 hover:ring-brand-300 dark:ring-offset-slate-950"
-                  panelClassName="w-60"
-                >
-                  <div className="px-3 pb-2 pt-2">
-                    <p className="truncate text-sm font-medium text-slate-800 dark:text-slate-100">{user.name || user.email}</p>
-                    {user.name && <p className="truncate text-xs text-slate-500 dark:text-slate-400">{user.email}</p>}
-                  </div>
-                  <MenuSeparator />
-                  {slug && <MenuLink to={wp('/settings/profile')}>Profile</MenuLink>}
-                  {slug && <MenuLink to={wp('/settings')}>Workspace settings</MenuLink>}
-                  {slug && <MenuLink to={wp('/status')}>Status</MenuLink>}
-                  <MenuLink to="/outbox">Outbox</MenuLink>
-                  <MenuButton onClick={() => usePaletteStore.getState().openShortcuts()}>Keyboard shortcuts</MenuButton>
-                  <MenuSeparator />
-                  <MenuHeading>Session</MenuHeading>
-                  <MenuButton onClick={handleLogout}>Log out</MenuButton>
-                </Menu>
-              </>
-            )}
+function TopBar({ slug, onOpenMobileNav }) {
+  const location = useLocation();
+  const user = useAuthStore((s) => s.user);
+  const { theme, toggle } = useThemeStore();
+  const workspaceName = useWorkspaceStore((s) => s.current?.name);
+  const openPalette = usePaletteStore((s) => s.openPalette);
+  const crumbs = crumbsFor(location.pathname, slug);
+
+  return (
+    <header className="sticky top-0 z-20 flex h-[var(--topbar-h)] shrink-0 items-center gap-3 border-b border-default bg-surface/80 px-4 backdrop-blur supports-[backdrop-filter]:bg-surface/70">
+      <IconButton icon={MenuIcon} label="Open menu" size="sm" className="lg:hidden" onClick={onOpenMobileNav} tooltip={false} />
+      <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-1.5 text-sm">
+        {workspaceName && <span className="truncate text-subtle">{workspaceName}</span>}
+        {crumbs.map((c, i) => (
+          <span key={`${c}-${i}`} className="flex min-w-0 items-center gap-1.5">
+            <ChevronRight className="h-3.5 w-3.5 shrink-0 text-subtle" aria-hidden="true" />
+            <span className={cx('truncate', i === crumbs.length - 1 ? 'font-medium text-fg' : 'text-subtle')}>{c}</span>
+          </span>
+        ))}
+      </nav>
+      <div className="ml-auto flex shrink-0 items-center gap-1.5">
+        {user && slug && (
+          <button
+            type="button"
+            onClick={openPalette}
+            title="Search and commands (⌘K)"
+            data-testid="open-palette"
+            className="flex h-8 items-center gap-2 rounded-control border border-default bg-surface pl-2.5 pr-1.5 text-sm text-subtle shadow-sm transition-colors hover:border-strong hover:text-fg"
+          >
+            <Search className="h-3.5 w-3.5" aria-hidden="true" />
+            <span className="hidden w-40 text-left md:inline">Search…</span>
+            <Kbd className="hidden md:inline-flex">⌘K</Kbd>
+          </button>
+        )}
+        <IconButton icon={theme === 'dark' ? Sun : Moon} label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'} onClick={toggle} data-testid="theme-toggle" />
+        {user && <NotificationBell />}
+      </div>
+    </header>
+  );
+}
+
+export default function Layout() {
+  const user = useAuthStore((s) => s.user);
+  // Layout sits above `/w/:slug`, so it reads the resolved workspace from the
+  // store rather than route params. Pages outside /w/:slug (the Outbox) have no
+  // current workspace; point the nav at the default one rather than hiding it.
+  const slug = useWorkspaceStore((s) => s.current?.slug || defaultWorkspace(s.workspaces)?.slug);
+  const [collapsed, setCollapsed] = useState(readCollapsed);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const location = useLocation();
+  // Canvas-style pages get the full content width and no page padding.
+  const builder = useMatch('/w/:slug/workflows/:id');
+  const runMonitor = useMatch('/w/:slug/runs/:runId');
+  const fullBleed = Boolean(builder || runMonitor);
+
+  // Canvas pages (Builder, Run Monitor) need the width: the sidebar drops to
+  // its icon rail there. That's a per-page override, not the saved preference -
+  // expanding it on a canvas lasts until you navigate.
+  const [canvasExpanded, setCanvasExpanded] = useState(false);
+  useEffect(() => { setMobileOpen(false); setCanvasExpanded(false); }, [location.pathname]);
+  const railed = fullBleed ? !canvasExpanded : collapsed;
+
+  function toggleCollapsed() {
+    setCollapsed((c) => {
+      try { localStorage.setItem(COLLAPSE_KEY, c ? '0' : '1'); } catch { /* storage blocked */ }
+      return !c;
+    });
+  }
+
+  return (
+    <div className="flex h-screen overflow-hidden bg-bg">
+      <div className="hidden lg:flex">
+        <Sidebar slug={slug} collapsed={railed} onToggle={fullBleed ? () => setCanvasExpanded((v) => !v) : toggleCollapsed} />
+      </div>
+      {mobileOpen && (
+        <div className="fixed inset-0 z-40 flex lg:hidden">
+          <div className="absolute inset-0 animate-fade-in bg-zinc-950/40" onClick={() => setMobileOpen(false)} aria-hidden="true" />
+          <div className="relative animate-slide-in-right bg-surface">
+            <Sidebar slug={slug} collapsed={false} mobile onNavigate={() => setMobileOpen(false)} />
           </div>
         </div>
-      </header>
-      <main className={fullBleed ? 'flex w-full flex-1 flex-col' : 'mx-auto w-full max-w-6xl flex-1 px-4 py-6'}>
-        <Outlet />
-      </main>
+      )}
+      <div className="flex min-w-0 flex-1 flex-col">
+        <TopBar slug={slug} onOpenMobileNav={() => setMobileOpen(true)} />
+        <main className={cx('min-h-0 flex-1', fullBleed ? 'flex flex-col overflow-hidden' : 'overflow-y-auto')}>
+          {fullBleed ? <Outlet /> : (
+            <div className="mx-auto w-full max-w-6xl px-6 py-8">
+              <Outlet />
+            </div>
+          )}
+        </main>
+      </div>
       {user && <CommandPalette />}
     </div>
   );

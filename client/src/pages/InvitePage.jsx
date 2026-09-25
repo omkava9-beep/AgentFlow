@@ -1,13 +1,12 @@
 import { useEffect, useState } from 'react';
+import AuthLayout from '../components/AuthLayout';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { getInvitation, acceptInvitation } from '../api/invitations';
 import { apiErrorMessage } from '../api/client';
 import { useAuthStore } from '../store/authStore';
 import { useWorkspaceStore, workspacePath } from '../store/workspaceStore';
 import { useToastStore } from '../store/toastStore';
-import { Card, Button, ErrorText } from '../components/ui';
-import { Wordmark } from '../components/Logo';
-import ThemeToggle from '../components/ThemeToggle';
+import { Button, ErrorText } from '../components/ui';
 import RoleBadge from '../components/RoleBadge';
 
 /**
@@ -111,7 +110,7 @@ export default function InvitePage() {
           )}
           {signedIn && !rightAccount && (
             <>
-              <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+              <p className="rounded-control border border-warning/30 bg-warning-subtle px-3 py-2 text-sm text-warning-subtle-fg">
                 This invite was sent to <span className="font-medium">{invite.email}</span>, but you're signed in as{' '}
                 <span className="font-medium">{user.email}</span>. Sign in with that account to accept it.
               </p>
@@ -127,14 +126,8 @@ export default function InvitePage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="flex items-center justify-between px-6 py-4">
-        <Wordmark className="text-lg" />
-        <ThemeToggle />
-      </header>
-      <main className="flex flex-1 items-center justify-center p-6">
-        <Card className="w-full max-w-md p-8 text-center">{body}</Card>
-      </main>
-    </div>
+    <AuthLayout>
+      <div data-testid="invite-card">{body}</div>
+    </AuthLayout>
   );
 }

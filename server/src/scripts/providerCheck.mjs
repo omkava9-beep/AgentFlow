@@ -144,38 +144,37 @@ console.log('\nD. env validation at boot');
   const noKey = boot({ AGENT_PROVIDER: 'openai', OPENAI_API_KEY: '' });
   check('AGENT_PROVIDER=openai without OPENAI_API_KEY refuses to boot', noKey.status !== 0 && /requires OPENAI_API_KEY/.test(noKey.stderr));
   const bogus = boot({ AGENT_PROVIDER: 'gemini' });
-  check('an unknown AGENT_PROVIDER refuses to boot with the allowed list', bogus.status !== 0 && /mock, openai, opencode, anthropic/.test(bogus.stderr));
+  check('an unknown AGENT_PROVIDER refuses to boot with the allowed list', bogus.status !== 0 && /mock, openai, openrouter, anthropic/.test(bogus.stderr));
   const ok = boot({ AGENT_PROVIDER: 'openai', OPENAI_API_KEY: 'sk-test' });
   check('AGENT_PROVIDER=openai with a key boots', ok.status === 0 && /BOOT_OK/.test(ok.stdout), String(ok.stderr || ok.error || '').slice(0, 200));
 }
 
-// ================================================================ D2: OpenCode Zen (OpenAI-compatible gateway)
-console.log('\nD2. OpenCode Zen settings');
+// ================================================================ D2: OpenRouter (OpenAI-compatible gateway)
+console.log('\nD2. OpenRouter settings');
 {
-  const { opencodeRequestOptions } = await import('../config/agentProvider.js');
+  const { openrouterRequestOptions } = await import('../config/agentProvider.js');
   const st = stub(() => completion({ content: null, tool_calls: [toolCall('c1', 'builtin__calculator', { expression: '2+2' })] }, 'tool_calls'));
-  const oc = new OpenAIAgentProvider({ name: 'opencode', apiKey: 'test', requestOptions: opencodeRequestOptions, client: st.client });
-  await oc.step(agentCfg(), { input: 'x', tools, history: [] });
+  const orp = new OpenAIAgentProvider({ name: 'openrouter', apiKey: 'test', requestOptions: openrouterRequestOptions, client: st.client });
+  await orp.step(agentCfg(), { input: 'x', tools, history: [] });
   const req = st.requests[0];
-  check(`defaults to a free Chat Completions model (${opencodeRequestOptions.model})`, req.model === opencodeRequestOptions.model && !/^(muse-|jev-)/.test(req.model));
-  check('sends max_tokens (not max_completion_tokens) for the gateway', req.max_tokens === opencodeRequestOptions.maxCompletionTokens && !('max_completion_tokens' in req));
+  check(`defaults to the free router (${openrouterRequestOptions.model})`, req.model === 'openrouter/free');
+  check('sends max_tokens (not max_completion_tokens) for the gateway', req.max_tokens === openrouterRequestOptions.maxCompletionTokens && !('max_completion_tokens' in req));
   check('omits the OpenAI-only parallel_tool_calls', !('parallel_tool_calls' in req));
   check('still sends tools as type function', req.tools?.[0]?.type === 'function');
-  check('provider reports its name', oc.name === 'opencode' && oc.mode === 'llm');
-  const r = await new OpenAIAgentProvider({ name: 'opencode', apiKey: 't', requestOptions: opencodeRequestOptions, client: stub(() => completion({ content: 'hi' })).client }).run(agentCfg(), 'x');
-  check('logs say OpenCode', r.logs.some((l) => /called OpenCode/.test(l)), r.logs.join(' | '));
+  check('provider reports its name', orp.name === 'openrouter' && orp.mode === 'llm');
+  const r = await new OpenAIAgentProvider({ name: 'openrouter', apiKey: 't', requestOptions: openrouterRequestOptions, client: stub(() => completion({ content: 'hi' })).client }).run(agentCfg(), 'x');
+  check('logs say OpenRouter', r.logs.some((l) => /called OpenRouter/.test(l)), r.logs.join(' | '));
 
-  const boot = (extra) => spawnSync(process.execPath, ['-e', "import('./src/config/agentProvider.js').then((m)=>{const p=m.getAgentProvider();console.log('BOOT_OK', p.name, p.baseURL, p.requestOptions.model)})"], {
+  const boot = (extra) => spawnSync(process.execPath, ['-e', "import('./src/config/agentProvider.js').then((m)=>{const p=m.getAgentProvider();console.log('BOOT_OK', p.name, p.baseURL, p.requestOptions.model, JSON.stringify(p.defaultHeaders))})"], {
     cwd: fileURLToPath(new URL('../..', import.meta.url)), env: { ...process.env, ...extra }, encoding: 'utf8',
   });
-  const noKey = boot({ AGENT_PROVIDER: 'opencode', OPENCODE_API_KEY: '' });
-  check('AGENT_PROVIDER=opencode without OPENCODE_API_KEY refuses to boot', noKey.status !== 0 && /requires OPENCODE_API_KEY/.test(noKey.stderr));
-  const muse = boot({ AGENT_PROVIDER: 'opencode', OPENCODE_API_KEY: 'k', OPENCODE_MODEL: 'muse-spark-1.3-contributor-free' });
-  check('a Muse (Responses API) model is refused with a hint', muse.status !== 0 && /isn't a Chat Completions model/.test(muse.stderr));
-  const jev = boot({ AGENT_PROVIDER: 'opencode', OPENCODE_API_KEY: 'k', OPENCODE_MODEL: 'jev-1.13-free' });
-  check('a Jev (custom API) model is refused', jev.status !== 0);
-  const ok = boot({ AGENT_PROVIDER: 'opencode', OPENCODE_API_KEY: 'k', OPENCODE_MODEL: 'nemotron-3-ultra-free' });
-  check('opencode boots with the Zen base URL and the chosen model', ok.status === 0 && /BOOT_OK opencode https:\/\/opencode\.ai\/zen\/v1 nemotron-3-ultra-free/.test(ok.stdout), (ok.stdout + ok.stderr).trim().slice(0, 200));
+  const noKey = boot({ AGENT_PROVIDER: 'openrouter', OPENROUTER_API_KEY: '' });
+  check('AGENT_PROVIDER=openrouter without OPENROUTER_API_KEY refuses to boot', noKey.status !== 0 && /requires OPENROUTER_API_KEY/.test(noKey.stderr));
+  const ok = boot({ AGENT_PROVIDER: 'openrouter', OPENROUTER_API_KEY: 'k', OPENROUTER_MODEL: 'qwen/qwen3.8-27b:free', OPENROUTER_APP_URL: 'http://localhost:5173' });
+  check('openrouter boots with its base URL and the chosen model', ok.status === 0 && /BOOT_OK openrouter https:\/\/openrouter\.ai\/api\/v1 qwen\/qwen3\.8-27b:free/.test(ok.stdout), (ok.stdout + ok.stderr).trim().slice(0, 200));
+  check('sends the OpenRouter attribution headers', /"HTTP-Referer":"http:\/\/localhost:5173"/.test(ok.stdout) && /"X-Title":"AgentFlow"/.test(ok.stdout), ok.stdout.trim().slice(0, 200));
+  const gone = boot({ AGENT_PROVIDER: 'opencode', OPENCODE_API_KEY: 'k' });
+  check('opencode is no longer an accepted provider', gone.status !== 0 && /must be one of/.test(gone.stderr));
 }
 
 // ================================================================ E: the real engine with the stub

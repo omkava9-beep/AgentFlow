@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Loader2, Search, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { usePaletteStore } from '../store/paletteStore';
 import { useWorkspaceStore, workspacePath } from '../store/workspaceStore';
@@ -251,7 +252,7 @@ export default function CommandPalette() {
     <>
       {open && (
         <div
-          className="fixed inset-0 z-[65] flex items-start justify-center bg-slate-900/40 p-4 pt-[12vh] backdrop-blur-sm"
+          className="fixed inset-0 z-[65] flex animate-fade-in items-start justify-center bg-zinc-950/50 p-4 pt-[12vh]"
           onMouseDown={(e) => { if (e.target === e.currentTarget) closePalette(); }}
         >
           <div
@@ -259,10 +260,10 @@ export default function CommandPalette() {
             aria-modal="true"
             aria-label="Command palette"
             data-testid="command-palette"
-            className="w-full max-w-xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900"
+            className="w-full max-w-xl animate-pop-in overflow-hidden rounded-dialog border border-default bg-surface-raised shadow-popover"
           >
-            <div className="flex items-center gap-2 border-b border-slate-100 px-4 dark:border-slate-800">
-              <span aria-hidden="true" className="text-slate-400">⌘</span>
+            <div className="flex items-center gap-2.5 border-b border-default px-4">
+              <Search className="h-4 w-4 shrink-0 text-subtle" aria-hidden="true" />
               <input
                 ref={inputRef}
                 value={query}
@@ -270,13 +271,13 @@ export default function CommandPalette() {
                 onKeyDown={onKeyDown}
                 placeholder="Search workflows and runs, or type a command…"
                 aria-label="Command"
-                className="w-full bg-transparent py-3 text-sm text-slate-800 outline-none placeholder:text-slate-400 dark:text-slate-100"
+                className="w-full bg-transparent py-3.5 text-sm text-fg outline-none placeholder:text-subtle"
               />
-              {loading && <span className="text-xs text-slate-400">…</span>}
+              {loading && <Loader2 className="h-4 w-4 shrink-0 animate-spin text-subtle" aria-hidden="true" />}
             </div>
-            <ul ref={listRef} role="listbox" className="max-h-[50vh] overflow-y-auto py-1">
+            <ul ref={listRef} role="listbox" className="max-h-[50vh] overflow-y-auto p-1.5">
               {items.length === 0 && (
-                <li className="px-4 py-6 text-center text-sm text-slate-500 dark:text-slate-400">
+                <li className="px-4 py-8 text-center text-sm text-muted">
                   {loading ? 'Searching…' : 'No matches.'}
                 </li>
               )}
@@ -285,7 +286,7 @@ export default function CommandPalette() {
                 return (
                   <li key={`${item.group}:${item.id}`}>
                     {showGroup && (
-                      <p className="px-4 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">{item.group}</p>
+                      <p className="px-2.5 pb-1 pt-2 text-2xs font-medium uppercase tracking-wider text-subtle">{item.group}</p>
                     )}
                     <button
                       type="button"
@@ -294,20 +295,18 @@ export default function CommandPalette() {
                       data-index={i}
                       onMouseEnter={() => setActive(i)}
                       onClick={() => runItem(item)}
-                      className={`flex w-full items-center justify-between gap-3 px-4 py-2 text-left text-sm ${
-                        i === active
-                          ? 'bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-200'
-                          : 'text-slate-700 dark:text-slate-200'
+                      className={`flex w-full items-center justify-between gap-3 rounded-md px-2.5 py-2 text-left text-sm ${
+                        i === active ? 'bg-bg-subtle text-fg' : 'text-muted'
                       }`}
                     >
                       <span className="truncate">{item.label}</span>
-                      {item.hint && <span className="shrink-0 text-xs capitalize text-slate-400">{item.hint}</span>}
+                      {item.hint && <span className="shrink-0 text-xs capitalize text-subtle">{item.hint}</span>}
                     </button>
                   </li>
                 );
               })}
             </ul>
-            <div className="flex justify-between border-t border-slate-100 px-4 py-2 text-[11px] text-slate-400 dark:border-slate-800">
+            <div className="flex justify-between border-t border-default bg-bg-subtle/50 px-4 py-2 text-2xs text-subtle">
               <span>↑↓ to move · ↵ to run · Esc to close</span>
               <span>? for shortcuts</span>
             </div>
@@ -339,19 +338,19 @@ function ShortcutSheet({ onClose }) {
   }, [onClose]);
   return (
     <div
-      className="fixed inset-0 z-[65] flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[65] flex animate-fade-in items-center justify-center bg-zinc-950/50 p-4"
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div role="dialog" aria-modal="true" aria-label="Keyboard shortcuts" data-testid="shortcut-sheet" className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+      <div role="dialog" aria-modal="true" aria-label="Keyboard shortcuts" data-testid="shortcut-sheet" className="w-full max-w-md animate-pop-in rounded-dialog border border-default bg-surface-raised p-5 shadow-popover">
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Keyboard shortcuts</h2>
-          <button type="button" onClick={onClose} aria-label="Close" className="text-slate-400 hover:text-slate-600">✕</button>
+          <h2 className="text-base font-semibold text-fg">Keyboard shortcuts</h2>
+          <button type="button" onClick={onClose} aria-label="Close" className="rounded p-1 text-subtle hover:bg-bg-subtle hover:text-fg"><X className="h-4 w-4" aria-hidden="true" /></button>
         </div>
-        <dl className="divide-y divide-slate-100 text-sm dark:divide-slate-800">
+        <dl className="divide-y divide-[rgb(var(--border))] text-sm">
           {SHORTCUTS.map(([keys, what]) => (
             <div key={keys} className="flex items-center justify-between py-2">
-              <dt className="text-slate-600 dark:text-slate-300">{what}</dt>
-              <dd><kbd className="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 font-mono text-xs dark:border-slate-700 dark:bg-slate-800">{keys}</kbd></dd>
+              <dt className="text-muted">{what}</dt>
+              <dd><kbd className="rounded border border-default bg-bg-subtle px-1.5 py-0.5 font-mono text-2xs text-muted">{keys}</kbd></dd>
             </div>
           ))}
         </dl>

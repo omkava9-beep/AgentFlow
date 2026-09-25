@@ -1,9 +1,10 @@
-import { NODE_STYLES } from './nodes/nodeStyles';
+import NodeTypeIcon from './ui/NodeTypeIcon';
+import { nodeTypeMeta } from './ui/nodeTypes';
 
 /** A glanceable shape summary — enough to tell templates apart without a render. */
 function NodeMix({ nodes = [] }) {
   const counts = nodes.reduce((acc, n) => ({ ...acc, [n.type]: (acc[n.type] || 0) + 1 }), {});
-  const order = ['start', 'agent', 'tool', 'condition', 'end'];
+  const order = ['agent', 'tool', 'condition', 'approval', 'loop', 'transform', 'code', 'merge', 'delay', 'subworkflow'];
 
   return (
     <div className="mt-3 flex flex-wrap items-center gap-1.5">
@@ -12,10 +13,11 @@ function NodeMix({ nodes = [] }) {
         .map((type) => (
           <span
             key={type}
-            title={`${counts[type]} ${type} node${counts[type] > 1 ? 's' : ''}`}
-            className={`rounded border px-1.5 py-0.5 text-[10px] font-medium ${NODE_STYLES[type].accent}`}
+            title={`${counts[type]} ${nodeTypeMeta(type).label.toLowerCase()} node${counts[type] > 1 ? 's' : ''}`}
+            className="inline-flex items-center gap-1 rounded-md border border-default bg-surface py-0.5 pl-0.5 pr-1.5 text-2xs font-medium tabular-nums text-muted"
           >
-            {NODE_STYLES[type].icon} {counts[type]}
+            <NodeTypeIcon type={type} size="xs" />
+            {counts[type]}
           </span>
         ))}
     </div>

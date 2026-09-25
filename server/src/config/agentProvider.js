@@ -32,12 +32,15 @@ export const openaiRequestOptions = Object.freeze({
 });
 
 /**
- * OpenCode Zen reuses the Chat Completions client against its own gateway, with
- * the conservative parameter set compatible backends accept.
+ * OpenRouter reuses the Chat Completions client against its gateway, with the
+ * conservative parameter set its upstream providers all accept: `max_tokens`,
+ * and no `parallel_tool_calls` (models return parallel calls or not on their
+ * own). Free-tier models are rate-limited; a 429 is retried by the job queue,
+ * honouring Retry-After (spec/26), so it shows up as attempts in the monitor.
  */
-export const opencodeRequestOptions = Object.freeze({
-  model: env.opencodeModel,
-  maxCompletionTokens: env.opencodeMaxTokens,
+export const openrouterRequestOptions = Object.freeze({
+  model: env.openrouterModel,
+  maxCompletionTokens: env.openrouterMaxTokens,
   tokenParam: 'max_tokens',
   parallelToolCalls: false,
   reasoningEffort: null,
@@ -53,12 +56,16 @@ export function getAgentProvider() {
       baseURL: env.openaiBaseUrl || null,
       requestOptions: openaiRequestOptions,
     });
-  } else if (env.agentProvider === 'opencode') {
+  } else if (env.agentProvider === 'openrouter') {
     instance = new OpenAIAgentProvider({
-      name: 'opencode',
-      apiKey: env.opencodeApiKey,
-      baseURL: env.opencodeBaseUrl,
-      requestOptions: opencodeRequestOptions,
+      name: 'openrouter',
+      apiKey: env.openrouterApiKey,
+      baseURL: env.openrouterBaseUrl,
+      requestOptions: openrouterRequestOptions,
+      defaultHeaders: {
+        ...(env.openrouterAppUrl && { 'HTTP-Referer': env.openrouterAppUrl }),
+        'X-Title': env.openrouterAppName,
+      },
     });
   } else if (env.agentProvider === 'anthropic') {
     instance = new LLMAgentProvider({ apiKey: env.anthropicApiKey, requestOptions: llmRequestOptions });

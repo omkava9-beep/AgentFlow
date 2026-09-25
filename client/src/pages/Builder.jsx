@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Undo2, Redo2, CopyPlus, ClipboardPaste, MoreHorizontal, Share2, LayoutTemplate, History, GitCommitVertical, Rocket, X } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router-dom';
 import ReactFlow, { Background, Controls, MiniMap } from 'reactflow';
 import 'reactflow/dist/style.css';
@@ -19,7 +20,8 @@ import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard';
 import { openWorkflowSession } from '../collab/transport';
 import { usePresence, useCursorBroadcast } from '../collab/usePresence';
 import { nodeTypes } from '../components/nodes';
-import NodePalette from '../components/NodePalette';
+import CanvasRail from '../components/builder/CanvasRail';
+import { NODE_DRAG_TYPE } from '../components/nodeCatalog';
 import NodeConfigPanel from '../components/NodeConfigPanel';
 import EdgeInspector from '../components/EdgeInspector';
 import TriggerPanel from '../components/TriggerPanel';
@@ -72,6 +74,8 @@ export default function Builder() {
   const viewportRef = useRef(viewport);
   const canvasRef = useRef(null);
   const flowRef = useRef(null);
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
+  const [triggersOpen, setTriggersOpen] = useState(false);
   const userId = useAuthStore((s) => s.user?.id);
   // Viewers get the canvas read-only (spec/23). The server enforces every one
   // of these regardless; this just doesn't offer what would be refused.
@@ -91,6 +95,14 @@ export default function Builder() {
   const workspaceName = useWorkspaceStore((s) => s.current?.name);
   useDocumentTitle(name ? `${name}${workspaceName ? ` · ${workspaceName}` : ''}` : null);
   useCanvasShortcuts({ enabled: canEdit });
+  useEffect(() => {
+    if (!canEdit) return undefined;
+    const onKey = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === '/') { e.preventDefault(); setAddMenuOpen((v) => !v); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [canEdit]);
   // Edits save themselves (spec/28 §9); only ops the server hasn't confirmed yet
   // are at risk when leaving.
   useUnsavedChangesGuard(pendingCount > 0 && canEdit, "Some changes haven't synced yet. Leave anyway?");
@@ -203,8 +215,32 @@ export default function Builder() {
     [edges, selectedEdgeId],
   );
 
-  function handleAddNode(type) {
-    store.addNode(type, { x: 100 + Math.random() * 300, y: 100 + Math.random() * 300 });
+  // New nodes land in the middle of what you're looking at (nudged so a burst
+  // of adds doesn't stack exactly), or where they were dropped.
+  function handleAddNode(type, position = null) {
+    const flow = flowRef.current;
+    const box = canvasRef.current?.getBoundingClientRect();
+    let at = position;
+    if (!at && flow && box) {
+      const center = flow.project({ x: box.width / 2, y: box.height / 2 });
+      at = { x: center.x - 116 + (Math.random() - 0.5) * 60, y: center.y - 30 + (Math.random() - 0.5) * 60 };
+    }
+    store.addNode(type, at || { x: 100 + Math.random() * 300, y: 100 + Math.random() * 300 });
+  }
+
+  function onCanvasDragOver(e) {
+    if (!canEdit || !e.dataTransfer.types.includes(NODE_DRAG_TYPE)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  }
+
+  function onCanvasDrop(e) {
+    const type = e.dataTransfer.getData(NODE_DRAG_TYPE);
+    if (!type || !canEdit || !flowRef.current || !canvasRef.current) return;
+    e.preventDefault();
+    const box = canvasRef.current.getBoundingClientRect();
+    const p = flowRef.current.project({ x: e.clientX - box.left, y: e.clientY - box.top });
+    handleAddNode(type, { x: p.x - 116, y: p.y - 24 });
   }
 
   function revealNode(nodeId) {
@@ -250,14 +286,15 @@ export default function Builder() {
   const hasSelection = nodes.some((n) => n.selected);
 
   return (
-    <div className="flex h-[calc(100vh-57px)] flex-col">
+    <div className="flex h-[calc(100vh-var(--topbar-h))] flex-col">
       {/* One toolbar row across the whole Builder (spec/36): it sits above the
           canvas and side panels, so nothing in it can overlap the config panel. */}
       <div
         data-testid="builder-toolbar"
-        className="relative z-20 flex h-12 shrink-0 flex-nowrap items-center gap-2 border-b border-slate-200/80 bg-white/80 px-3 backdrop-blur-md dark:border-slate-800/80 dark:bg-slate-950/80"
+        className="relative z-20 flex h-12 shrink-0 flex-nowrap items-center gap-2 border-b border-default bg-surface px-3"
       >
         <div className="flex min-w-0 flex-1 items-center gap-2">
+          <NameInput name={name} readOnly={!canEdit} onChange={store.setName} />
           {canEdit && <SaveStatus />}
           <VersionChip
             publishedVersion={versionState.publishedVersion}
@@ -267,7 +304,7 @@ export default function Builder() {
           {(serverError || lastError) && (
             <span
               title={serverError || lastError}
-              className="min-w-0 truncate rounded-lg bg-red-50 px-3 py-1.5 text-sm text-red-600 dark:bg-red-950 dark:text-red-300"
+              className="min-w-0 truncate rounded-control bg-danger-subtle px-2.5 py-1 text-xs font-medium text-danger-subtle-fg"
             >
               {serverError || lastError}
             </span>
@@ -293,16 +330,17 @@ export default function Builder() {
               disabled={syncing}
               title={syncing ? 'Syncing your latest changes…' : 'Publish the draft as a new version'}
             >
+              <Rocket className="h-3.5 w-3.5" aria-hidden="true" />
               Publish
             </Button>
           )}
 
           {canEdit && (
-            <div className="hidden items-center gap-0.5 rounded-lg border border-slate-200 bg-white/60 p-0.5 dark:border-slate-700 dark:bg-slate-900/60 xl:flex">
-              <IconAction onClick={store.undo} disabled={!past.length} title="Undo your last change (⌘Z)" label="↺" />
-              <IconAction onClick={store.redo} disabled={!future.length} title="Redo (⇧⌘Z)" label="↻" />
-              <IconAction onClick={store.duplicateSelection} disabled={!hasSelection} title="Duplicate selection (⌘D)" label="⧉" />
-              <IconAction onClick={store.paste} disabled={!clipboard?.nodes?.length} title="Paste (⌘V)" label="⇤" />
+            <div className="hidden items-center rounded-control border border-default bg-surface p-0.5 shadow-sm xl:flex">
+              <IconAction onClick={store.undo} disabled={!past.length} title="Undo your last change (⌘Z)" icon={Undo2} />
+              <IconAction onClick={store.redo} disabled={!future.length} title="Redo (⇧⌘Z)" icon={Redo2} />
+              <IconAction onClick={store.duplicateSelection} disabled={!hasSelection} title="Duplicate selection (⌘D)" icon={CopyPlus} />
+              <IconAction onClick={store.paste} disabled={!clipboard?.nodes?.length} title="Paste (⌘V)" icon={ClipboardPaste} />
             </div>
           )}
 
@@ -314,19 +352,19 @@ export default function Builder() {
             align="right"
             title="More actions"
             testId="builder-more"
-            label={<span aria-hidden="true">⋯</span>}
-            buttonClassName="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm font-semibold text-slate-600 shadow-sm hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+            label={<MoreHorizontal className="h-4 w-4" aria-hidden="true" />}
+            buttonClassName="inline-flex h-8 w-8 items-center justify-center rounded-control border border-default bg-surface text-muted shadow-sm hover:bg-bg-subtle hover:text-fg"
           >
             {canShare && (
-              <MenuButton onClick={() => setShareDialog(true)}>{shareToken ? 'Share · on' : 'Share'}</MenuButton>
+              <MenuButton onClick={() => setShareDialog(true)}><Share2 /> {shareToken ? 'Share · on' : 'Share'}</MenuButton>
             )}
             {canTemplate && (
               <MenuButton onClick={() => setTemplateDialog(true)} disabled={syncing} title={syncing ? 'Syncing your latest changes…' : undefined}>
-                Save as template
+                <LayoutTemplate /> Save as template
               </MenuButton>
             )}
-            <MenuLink to={wp(`/workflows/${id}/runs`)}>History</MenuLink>
-            <MenuButton onClick={() => setVersionsOpen(true)}>Versions</MenuButton>
+            <MenuLink to={wp(`/workflows/${id}/runs`)}><History /> History</MenuLink>
+            <MenuButton onClick={() => setVersionsOpen(true)}><GitCommitVertical /> Versions</MenuButton>
             {canEdit && (
               // The icon group is hidden below xl; its actions live here instead.
               <div className="xl:hidden">
@@ -344,21 +382,35 @@ export default function Builder() {
       </div>
 
       <div className="flex min-h-0 flex-1">
-        <div className="w-64 shrink-0 overflow-y-auto border-r border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950">
-          <NameInput name={name} readOnly={!canEdit} onChange={store.setName} />
-          {canEdit ? (
-            <NodePalette onAdd={handleAddNode} />
-          ) : (
-            <p className="rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-              <span className="font-medium">Read-only.</span> Your role can view this workflow and its runs, but not edit
-              or run it. Other people's edits appear live.
-            </p>
-          )}
-          <div className="my-4 border-t border-slate-200 dark:border-slate-800" />
-          <TriggerPanel workflowId={id} readOnly={!canTriggers} />
-        </div>
+        <CanvasRail
+          canEdit={canEdit}
+          menuOpen={addMenuOpen}
+          onMenuOpenChange={setAddMenuOpen}
+          onAdd={(type) => handleAddNode(type)}
+          triggersOpen={triggersOpen}
+          onToggleTriggers={() => setTriggersOpen((v) => !v)}
+        />
+        {triggersOpen && (
+          <div data-testid="triggers-flyout" className="z-10 flex w-[300px] shrink-0 flex-col border-r border-default bg-surface">
+            <div className="flex h-10 shrink-0 items-center justify-between border-b border-default px-3">
+              <span className="text-sm font-semibold text-fg">Triggers</span>
+              <button type="button" onClick={() => setTriggersOpen(false)} aria-label="Close triggers" className="rounded-control p-1 text-subtle hover:bg-bg-subtle hover:text-fg">
+                <X className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto p-3">
+              {!canEdit && (
+                <p className="mb-3 rounded-control border border-default bg-bg-subtle px-3 py-2 text-xs text-muted">
+                  <span className="font-medium">Read-only.</span> Your role can view this workflow and its runs, but not edit
+                  or run it. Other people's edits appear live.
+                </p>
+              )}
+              <TriggerPanel workflowId={id} readOnly={!canTriggers} />
+            </div>
+          </div>
+        )}
 
-        <div ref={canvasRef} className="relative min-w-0 flex-1" onMouseMove={onMouseMove}>
+        <div ref={canvasRef} className="relative min-w-0 flex-1" onMouseMove={onMouseMove} onDragOver={onCanvasDragOver} onDrop={onCanvasDrop}>
           <ReactFlow
             nodes={decoratedNodes}
             edges={decoratedEdges}
@@ -391,11 +443,16 @@ export default function Builder() {
             // Deletion goes through the store so it lands in the undo stack.
             deleteKeyCode={null}
             fitView
+            // Fit, but never shrink a graph past readable (pan instead), and don't
+            // blow a two-node graph up to poster size either.
+            fitViewOptions={{ padding: 0.2, minZoom: 0.7, maxZoom: 1 }}
+            minZoom={0.25}
+            maxZoom={2}
           >
             <Background />
             {/* Top-left: the bottom-left corner belongs to the validation pill. */}
             <Controls position="top-left" />
-            <MiniMap pannable zoomable className="!bg-white dark:!bg-slate-900" />
+            <MiniMap pannable zoomable position="bottom-right" />
           </ReactFlow>
 
           <RemoteCursors viewport={viewport} width={canvasSize.width} height={canvasSize.height} />
@@ -474,7 +531,7 @@ export default function Builder() {
 
 function BuilderSkeleton() {
   return (
-    <div role="status" aria-label="Loading workflow" className="flex h-[calc(100vh-57px)] flex-col">
+    <div role="status" aria-label="Loading workflow" className="flex h-[calc(100vh-var(--topbar-h))] flex-col">
       <div className="flex h-12 items-center gap-2 border-b border-slate-200/80 px-3 dark:border-slate-800/80">
         <Skeleton className="h-7 w-36" />
         <Skeleton className="h-6 w-24 rounded-full" />
@@ -513,20 +570,23 @@ function NameInput({ name, readOnly, onChange }) {
         setDraft(e.target.value);
         if (e.target.value.trim()) onChange(e.target.value);
       }}
-      className="mb-4 w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm font-medium dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+      data-testid="workflow-name"
+      aria-label="Workflow name"
+      className="h-8 w-56 min-w-0 shrink rounded-control border border-transparent bg-transparent px-2 text-sm font-semibold text-fg hover:border-default focus:border-accent focus:bg-surface focus:outline-none focus:ring-2 focus:ring-accent/20"
     />
   );
 }
 
-function IconAction({ onClick, disabled, title, label }) {
+function IconAction({ onClick, disabled, title, icon: Icon }) {
   return (
     <button
       onClick={onClick}
       disabled={disabled}
       title={title}
-      className="rounded px-2 py-1 text-sm text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-30 dark:text-slate-300 dark:hover:bg-slate-800"
+      aria-label={title}
+      className="inline-flex h-7 w-7 items-center justify-center rounded-[5px] text-muted transition-colors hover:bg-bg-subtle hover:text-fg disabled:cursor-not-allowed disabled:opacity-30"
     >
-      {label}
+      <Icon className="h-4 w-4" aria-hidden="true" />
     </button>
   );
 }

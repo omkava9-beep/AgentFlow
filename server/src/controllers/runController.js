@@ -16,7 +16,14 @@ export async function createRun(req, res, next) {
     // sends source 'published'. (`kind` is accepted as an alias.)
     const requested = req.body?.source ?? req.body?.kind ?? 'draft';
     if (!['draft', 'published'].includes(requested)) throw new HttpError(400, "source must be 'draft' or 'published'");
-    const result = await createAndStartRun(workflow, { trigger: 'manual', triggeredBy: req.userId, source: requested });
+    // An optional test payload (e.g. a template's sampleInput), handed to the
+    // Start node exactly as a webhook or event payload would be.
+    const input = req.body?.input;
+    if (input !== undefined && input !== null && typeof input !== 'object') {
+      throw new HttpError(400, 'input must be a JSON object or array');
+    }
+    if (input && JSON.stringify(input).length > 100_000) throw new HttpError(400, 'input is larger than 100 KB');
+    const result = await createAndStartRun(workflow, { trigger: 'manual', triggeredBy: req.userId, source: requested, input: input ?? null });
 
     if (!result.ok && result.reason === SKIP_REASONS.QUOTA_EXCEEDED) return sendQuotaExceeded(res, result);
     if (!result.ok) {

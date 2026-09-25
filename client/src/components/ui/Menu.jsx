@@ -6,7 +6,7 @@ import { NavLink } from 'react-router-dom';
  * outside click, Escape, or picking an item. Used by the header's nav groups,
  * the user menu and the Builder's "⋯" overflow menu (spec/36).
  */
-export function Menu({ label, title, align = 'left', buttonClassName = '', panelClassName = 'w-56', children, testId }) {
+export function Menu({ label, title, align = 'left', up = false, buttonClassName = '', panelClassName = 'w-56', children, testId }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -39,7 +39,7 @@ export function Menu({ label, title, align = 'left', buttonClassName = '', panel
       {open && (
         <div
           role="menu"
-          className={`absolute top-full z-40 mt-2 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-xl dark:border-slate-700 dark:bg-slate-900 ${
+          className={`absolute ${up ? 'bottom-full mb-1.5' : 'top-full mt-1.5'} z-40 animate-pop-in overflow-hidden rounded-card border border-default bg-surface-raised p-1 shadow-popover ${
             align === 'right' ? 'right-0' : 'left-0'
           } ${panelClassName}`}
           // Children are rendered with a `close` helper so links and buttons
@@ -53,7 +53,7 @@ export function Menu({ label, title, align = 'left', buttonClassName = '', panel
   );
 }
 
-const itemClass = 'flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-200 dark:hover:bg-slate-800';
+const itemClass = 'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-fg transition-colors hover:bg-bg-subtle focus:bg-bg-subtle focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 [&>svg]:h-4 [&>svg]:w-4 [&>svg]:text-subtle';
 
 export function MenuLink({ to, children, end }) {
   return (
@@ -62,7 +62,7 @@ export function MenuLink({ to, children, end }) {
       end={end}
       role="menuitem"
       data-menu-close
-      className={({ isActive }) => `${itemClass} ${isActive ? 'font-semibold text-brand-600 dark:text-brand-400' : ''}`}
+      className={({ isActive }) => `${itemClass} ${isActive ? 'bg-bg-subtle font-medium' : ''}`}
     >
       {children}
     </NavLink>
@@ -78,7 +78,7 @@ export function MenuButton({ onClick, children, disabled, title, danger = false 
       onClick={onClick}
       disabled={disabled}
       title={title}
-      className={`${itemClass} ${danger ? 'text-red-600 dark:text-red-400' : ''}`}
+      className={`${itemClass} ${danger ? '!text-danger [&>svg]:!text-danger' : ''}`}
     >
       {children}
     </button>
@@ -86,9 +86,9 @@ export function MenuButton({ onClick, children, disabled, title, danger = false 
 }
 
 export function MenuSeparator() {
-  return <div className="my-1 border-t border-slate-100 dark:border-slate-800" />;
+  return <div className="-mx-1 my-1 border-t border-default" />;
 }
 
 export function MenuHeading({ children }) {
-  return <p className="px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">{children}</p>;
+  return <p className="px-2 pb-1 pt-2 text-2xs font-medium uppercase tracking-wider text-subtle">{children}</p>;
 }

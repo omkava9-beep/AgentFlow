@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { X } from 'lucide-react';
 import { formatRelativeTime } from '../../utils/time';
 import { mentionParts } from '../../utils/mentions';
 
@@ -36,7 +37,7 @@ export default function ThreadListPanel({ threads, onOpen, onRepin, onClose }) {
             </button>
           );
         })}
-        <button type="button" onClick={onClose} aria-label="Close" className="ml-auto rounded-md px-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">✕</button>
+        <button type="button" onClick={onClose} aria-label="Close" className="ml-auto rounded-md px-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"><X className="h-4 w-4" aria-hidden="true" /></button>
       </div>
       <div className="flex-1 divide-y divide-slate-100 overflow-y-auto dark:divide-slate-800">
         {shown.length === 0 && <p className="px-3 py-6 text-center text-xs text-slate-400">No {current.label.toLowerCase()} threads.</p>}

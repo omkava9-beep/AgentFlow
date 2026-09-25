@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { X } from 'lucide-react';
 import { listVersions, restoreVersion, rollbackVersion } from '../../api/workflows';
 import { apiErrorMessage } from '../../api/client';
 import { on } from '../../realtime/socket';
@@ -52,7 +53,7 @@ export default function VersionsDrawer({ workflowId, onView, onCompare, onClose,
     <div className="absolute inset-y-0 right-0 z-30 flex w-96 flex-col border-l border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-900">
       <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-slate-800">
         <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Versions</h3>
-        <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600" aria-label="Close">✕</button>
+        <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600" aria-label="Close"><X className="h-4 w-4" aria-hidden="true" /></button>
       </div>
       {error && <p className="px-4 pt-3 text-xs text-red-500">{error}</p>}
       <div className="flex-1 overflow-y-auto p-3">

@@ -5,7 +5,6 @@ import ProtectedRoute from './components/ProtectedRoute';
 import WorkspaceRoute from './components/WorkspaceRoute';
 import LegacyRedirect from './components/LegacyRedirect';
 import WorkspaceFallback from './components/WorkspaceFallback';
-import GradientBackdrop from './components/GradientBackdrop';
 import Toaster from './components/Toaster';
 import ConfirmHost from './components/ui/ConfirmDialog';
 import { RouteErrorBoundary } from './components/ui/ErrorBoundary';
@@ -48,7 +47,6 @@ function Root() {
 
   return (
     <>
-      <GradientBackdrop />
       <Outlet />
       <Toaster />
       <ConfirmHost />

@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import { createConnection, updateConnection, testConnection, createInboundToken } from '../api/connections';
 import { apiErrorMessage } from '../api/client';
-import { actionIsLive, integrationIcon } from '../utils/integrationCatalog';
+import { actionIsLive } from '../utils/integrationCatalog';
+import IntegrationLogo from './ui/IntegrationLogo';
 import { useIntegrationStore } from '../store/integrationStore';
 import ToolConfigFields from './ToolConfigFields';
 import McpConnectionFields from './McpConnectionFields';
@@ -109,7 +110,7 @@ export default function ConnectionDialog({ integration, connection = null, onClo
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
       <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl border border-slate-200 bg-white p-5 shadow-xl dark:border-slate-800 dark:bg-slate-900">
         <div className="mb-4 flex items-center gap-2">
-          <span className="text-xl">{integrationIcon(integration?.icon || integration?.id)}</span>
+          <IntegrationLogo id={integration?.id} name={integration?.name} size="lg" />
           <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
             {connection ? `Edit ${connection.name}` : `New ${integration?.name} connection`}
           </h2>

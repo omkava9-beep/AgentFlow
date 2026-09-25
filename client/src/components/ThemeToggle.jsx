@@ -1,14 +1,8 @@
+import { Moon, Sun } from 'lucide-react';
 import { useThemeStore } from '../store/themeStore';
+import { IconButton } from './ui/Button';
 
 export default function ThemeToggle() {
   const { theme, toggle } = useThemeStore();
-  return (
-    <button
-      onClick={toggle}
-      title="Toggle theme"
-      className="rounded-lg border border-slate-200 p-2 text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-    >
-      {theme === 'dark' ? '☀️' : '🌙'}
-    </button>
-  );
+  return <IconButton icon={theme === 'dark' ? Sun : Moon} label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'} onClick={toggle} />;
 }

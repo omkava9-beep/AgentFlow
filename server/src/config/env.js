@@ -22,12 +22,17 @@ export const env = {
   // low | medium | high - reasoning models only; unset sends nothing.
   openaiReasoningEffort: process.env.OPENAI_REASONING_EFFORT || '',
   openaiMaxCompletionTokens: Number(process.env.OPENAI_MAX_COMPLETION_TOKENS) || 4096,
-  // OpenCode Zen: an OpenAI-compatible gateway (Chat Completions) with free
-  // models. Same client as OpenAI, its own key/model so switching is one line.
-  opencodeApiKey: process.env.OPENCODE_API_KEY || '',
-  opencodeBaseUrl: (process.env.OPENCODE_BASE_URL || 'https://opencode.ai/zen/v1').replace(/\/+$/, ''),
-  opencodeModel: process.env.OPENCODE_MODEL || 'mimo-v2.6-flash-free',
-  opencodeMaxTokens: Number(process.env.OPENCODE_MAX_TOKENS) || 4096,
+  // OpenRouter: an OpenAI-compatible gateway (Chat Completions) in front of
+  // many models, including a free tier (ids ending ":free", plus the
+  // `openrouter/free` router that picks an available free model). Same client
+  // as OpenAI, its own key/model so switching providers is one line.
+  openrouterApiKey: process.env.OPENROUTER_API_KEY || '',
+  openrouterBaseUrl: (process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1').replace(/\/+$/, ''),
+  openrouterModel: process.env.OPENROUTER_MODEL || 'openrouter/free',
+  openrouterMaxTokens: Number(process.env.OPENROUTER_MAX_TOKENS) || 4096,
+  // Optional attribution OpenRouter shows on its dashboard/rankings.
+  openrouterAppUrl: process.env.OPENROUTER_APP_URL || '',
+  openrouterAppName: process.env.OPENROUTER_APP_NAME || 'AgentFlow',
   defaultToolFailureRate: Number(process.env.DEFAULT_TOOL_FAILURE_RATE ?? 0.1),
   queueConcurrency: Number(process.env.QUEUE_CONCURRENCY) || 8,
   queueMaxAttempts: Number(process.env.QUEUE_MAX_ATTEMPTS) || 3,
@@ -83,20 +88,15 @@ if (env.httpAllowPrivateNetworks) {
   console.warn('[env] HTTP_TOOL_ALLOW_PRIVATE_NETWORKS=true — outbound requests may reach private networks. Local development only.');
 }
 
-const AGENT_PROVIDERS = ['mock', 'openai', 'opencode', 'anthropic'];
+const AGENT_PROVIDERS = ['mock', 'openai', 'openrouter', 'anthropic'];
 if (!AGENT_PROVIDERS.includes(env.agentProvider)) {
   throw new Error(`AGENT_PROVIDER must be one of ${AGENT_PROVIDERS.join(', ')} (got "${env.agentProvider}")`);
 }
 if (env.agentProvider === 'openai' && !env.openaiApiKey) {
   throw new Error('AGENT_PROVIDER=openai requires OPENAI_API_KEY to be set');
 }
-if (env.agentProvider === 'opencode') {
-  if (!env.opencodeApiKey) throw new Error('AGENT_PROVIDER=opencode requires OPENCODE_API_KEY to be set');
-  // These families aren't served on /chat/completions by OpenCode Zen
-  // (Muse → /responses, Jev → /systemone), so the provider can't call them.
-  if (/^(muse-|jev-)/.test(env.opencodeModel)) {
-    throw new Error(`OPENCODE_MODEL=${env.opencodeModel} isn't a Chat Completions model on OpenCode Zen - pick one served on /chat/completions (e.g. mimo-v2.6-flash-free, nemotron-3-ultra-free)`);
-  }
+if (env.agentProvider === 'openrouter' && !env.openrouterApiKey) {
+  throw new Error('AGENT_PROVIDER=openrouter requires OPENROUTER_API_KEY to be set (get one at https://openrouter.ai/keys)');
 }
 if (env.agentProvider === 'anthropic' && !env.anthropicApiKey) {
   throw new Error('AGENT_PROVIDER=anthropic requires ANTHROPIC_API_KEY to be set');

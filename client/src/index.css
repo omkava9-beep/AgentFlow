@@ -1,6 +1,84 @@
+@import '@fontsource-variable/inter';
+@import '@fontsource-variable/jetbrains-mono';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/*
+ * Design tokens (see components/ui/README.md). Pages use the semantic Tailwind
+ * classes mapped to these (bg-surface, text-muted, border-default, ...), never
+ * raw hex or slate/indigo. Values are space-separated RGB channels so Tailwind's
+ * opacity modifiers (bg-accent/10) keep working.
+ *
+ * Neutrals are zinc; the one accent is indigo. Status hues are shared with the
+ * chart palette below so a "failed" badge and a failed bar are the same red.
+ */
+:root {
+  --bg: 250 250 250;            /* zinc-50: app background */
+  --bg-subtle: 244 244 245;     /* zinc-100: hovered rows, sunken strips */
+  --surface: 255 255 255;       /* cards, panels, tables */
+  --surface-raised: 255 255 255;/* popovers, dialogs (paired with a shadow) */
+  --surface-sunken: 244 244 245;/* inputs on surfaces, code blocks */
+  --border: 228 228 231;        /* zinc-200 */
+  --border-strong: 212 212 216; /* zinc-300 */
+  --text: 24 24 27;             /* zinc-900 */
+  --text-muted: 82 82 91;       /* zinc-600 */
+  --text-subtle: 113 113 122;   /* zinc-500 */
+  --accent: 79 70 229;          /* indigo-600 */
+  --accent-hover: 67 56 202;    /* indigo-700 */
+  --accent-fg: 255 255 255;
+  --accent-subtle: 238 242 255; /* indigo-50 */
+  --accent-subtle-fg: 67 56 202;
+  --success: 22 163 74;         /* green-600 */
+  --success-subtle: 240 253 244;
+  --success-subtle-fg: 21 128 61;
+  --warning: 217 119 6;         /* amber-600 */
+  --warning-subtle: 255 251 235;
+  --warning-subtle-fg: 180 83 9;
+  --danger: 220 38 38;          /* red-600 */
+  --danger-subtle: 254 242 242;
+  --danger-subtle-fg: 185 28 28;
+  --info: 37 99 235;            /* blue-600 */
+  --info-subtle: 239 246 255;
+  --info-subtle-fg: 29 78 216;
+  --ring: 99 102 241;           /* indigo-500 */
+  --canvas-dot: 212 212 216;
+  color-scheme: light;
+}
+
+.dark {
+  --bg: 9 9 11;                 /* zinc-950 */
+  --bg-subtle: 24 24 27;        /* zinc-900 */
+  --surface: 17 17 19;
+  --surface-raised: 28 28 31;
+  --surface-sunken: 9 9 11;
+  --border: 39 39 42;           /* zinc-800 */
+  --border-strong: 63 63 70;    /* zinc-700 */
+  --text: 244 244 245;          /* zinc-100 */
+  --text-muted: 161 161 170;    /* zinc-400 */
+  --text-subtle: 113 113 122;   /* zinc-500 */
+  --accent: 129 140 248;        /* indigo-400 */
+  --accent-hover: 165 180 252;  /* indigo-300 */
+  --accent-fg: 17 17 19;
+  --accent-subtle: 30 27 75;    /* indigo-950 */
+  --accent-subtle-fg: 165 180 252;
+  --success: 34 197 94;
+  --success-subtle: 5 46 22;
+  --success-subtle-fg: 134 239 172;
+  --warning: 245 158 11;
+  --warning-subtle: 69 26 3;
+  --warning-subtle-fg: 252 211 77;
+  --danger: 248 113 113;
+  --danger-subtle: 69 10 10;
+  --danger-subtle-fg: 252 165 165;
+  --info: 96 165 250;
+  --info-subtle: 23 37 84;
+  --info-subtle-fg: 147 197 253;
+  --ring: 129 140 248;
+  --canvas-dot: 39 39 42;
+  color-scheme: dark;
+}
 
 html,
 body,
@@ -8,9 +86,42 @@ body,
   height: 100%;
 }
 
+:root {
+  --topbar-h: 48px;
+  --sidebar-w: 240px;
+}
+
+html {
+  font-size: 14px;
+}
+
 body {
-  @apply bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100;
-  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+  background: rgb(var(--bg));
+  color: rgb(var(--text));
+  font-family: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-feature-settings: 'cv11', 'ss01';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code, kbd, pre, samp, .font-mono {
+  font-family: 'JetBrains Mono Variable', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* One focus treatment everywhere: keyboard focus only, on the token ring. */
+:focus-visible {
+  outline: 2px solid rgb(var(--ring));
+  outline-offset: 2px;
+}
+
+::selection {
+  background: rgb(var(--accent) / 0.2);
+}
+
+/* Quiet scrollbars that follow the theme. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--border-strong)) transparent;
 }
 
 /*
@@ -34,9 +145,9 @@ body {
 :root {
   --viz-series: #2a78d6;
   --viz-series-soft: rgba(42, 120, 214, 0.18);
-  --viz-grid: #e1e0d9;
-  --viz-axis: #c3c2b7;
-  --viz-muted: #898781;
+  --viz-grid: #e4e4e7;
+  --viz-axis: #d4d4d8;
+  --viz-muted: #71717a;
   --viz-surface: #ffffff;
   --viz-ring: rgba(11, 11, 11, 0.1);
 
@@ -49,10 +160,10 @@ body {
 .dark {
   --viz-series: #3987e5;
   --viz-series-soft: rgba(57, 135, 229, 0.22);
-  --viz-grid: #2c2c2a;
-  --viz-axis: #383835;
+  --viz-grid: #27272a;
+  --viz-axis: #3f3f46;
   --viz-muted: #898781;
-  --viz-surface: #0f172a;
+  --viz-surface: #111113;
   --viz-ring: rgba(255, 255, 255, 0.12);
 }
 
@@ -65,3 +176,56 @@ body {
   pointer-events: none;
   opacity: 0;
 }
+
+/*
+ * React Flow, themed from the tokens so the canvas, controls, minimap and
+ * attribution all follow dark mode (they're white by default).
+ */
+.react-flow {
+  --xy-background-color: transparent;
+}
+.react-flow .react-flow__background { color: rgb(var(--canvas-dot)); }
+.react-flow .react-flow__background circle, .react-flow .react-flow__background path { fill: rgb(var(--canvas-dot)); }
+.react-flow .react-flow__controls {
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.06);
+  border: 1px solid rgb(var(--border));
+  border-radius: 8px;
+  overflow: hidden;
+}
+.react-flow .react-flow__controls-button {
+  background: rgb(var(--surface));
+  border-bottom: 1px solid rgb(var(--border));
+  color: rgb(var(--text-muted));
+  box-sizing: border-box;
+  padding: 0;
+  width: 26px;
+  height: 26px;
+}
+.react-flow .react-flow__controls-button:hover { background: rgb(var(--bg-subtle)); }
+.react-flow .react-flow__controls-button svg { fill: currentColor; max-width: 12px; max-height: 12px; }
+.react-flow .react-flow__controls-button:last-child { border-bottom: none; }
+.react-flow .react-flow__minimap {
+  background: rgb(var(--surface));
+  border: 1px solid rgb(var(--border));
+  border-radius: 8px;
+  overflow: hidden;
+}
+.react-flow .react-flow__minimap-mask { fill: rgb(var(--bg-subtle) / 0.7); }
+.react-flow .react-flow__minimap-node { fill: rgb(var(--border-strong)); stroke: none; }
+.react-flow .react-flow__attribution {
+  background: transparent !important;
+  color: rgb(var(--text-subtle));
+}
+.react-flow .react-flow__attribution a { color: rgb(var(--text-subtle)); }
+.react-flow .react-flow__edge-path { stroke: rgb(var(--border-strong)); }
+.react-flow .react-flow__edge.selected .react-flow__edge-path { stroke: rgb(var(--accent)); }
+.react-flow .react-flow__edge-textbg { fill: rgb(var(--surface)); }
+.react-flow .react-flow__edge-text { fill: rgb(var(--text-muted)); font-size: 11px; }
+.react-flow .react-flow__handle {
+  width: 9px;
+  height: 9px;
+  background: rgb(var(--surface));
+  border: 1.5px solid rgb(var(--border-strong));
+}
+.react-flow .react-flow__handle:hover { border-color: rgb(var(--accent)); }
+.react-flow .react-flow__node.selected > div { box-shadow: 0 0 0 2px rgb(var(--accent) / 0.55); }

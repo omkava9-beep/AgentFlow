@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
+import { X } from 'lucide-react';
 import { useIntegrationStore } from '../../store/integrationStore';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import { listMcpTools } from '../../api/mcp';
-import { integrationIcon, needsCredentials } from '../../utils/integrationCatalog';
+import { needsCredentials } from '../../utils/integrationCatalog';
+import IntegrationLogo from '../ui/IntegrationLogo';
 import { toolToAction, snapshotTools, actionHasSideEffect, MAX_AGENT_TOOLS } from '../../utils/mcpSchema';
 import { ToolBadges } from '../McpToolList';
 
@@ -132,7 +134,7 @@ export default function AgentToolsField({ config, set, readOnly }) {
             return (
               <li key={i} className="rounded-md bg-slate-50 px-2 py-1.5 text-xs dark:bg-slate-800/60">
                 <div className="flex items-center gap-1.5">
-                  <span>{integrationIcon(integration?.icon || entry.integration)}</span>
+                  <IntegrationLogo id={entry.integration} name={integration?.name} size="xs" />
                   <span className="min-w-0 flex-1 truncate font-medium text-slate-700 dark:text-slate-200">
                     {entry.integration === 'mcp' ? `${conn?.name || 'Missing connection'} → ` : `${integration?.name || entry.integration} · `}
                     {action?.name || entry.action}
@@ -141,9 +143,7 @@ export default function AgentToolsField({ config, set, readOnly }) {
                     <span className="rounded bg-amber-100 px-1 text-[10px] text-amber-700 dark:bg-amber-950 dark:text-amber-300">side effect</span>
                   )}
                   {!readOnly && (
-                    <button type="button" aria-label="Remove tool" onClick={() => toggle(entry)} className="text-slate-400 hover:text-red-500">
-                      ✕
-                    </button>
+                    <button type="button" aria-label="Remove tool" onClick={() => toggle(entry)} className="text-slate-400 hover:text-red-500"><X className="h-4 w-4" aria-hidden="true" /></button>
                   )}
                 </div>
                 {entry.integration !== 'mcp' && integration && needsCredentials(integration) && (
@@ -188,7 +188,7 @@ export default function AgentToolsField({ config, set, readOnly }) {
               return (
                 <div key={key}>
                   <button type="button" onClick={() => toggleGroup(key, c.id)} className="flex w-full items-center gap-1 text-left text-xs font-semibold text-slate-600 dark:text-slate-300">
-                    <span>{expanded ? '▾' : '▸'}</span> 🔌 {c.name}
+                    <span>{expanded ? '▾' : '▸'}</span> <IntegrationLogo id="mcp" name={c.name} size="xs" /> {c.name}
                     <span className="font-normal text-slate-400">MCP</span>
                   </button>
                   {expanded && (
@@ -209,7 +209,7 @@ export default function AgentToolsField({ config, set, readOnly }) {
               return (
                 <div key={key}>
                   <button type="button" onClick={() => toggleGroup(key)} className="flex w-full items-center gap-1 text-left text-xs font-semibold text-slate-600 dark:text-slate-300">
-                    <span>{expanded ? '▾' : '▸'}</span> {integrationIcon(integration.icon || integration.id)} {integration.name}
+                    <span>{expanded ? '▾' : '▸'}</span> <IntegrationLogo id={integration.id} name={integration.name} size="xs" /> {integration.name}
                   </button>
                   {expanded && (
                     <div className="ml-3 mt-1">{list.map((a) => checkbox({ integration: integration.id, action: a.id, connectionId: null }, a))}</div>

@@ -1,5 +1,7 @@
 import mongoose from 'mongoose';
 import Workflow from '../models/Workflow.js';
+import Run from '../models/Run.js';
+import User from '../models/User.js';
 import { HttpError } from '../middleware/errorHandler.js';
 import { findCycle } from '../engine/topologicalOrder.js';
 import { scopedFilter, findInWorkspace, createInWorkspace } from '../tenancy/scoped.js';
@@ -29,24 +31,101 @@ function presentWorkflow(workflow, req) {
 
 export async function list(req, res, next) {
   try {
+    const workspaceOid = new mongoose.Types.ObjectId(req.workspaceId);
     // aggregate() skips Mongoose casting, so the id has to be an ObjectId here.
     const workflows = await Workflow.aggregate([
-      { $match: scopedFilter(req, { workspaceId: new mongoose.Types.ObjectId(req.workspaceId) }) },
+      { $match: scopedFilter(req, { workspaceId: workspaceOid }) },
       {
         $project: {
           name: 1,
           updatedAt: 1,
           createdAt: 1,
+          createdBy: 1,
+          updatedBy: 1,
           nodeCount: { $size: '$nodes' },
           edgeCount: { $size: '$edges' },
           // spec/30: the dashboard's "v3" badge and its unpublished-changes dot.
           publishedVersion: { $ifNull: ['$publishedVersion', null] },
           hasUnpublishedChanges: { $ifNull: ['$hasUnpublishedChanges', false] },
+          // What the list shows at a glance: the node kinds used, the tools'
+          // integrations, and which automatic triggers are switched on.
+          nodeTypes: { $setUnion: ['$nodes.type', []] },
+          integrations: { $setUnion: ['$nodes.data.config.integration', []] },
+          schedule: { enabled: '$schedule.enabled', cronExpression: '$schedule.cronExpression' },
+          webhookEnabled: { $ifNull: ['$webhook.enabled', false] },
+          eventTrigger: { enabled: '$eventTrigger.enabled', eventName: '$eventTrigger.eventName' },
         },
       },
       { $sort: { updatedAt: -1 } },
     ]);
-    res.json(workflows);
+
+    const ids = workflows.map((w) => w._id);
+    const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    since.setUTCHours(0, 0, 0, 0);
+    const runScope = scopedFilter(req, { workspaceId: workspaceOid, workflowId: { $in: ids }, parentRunId: null });
+    const [lastRuns, weekly, users] = await Promise.all([
+      // Latest top-level run per workflow (child runs of loops/sub-workflows excluded).
+      Run.aggregate([
+        { $match: runScope },
+        { $sort: { createdAt: -1 } },
+        { $group: { _id: '$workflowId', id: { $first: '$_id' }, status: { $first: '$status' }, trigger: { $first: '$trigger' }, isDraft: { $first: '$isDraft' }, startedAt: { $first: '$startedAt' }, finishedAt: { $first: '$finishedAt' }, createdAt: { $first: '$createdAt' } } },
+      ]),
+      // Last 7 days, per workflow per UTC day: the list's sparkline and success rate.
+      Run.aggregate([
+        { $match: { ...runScope, createdAt: { $gte: since } } },
+        { $group: {
+          _id: { wf: '$workflowId', day: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } } },
+          total: { $sum: 1 },
+          success: { $sum: { $cond: [{ $eq: ['$status', 'success'] }, 1, 0] } },
+          failed: { $sum: { $cond: [{ $eq: ['$status', 'failed'] }, 1, 0] } },
+        } },
+      ]),
+      User.find({ _id: { $in: [...new Set(workflows.flatMap((w) => [w.createdBy, w.updatedBy]).filter(Boolean).map(String))] } }).select('name email').lean(),
+    ]);
+
+    const lastByWf = new Map(lastRuns.map((r) => [String(r._id), r]));
+    const days = Array.from({ length: 8 }, (_, i) => new Date(since.getTime() + i * 86400000).toISOString().slice(0, 10));
+    const weeklyByWf = new Map();
+    for (const row of weekly) {
+      const key = String(row._id.wf);
+      const entry = weeklyByWf.get(key) || { total: 0, success: 0, failed: 0, byDay: {} };
+      entry.total += row.total; entry.success += row.success; entry.failed += row.failed;
+      entry.byDay[row._id.day] = row.total;
+      weeklyByWf.set(key, entry);
+    }
+    const userById = new Map(users.map((u) => [String(u._id), { id: String(u._id), name: u.name || u.email, email: u.email }]));
+
+    res.json(workflows.map((w) => {
+      const week = weeklyByWf.get(String(w._id));
+      const last = lastByWf.get(String(w._id));
+      const triggers = [
+        w.schedule?.enabled && { type: 'schedule', detail: w.schedule.cronExpression },
+        w.webhookEnabled && { type: 'webhook' },
+        w.eventTrigger?.enabled && { type: 'event', detail: w.eventTrigger.eventName },
+      ].filter(Boolean);
+      return {
+        _id: w._id,
+        name: w.name,
+        createdAt: w.createdAt,
+        updatedAt: w.updatedAt,
+        nodeCount: w.nodeCount,
+        edgeCount: w.edgeCount,
+        publishedVersion: w.publishedVersion,
+        hasUnpublishedChanges: w.hasUnpublishedChanges,
+        nodeTypes: (w.nodeTypes || []).filter(Boolean),
+        integrations: (w.integrations || []).filter(Boolean),
+        triggers,
+        lastRun: last ? { id: String(last.id), status: last.status, trigger: last.trigger, isDraft: Boolean(last.isDraft), startedAt: last.startedAt || last.createdAt, finishedAt: last.finishedAt || null } : null,
+        stats7d: {
+          total: week?.total || 0,
+          success: week?.success || 0,
+          failed: week?.failed || 0,
+          daily: days.map((d) => week?.byDay[d] || 0),
+        },
+        createdBy: userById.get(String(w.createdBy)) || null,
+        updatedBy: userById.get(String(w.updatedBy)) || userById.get(String(w.createdBy)) || null,
+      };
+    }));
   } catch (err) {
     next(err);
   }

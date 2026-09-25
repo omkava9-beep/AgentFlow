@@ -6,7 +6,7 @@ import ConnectionDialog from './ConnectionDialog';
 import { Select } from './ui';
 
 const NEW = '__new__';
-const STATUS_DOT = { ok: '🟢', error: '🔴', untested: '⚪' };
+const STATUS_TEXT = { ok: '', error: ' · error', untested: ' · untested' };
 
 /**
  * The Connection select under the action picker (spec/25 UI). Options are this
@@ -53,8 +53,9 @@ export default function ConnectionPicker({ integration, value, onChange, readOnl
         )}
         {mine.map((c) => (
           <option key={c.id} value={c.id}>
-            {STATUS_DOT[c.status] || '⚪'} {c.name}
+            {c.name}
             {c.mode === 'sandbox' ? ' (sandbox)' : ''}
+            {STATUS_TEXT[c.status] ?? ''}
           </option>
         ))}
         <option value="sandbox">Sandbox (no account)</option>

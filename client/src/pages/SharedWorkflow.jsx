@@ -31,8 +31,8 @@ export default function SharedWorkflow() {
     return (
       <div className="flex min-h-screen items-center justify-center p-6">
         <Card className="max-w-md p-8 text-center">
-          <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Not published yet</h1>
-          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+          <h1 className="text-lg font-semibold text-fg">Not published yet</h1>
+          <p className="mt-2 text-sm text-muted">
             This workflow hasn't been published yet. The link will show it once its owner publishes a version.
           </p>
         </Card>
@@ -44,11 +44,11 @@ export default function SharedWorkflow() {
     return (
       <div className="flex min-h-screen items-center justify-center p-6">
         <Card className="max-w-md p-8 text-center">
-          <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Link not found</h1>
-          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+          <h1 className="text-lg font-semibold text-fg">Link not found</h1>
+          <p className="mt-2 text-sm text-muted">
             This share link is no longer valid. The owner may have disabled it or generated a new one.
           </p>
-          <Link to="/login" className="mt-4 inline-block text-sm text-brand-600 hover:underline dark:text-brand-400">
+          <Link to="/login" className="mt-4 inline-block text-sm text-accent hover:underline">
             Go to AgentFlow
           </Link>
         </Card>
@@ -56,18 +56,19 @@ export default function SharedWorkflow() {
     );
   }
 
-  if (!data) return <p className="p-6 text-sm text-slate-500 dark:text-slate-400">Loading shared workflow...</p>;
+  if (!data) return <p className="p-6 text-sm text-muted">Loading shared workflow...</p>;
 
   const { workflow, runs } = data;
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-20 border-b border-slate-200/80 bg-white/70 backdrop-blur-md dark:border-slate-800/80 dark:bg-slate-950/70">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
+      <header className="sticky top-0 z-20 border-b border-default bg-surface/80 backdrop-blur">
+        <div className="mx-auto flex h-12 max-w-6xl items-center justify-between gap-3 px-4">
           <div className="flex min-w-0 items-center gap-3">
-            <Wordmark className="text-lg" />
-            <span className="truncate text-sm text-slate-600 dark:text-slate-300">{workflow.name}</span>
-            <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+            <Wordmark className="text-sm" />
+            <span className="h-4 w-px bg-[rgb(var(--border))]" aria-hidden="true" />
+            <span className="truncate text-sm font-medium text-fg">{workflow.name}</span>
+            <span className="shrink-0 rounded-full bg-bg-subtle px-2 py-0.5 text-2xs font-medium text-muted ring-1 ring-inset ring-zinc-900/5 dark:ring-white/10">
               Read-only
             </span>
           </div>
@@ -75,8 +76,8 @@ export default function SharedWorkflow() {
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">
-        <p className="mb-4 text-sm text-slate-500 dark:text-slate-400">
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
+        <p className="mb-4 text-sm text-muted">
           Shared view of a workflow design and its recent runs. Last updated {formatRelativeTime(workflow.updatedAt)}.
         </p>
 
@@ -84,24 +85,24 @@ export default function SharedWorkflow() {
           <RunGraphView workflow={workflow} nodeResults={[]} />
         </Card>
 
-        <h2 className="mb-2 mt-6 text-xs font-semibold uppercase tracking-wide text-slate-400">Recent runs</h2>
+        <h2 className="mb-2 mt-8 text-sm font-semibold text-fg">Recent runs</h2>
         {runs.length === 0 ? (
-          <Card className="p-6 text-center text-sm text-slate-500 dark:text-slate-400">
+          <Card className="p-6 text-center text-sm text-muted">
             This workflow hasn't run yet.
           </Card>
         ) : (
           <div className="space-y-2">
             {runs.map((run) => {
               const row = (
-              <Card className={`flex items-center justify-between p-3 ${run.openable ? 'transition hover:border-brand-400' : ''}`}>
+              <Card className={`flex items-center justify-between p-3 ${run.openable ? 'transition hover:border-strong' : ''}`}>
                 <div className="flex items-center gap-3">
                   <StatusBadge status={run.status} />
                   <TriggerBadge trigger={run.trigger} />
-                  <span className="text-sm text-slate-600 dark:text-slate-300">
+                  <span className="text-sm text-muted">
                     {run.startedAt ? new Date(run.startedAt).toLocaleString() : 'Not started'}
                   </span>
                 </div>
-                <span className="text-xs text-slate-400">
+                <span className="text-xs tabular-nums text-subtle">
                   {run.durationMs != null ? `${(run.durationMs / 1000).toFixed(1)}s` : '—'}
                 </span>
               </Card>

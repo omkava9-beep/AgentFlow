@@ -84,7 +84,7 @@ export default function RunMonitor() {
   const labelOf = (id) => labels.get(id) || id;
 
   return (
-    <div className="-mx-4 -my-6 flex h-[calc(100vh-57px)] flex-col">
+    <div className="flex h-[calc(100vh-var(--topbar-h))] flex-col">
       <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
         <div className="flex items-center gap-3">
           {run.parentRunId && (

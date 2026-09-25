@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { MessageSquarePlus } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useSearchParams } from 'react-router-dom';
 import { createThread, repinThread } from '../../api/comments';
@@ -157,9 +158,9 @@ export default function CommentsLayer({ workflowId, nodes, viewport, flowRef, wi
   // One compact segmented group. The Builder hands in a slot in its toolbar
   // (spec/36) so these never float over the canvas or the config panel; without
   // a slot they sit in the canvas's top-right corner as before.
-  const segment = 'flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium transition';
+  const segment = 'flex h-7 items-center gap-1.5 px-2.5 text-xs font-medium transition-colors';
   const controls = (
-    <div className="pointer-events-auto flex items-center divide-x divide-slate-200 overflow-hidden rounded-lg border border-slate-200 bg-white/90 shadow-sm dark:divide-slate-700 dark:border-slate-700 dark:bg-slate-900/90">
+    <div className="pointer-events-auto flex items-center divide-x divide-[rgb(var(--border))] overflow-hidden rounded-control border border-default bg-surface shadow-sm">
       {canComment && (
         <button
           type="button"
@@ -167,9 +168,9 @@ export default function CommentsLayer({ workflowId, nodes, viewport, flowRef, wi
           onClick={() => { setMode((m) => !m); setDraft(null); setRepinning(null); }}
           title="Comment mode (C): click a node or an empty spot to start a thread"
           aria-pressed={mode}
-          className={`${segment} ${mode ? 'bg-brand-600 text-white' : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800'}`}
+          className={`${segment} ${mode ? 'bg-accent text-accent-fg' : 'text-fg hover:bg-bg-subtle'}`}
         >
-          💬 <span className="hidden xl:inline">Comment</span>
+          <MessageSquarePlus className="h-3.5 w-3.5" aria-hidden="true" /> <span className="hidden xl:inline">Comment</span>
         </button>
       )}
       <button
@@ -178,12 +179,12 @@ export default function CommentsLayer({ workflowId, nodes, viewport, flowRef, wi
         onClick={() => setListOpen((v) => !v)}
         title="All comment threads on this workflow"
         aria-pressed={listOpen}
-        className={`${segment} ${listOpen ? 'bg-slate-100 dark:bg-slate-800' : ''} text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800`}
+        className={`${segment} ${listOpen ? 'bg-bg-subtle' : ''} text-fg hover:bg-bg-subtle`}
       >
         Threads{openCount ? ` · ${openCount}` : ''}
       </button>
-      <label className={`${segment} cursor-pointer text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800`} title="Show resolved threads on the canvas">
-        <input type="checkbox" checked={showResolved} onChange={(e) => setShowResolved(e.target.checked)} />
+      <label className={`${segment} cursor-pointer text-muted hover:bg-bg-subtle`} title="Show resolved threads on the canvas">
+        <input type="checkbox" className="h-3 w-3 accent-[rgb(var(--accent))]" checked={showResolved} onChange={(e) => setShowResolved(e.target.checked)} />
         Resolved
       </label>
     </div>

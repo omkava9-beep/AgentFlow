@@ -1,4 +1,5 @@
 import { useWorkflowStore, isConditionEdge } from '../store/workflowStore';
+import { X } from 'lucide-react';
 import { TextField, Select, Button } from './ui';
 
 /**
@@ -26,12 +27,10 @@ export default function EdgeInspector({ readOnly = false }) {
   }
 
   return (
-    <div data-testid="edge-inspector" className="h-full w-80 shrink-0 overflow-y-auto border-l border-slate-200/80 bg-white/90 p-4 shadow-lg backdrop-blur-md dark:border-slate-800/80 dark:bg-slate-900/85">
-      <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-400">Configure edge</h3>
-        <button onClick={() => selectEdge(null)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
-          ✕
-        </button>
+    <div data-testid="edge-inspector" className="h-full w-[340px] shrink-0 overflow-y-auto border-l border-default bg-surface p-4">
+      <div className="-mx-4 -mt-4 mb-4 flex items-center justify-between border-b border-default px-4 py-3">
+        <h3 className="text-sm font-semibold text-fg">Configure edge</h3>
+        <button onClick={() => selectEdge(null)} aria-label="Close panel" className="rounded-control p-1 text-subtle hover:bg-bg-subtle hover:text-fg"><X className="h-4 w-4" aria-hidden="true" /></button>
       </div>
 
       <p className="mb-4 text-xs text-slate-500 dark:text-slate-400">

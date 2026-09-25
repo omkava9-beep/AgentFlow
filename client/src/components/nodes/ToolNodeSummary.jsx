@@ -1,10 +1,11 @@
 import { useIntegrationStore, connectionById } from '../../store/integrationStore';
 import { normalizeToolConfig } from '../../utils/normalizeToolConfig';
-import { findIntegration, integrationIcon, predictMode } from '../../utils/integrationCatalog';
+import { findIntegration, predictMode } from '../../utils/integrationCatalog';
+import IntegrationLogo from '../ui/IntegrationLogo';
 
 const BADGE = {
-  live: 'bg-emerald-600 text-white',
-  sandbox: 'bg-slate-500 text-white dark:bg-slate-600',
+  live: 'bg-success-subtle text-success-subtle-fg ring-1 ring-inset ring-success/25',
+  sandbox: 'bg-bg-subtle text-muted ring-1 ring-inset ring-zinc-900/10 dark:ring-white/10',
 };
 
 /**
@@ -20,7 +21,7 @@ export default function ToolNodeSummary({ data }) {
 
   const config = normalizeToolConfig(data.config || {});
   if (!config.integration) {
-    return <div className="mt-0.5 text-xs italic text-slate-400">No integration selected</div>;
+    return <div className="text-xs italic text-subtle">No integration selected</div>;
   }
 
   const integration = findIntegration(catalog, config.integration);
@@ -38,15 +39,15 @@ export default function ToolNodeSummary({ data }) {
   }
 
   return (
-    <div className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
-      <span>{integrationIcon(integration?.icon || config.integration)}</span>
-      <span className="max-w-[170px] truncate" title={`${integrationName} · ${actionName}`}>
+    <div className="flex items-center gap-1.5 text-xs text-subtle">
+      <IntegrationLogo id={config.integration} name={integrationName} size="xs" />
+      <span className="min-w-0 flex-1 truncate" title={`${integrationName} · ${actionName}`}>
         {integrationName} · {actionName}
       </span>
       {mode && (
         <span
           title={data.runMode ? `Ran ${mode}` : `Predicted: runs ${mode}`}
-          className={`shrink-0 rounded px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${BADGE[mode]} ${
+          className={`shrink-0 rounded px-1 text-[9px] font-semibold uppercase leading-4 tracking-wide ${BADGE[mode]} ${
             data.runMode ? '' : 'opacity-70'
           }`}
         >

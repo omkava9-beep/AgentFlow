@@ -233,7 +233,7 @@ createAndStartRun(workflow, trigger)
 | `37-mcp` | ✅ | ✅ MCP pool, allowlisted stdio + SSRF-guarded HTTP, demo server, agent tool loop; `check:mcp` 106; browser 30/30 |
 | `35-run-operations` | ✅ | ✅ re-run (recorded graph), retry-from-failed (reuses results), Runs page, shared run detail, live + per-workflow analytics, attempt timelines; `check:runs` 85 |
 | `36-production-polish` | ✅ | ✅ grouped nav + user menu, one-row Builder toolbar, ⌘K palette + `/api/search`, UI kit (skeletons, empty states, confirm dialog, error boundaries, 404), profile + password + sign-out-everywhere, template edit/delete, onboarding checklist, status page, `seed:demo`, `check:all`, CI, README; `check:polish` 63 |
-| OpenAI agent provider (added at the user's request) | — | ✅ `AGENT_PROVIDER=openai`; `check:providers` 40 (stubbed client); `npm run try:llm` for a real call |
+| Real-model providers (added at the user's request) | — | ✅ OpenRouter (`AGENT_PROVIDER=openrouter`, free tier via `openrouter/free` / `:free` models) and OpenAI (`AGENT_PROVIDER=openai`), same Chat Completions client; OpenCode removed; `check:providers` (stubbed client); `npm run try:llm` (`--list-free`, `--models`) for real calls |
 
 **Phase 3 is implemented.** Final state: `npm run check:all` — **24/24 suites, 1,904 checks** green on one throwaway server; 15 browser tests (1–3 browsers each, live mode on) **252/252**, no page errors.
 
@@ -264,7 +264,8 @@ These came out of the specs themselves and bind more than one of them:
 | `QUEUE_CONCURRENCY` | **8** (was 4) | `33` |
 | `OPERATOR_EMAILS` | empty | `36` |
 | `ANTHROPIC_MODEL` / `MCP_CALL_TIMEOUT_MS` / `AGENT_TOOL_RESULT_MAX_CHARS` | `claude-opus-5` / see spec | `37` |
-| `AGENT_PROVIDER=openai`, `OPENAI_API_KEY`, `OPENAI_MODEL`, `OPENAI_REASONING_EFFORT`, `OPENAI_MAX_COMPLETION_TOKENS`, `OPENAI_BASE_URL` | `gpt-5.4-mini` / empty / 4096 | OpenAI provider (added 2026-09-25 at the user's request; the real provider used for the demo). `check:providers` covers it with a stubbed client; `try:llm` makes real calls. |
+| `AGENT_PROVIDER=openrouter`, `OPENROUTER_API_KEY`, `OPENROUTER_MODEL`, `OPENROUTER_MAX_TOKENS`, `OPENROUTER_BASE_URL`, `OPENROUTER_APP_URL`, `OPENROUTER_APP_NAME` | `openrouter/free` / 4096 / `https://openrouter.ai/api/v1` | OpenRouter provider — the free-tier real provider for the demo (added at the user's request, replacing OpenCode). |
+| `AGENT_PROVIDER=openai`, `OPENAI_API_KEY`, `OPENAI_MODEL`, `OPENAI_REASONING_EFFORT`, `OPENAI_MAX_COMPLETION_TOKENS`, `OPENAI_BASE_URL` | `gpt-5.4-mini` / empty / 4096 | OpenAI provider. `check:providers` covers both with a stubbed client; `try:llm` makes real calls. |
 | `SLACK_TEST_WEBHOOK_URL`, `DISCORD_TEST_WEBHOOK_URL`, `GITHUB_TEST_TOKEN`, `GITHUB_TEST_REPO` | empty; only for `check:integrations:live` | `27` |
 
 New npm dependencies: `@modelcontextprotocol/sdk` (lazy, `37`) and `fast-xml-parser` (RSS, `27`). New migrations that run on boot and can be run by hand: `migrate:workspaces` (`22`), `migrate:tool-nodes` (`26`), `migrate:versions` (`30`).

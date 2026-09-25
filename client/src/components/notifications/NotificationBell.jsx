@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useNotificationStore } from '../../store/notificationStore';
 import { useAuthStore } from '../../store/authStore';
 import NotificationRow from './NotificationRow';
+import { Bell, BellOff } from 'lucide-react';
 
 /**
  * The header bell (spec/29 UI): unread count across all your workspaces
@@ -52,34 +53,34 @@ export default function NotificationBell() {
         title="Notifications"
         aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ''}`}
         data-testid="notification-bell"
-        className="relative rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm transition hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
+        className="relative inline-flex h-8 w-8 items-center justify-center rounded-control text-muted transition-colors hover:bg-bg-subtle hover:text-fg"
       >
-        🔔
+        <Bell className="h-4 w-4" aria-hidden="true" />
         {unreadCount > 0 && (
           <span
             data-testid="notification-badge"
-            className="absolute -right-1.5 -top-1.5 min-w-[1.25rem] rounded-full bg-red-500 px-1 text-center text-[10px] font-semibold leading-5 text-white"
+            className="absolute -right-0.5 -top-0.5 min-w-[1rem] rounded-full bg-danger px-1 text-center text-[9px] font-semibold leading-4 text-white ring-2 ring-surface dark:text-zinc-950"
           >
             {badge}
           </span>
         )}
       </button>
       {open && (
-        <div className="absolute right-0 top-full z-40 mt-2 w-96 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900">
-          <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2 dark:border-slate-800">
-            <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">Notifications</span>
+        <div className="absolute right-0 top-full z-40 mt-1.5 w-96 animate-pop-in overflow-hidden rounded-card border border-default bg-surface-raised shadow-popover">
+          <div className="flex items-center justify-between border-b border-default px-3 py-2.5">
+            <span className="text-sm font-semibold text-fg">Notifications</span>
             <button
               type="button"
               onClick={markAll}
               disabled={!unreadCount}
-              className="text-xs font-medium text-brand-600 hover:underline disabled:cursor-default disabled:text-slate-400 disabled:no-underline dark:text-brand-400"
+              className="text-xs font-medium text-accent hover:underline disabled:cursor-default disabled:text-subtle disabled:no-underline"
             >
               Mark all read
             </button>
           </div>
-          <div className="max-h-[26rem] divide-y divide-slate-100 overflow-y-auto dark:divide-slate-800">
+          <div className="max-h-[26rem] divide-y divide-[rgb(var(--border))] overflow-y-auto">
             {items.length === 0 ? (
-              <p className="px-3 py-8 text-center text-sm text-slate-500 dark:text-slate-400">You're all caught up.</p>
+              <div className="flex flex-col items-center gap-2 px-3 py-10 text-center"><BellOff className="h-5 w-5 text-subtle" aria-hidden="true" /><p className="text-sm text-muted">You're all caught up.</p></div>
             ) : (
               items.map((n) => <NotificationRow key={n.id} n={n} onOpen={openNotification} compact />)
             )}
@@ -87,7 +88,7 @@ export default function NotificationBell() {
           <Link
             to="/notifications"
             onClick={() => setOpen(false)}
-            className="block border-t border-slate-100 px-3 py-2 text-center text-xs font-medium text-brand-600 hover:bg-slate-50 dark:border-slate-800 dark:text-brand-400 dark:hover:bg-slate-800"
+            className="block border-t border-default px-3 py-2 text-center text-xs font-medium text-accent hover:bg-bg-subtle"
           >
             View all
           </Link>

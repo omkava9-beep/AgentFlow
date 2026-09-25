@@ -29,7 +29,7 @@ AgentFlow is a visual builder for AI-agent workflows: drag agents, tools and int
 - Readiness-driven DAG execution with bounded concurrency, fan-in/skip semantics, per-node retries and cancellation (spec 19).
 - Transform, Code, Delay, Loop, Merge, Sub-workflow and error-branch nodes; nothing that waits ever holds a queue slot (spec 31).
 - Human-in-the-loop **Approval** nodes: a waiting run is parked in MongoDB and resumes after a server restart; runs interrupted by a crash are reconciled at boot (spec 32).
-- Agents run through a pluggable `AgentProvider` — mock by default, Anthropic when `AGENT_PROVIDER=anthropic`.
+- Agents run through a pluggable `AgentProvider` — mock by default; real models via OpenRouter (`AGENT_PROVIDER=openrouter`, free tier), OpenAI (`openai`) or Anthropic (`anthropic`).
 
 ## Architecture
 
@@ -144,8 +144,11 @@ Suites create users and data, so run them against a throwaway database — `chec
 | `SECRETS_MASTER_KEY` | — | **Required, secret.** 32 bytes of base64; encrypts stored credentials. Boot fails with a generate command if missing |
 | `CLIENT_ORIGIN` | `http://localhost:5173` | CORS origin and base for invite/share/approval links |
 | `PUBLIC_BASE_URL` | `http://localhost:<PORT>` | Base for copyable webhook and event URLs |
-| `AGENT_PROVIDER` | `mock` | `mock` or `anthropic` |
-| `ANTHROPIC_API_KEY` | — | Secret; required when `AGENT_PROVIDER=anthropic` |
+| `AGENT_PROVIDER` | `mock` | `mock`, `openrouter`, `openai` or `anthropic` |
+| `OPENROUTER_API_KEY` | — | Secret; required when `AGENT_PROVIDER=openrouter` ([get one](https://openrouter.ai/keys)) |
+| `OPENROUTER_MODEL` | `openrouter/free` | Any OpenRouter model id; free ones end in `:free` — list those with tool support via `npm run try:llm -- --list-free` |
+| `OPENAI_API_KEY` / `OPENAI_MODEL` | — / `gpt-5.4-mini` | Required when `AGENT_PROVIDER=openai` |
+| `ANTHROPIC_API_KEY` | — | Secret; required when `AGENT_PROVIDER=anthropic` (also `npm install @anthropic-ai/sdk`) |
 | `ANTHROPIC_MODEL` | `claude-opus-5` | Model for the LLM provider |
 | `INTEGRATIONS_LIVE` | `true` | `false` forces every integration into sandbox |
 | `HTTP_TOOL_ALLOW_PRIVATE_NETWORKS` | `false` | Local-development escape hatch for the SSRF guard |

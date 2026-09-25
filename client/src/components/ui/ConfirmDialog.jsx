@@ -28,7 +28,7 @@ export default function ConfirmHost() {
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[60] flex animate-fade-in items-center justify-center bg-zinc-950/50 p-4"
       onMouseDown={(e) => { if (e.target === e.currentTarget) answer(false); }}
       onKeyDown={(e) => { if (e.key === 'Escape') answer(false); }}
     >
@@ -37,19 +37,19 @@ export default function ConfirmHost() {
         aria-modal="true"
         aria-labelledby="confirm-title"
         data-testid="confirm-dialog"
-        className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-700 dark:bg-slate-900"
+        className="w-full max-w-md animate-pop-in rounded-dialog border border-default bg-surface-raised p-5 shadow-popover"
       >
-        <h2 id="confirm-title" className="text-base font-semibold text-slate-900 dark:text-slate-100">{title}</h2>
-        {body && <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{body}</p>}
+        <h2 id="confirm-title" className="text-base font-semibold text-fg">{title}</h2>
+        {body && <p className="mt-2 text-sm leading-relaxed text-muted">{body}</p>}
         {typeToConfirm && (
-          <label className="mt-4 block text-sm text-slate-600 dark:text-slate-300">
+          <label className="mt-4 block text-sm text-muted">
             Type <span className="font-mono font-semibold">{typeToConfirm}</span> to confirm
             <input
               ref={inputRef}
               value={typed}
               onChange={(e) => setTyped(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter' && !blocked) answer(true); }}
-              className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+              className="mt-1.5 h-8 w-full rounded-control border border-default bg-surface px-2.5 text-sm text-fg focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
             />
           </label>
         )}
@@ -57,7 +57,7 @@ export default function ConfirmHost() {
           <button
             type="button"
             onClick={() => answer(false)}
-            className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+            className="inline-flex h-8 items-center rounded-control border border-default bg-surface px-3 text-sm font-medium text-fg shadow-sm hover:bg-bg-subtle"
           >
             {cancelLabel}
           </button>
@@ -67,8 +67,8 @@ export default function ConfirmHost() {
             data-testid="confirm-accept"
             onClick={() => answer(true)}
             disabled={blocked}
-            className={`rounded-lg px-4 py-2 text-sm font-medium text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-50 ${
-              destructive ? 'bg-red-600 hover:bg-red-700' : 'bg-brand-600 hover:bg-brand-700'
+            className={`inline-flex h-8 items-center rounded-control px-3 text-sm font-medium shadow-sm disabled:cursor-not-allowed disabled:opacity-50 ${
+              destructive ? 'bg-danger text-white hover:brightness-95 dark:text-zinc-950' : 'bg-accent text-accent-fg hover:bg-accent-hover'
             }`}
           >
             {confirmLabel}

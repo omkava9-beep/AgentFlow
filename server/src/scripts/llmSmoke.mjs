@@ -3,9 +3,10 @@
  * deliberately spends tokens (about three short requests per model).
  *
  *   # in server/.env: AGENT_PROVIDER=openai + OPENAI_API_KEY
- *   #             or: AGENT_PROVIDER=opencode + OPENCODE_API_KEY
+ *   #             or: AGENT_PROVIDER=openrouter + OPENROUTER_API_KEY
  *   npm run try:llm
- *   npm run try:llm -- --models mimo-v2.6-flash-free,nemotron-3-ultra-free
+ *   npm run try:llm -- --list-free        # OpenRouter's free models that support tools
+ *   npm run try:llm -- --models openrouter/free,qwen/qwen3.8-27b:free
  *
  * Per model:
  * 1. one plain agent call (provider.run)
@@ -15,41 +16,57 @@
  *    can't do tool calling at all) is reported as such.
  *
  * `--models` compares several models on the configured provider and prints a
- * summary table - the quick way to pick a free OpenCode model that handles
+ * summary table - the quick way to pick a free OpenRouter model that handles
  * tools. Uses a throwaway `-llmsmoke` database and drops it afterwards.
  */
 import mongoose from 'mongoose';
 import { env } from '../config/env.js';
 import {
-  getAgentProvider, openaiRequestOptions, opencodeRequestOptions, __setAgentProviderForTests,
+  getAgentProvider, openaiRequestOptions, openrouterRequestOptions, __setAgentProviderForTests,
 } from '../config/agentProvider.js';
 import { OpenAIAgentProvider } from '../providers/OpenAIAgentProvider.js';
 
+// Read-only and key-free: OpenRouter's public model list, filtered to free
+// models that accept `tools` (agent nodes with tools need that).
+if (process.argv.includes('--list-free')) {
+  const res = await fetch(`${env.openrouterBaseUrl}/models`);
+  if (!res.ok) { console.log(`Couldn't load the model list (HTTP ${res.status}).`); process.exit(1); }
+  const all = (await res.json()).data || [];
+  const free = all.filter((m) => m.id.endsWith(':free') || (Number(m.pricing?.prompt) === 0 && Number(m.pricing?.completion) === 0));
+  const withTools = free.filter((m) => (m.supported_parameters || []).includes('tools'))
+    .sort((a, b) => (b.context_length || 0) - (a.context_length || 0));
+  console.log(`${withTools.length} free OpenRouter models support tool calling (of ${free.length} free, ${all.length} total):\n`);
+  for (const m of withTools) console.log(`  ${m.id.padEnd(56)} ${String(m.context_length || '').padStart(8)} ctx`);
+  console.log('\nPick one for OPENROUTER_MODEL, or compare a few: npm run try:llm -- --models <id>,<id>');
+  process.exit(0);
+}
+
 if (env.agentProvider === 'mock') {
   console.log('AGENT_PROVIDER is "mock" - nothing real to test.');
-  console.log('In server/.env set AGENT_PROVIDER=openai (+ OPENAI_API_KEY) or AGENT_PROVIDER=opencode (+ OPENCODE_API_KEY), then run this again.');
+  console.log('In server/.env set AGENT_PROVIDER=openrouter (+ OPENROUTER_API_KEY) or AGENT_PROVIDER=openai (+ OPENAI_API_KEY), then run this again.');
   process.exit(1);
 }
 
 const argIndex = process.argv.indexOf('--models');
 const requested = argIndex > -1 ? (process.argv[argIndex + 1] || '').split(',').map((m) => m.trim()).filter(Boolean) : [];
-const configuredModel = { openai: env.openaiModel, opencode: env.opencodeModel, anthropic: env.anthropicModel }[env.agentProvider];
+const configuredModel = { openai: env.openaiModel, openrouter: env.openrouterModel, anthropic: env.anthropicModel }[env.agentProvider];
 const models = requested.length ? requested : [configuredModel];
 
-if (requested.length && !['openai', 'opencode'].includes(env.agentProvider)) {
-  console.log('--models is supported for AGENT_PROVIDER=openai or opencode.');
+if (requested.length && !['openai', 'openrouter'].includes(env.agentProvider)) {
+  console.log('--models is supported for AGENT_PROVIDER=openai or openrouter.');
   process.exit(1);
 }
 
 /** The configured provider, or the same one pointed at another model. */
 function providerFor(model) {
   if (!requested.length) return getAgentProvider();
-  const isOpencode = env.agentProvider === 'opencode';
+  const isOpenRouter = env.agentProvider === 'openrouter';
   return new OpenAIAgentProvider({
     name: env.agentProvider,
-    apiKey: isOpencode ? env.opencodeApiKey : env.openaiApiKey,
-    baseURL: isOpencode ? env.opencodeBaseUrl : (env.openaiBaseUrl || null),
-    requestOptions: { ...(isOpencode ? opencodeRequestOptions : openaiRequestOptions), model },
+    apiKey: isOpenRouter ? env.openrouterApiKey : env.openaiApiKey,
+    baseURL: isOpenRouter ? env.openrouterBaseUrl : (env.openaiBaseUrl || null),
+    requestOptions: { ...(isOpenRouter ? openrouterRequestOptions : openaiRequestOptions), model },
+    ...(isOpenRouter && { defaultHeaders: { 'X-Title': env.openrouterAppName, ...(env.openrouterAppUrl && { 'HTTP-Referer': env.openrouterAppUrl }) } }),
   });
 }
 

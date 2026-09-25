@@ -103,6 +103,8 @@ export default function RunGraphView({ workflow, nodeResults }) {
       // rather than leave a connection affordance the view can't honour.
       className="rf-readonly"
       fitView
+      fitViewOptions={{ padding: 0.2, minZoom: 0.6, maxZoom: 1 }}
+      minZoom={0.25}
     >
       <Background />
       <Controls showInteractive={false} />

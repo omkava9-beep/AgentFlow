@@ -8,7 +8,6 @@ import { ToolBadges } from './McpToolList';
 import {
   findIntegration,
   groupByCategory,
-  integrationIcon,
   predictMode,
   actionIsLive,
 } from '../utils/integrationCatalog';
@@ -119,7 +118,7 @@ export default function ToolNodeFields({ node, set, readOnly }) {
             <optgroup key={group.label} label={group.label}>
               {group.items.map((i) => (
                 <option key={i.id} value={i.id}>
-                  {integrationIcon(i.icon || i.id)} {i.name}
+                  {i.name}
                   {(i.actions || []).some(actionIsLive) || i.liveCapable ? ' · live-capable' : ''}
                 </option>
               ))}
@@ -129,7 +128,7 @@ export default function ToolNodeFields({ node, set, readOnly }) {
               value that isn't in its option list. */}
           {integration && !groups.some((g) => g.items.includes(integration)) && (
             <option value={integration.id}>
-              {integrationIcon(integration.icon || integration.id)} {integration.name}
+              {integration.name}
             </option>
           )}
           {unknownIntegration && <option value={config.integration}>{config.integration} (unknown)</option>}

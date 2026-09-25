@@ -1,24 +1,17 @@
 import { useState } from 'react';
+import { CheckCircle2, XCircle, AlertTriangle, Info, ChevronDown, ChevronRight } from 'lucide-react';
+import { cx } from './ui/cx';
 
 const TONE = {
-  error: {
-    dot: 'bg-red-500',
-    text: 'text-red-700 dark:text-red-300',
-    pill: 'border-red-300 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/60 dark:text-red-300',
-  },
-  warning: {
-    dot: 'bg-amber-500',
-    text: 'text-amber-700 dark:text-amber-300',
-    pill: 'border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/60 dark:text-amber-300',
-  },
+  error: { icon: XCircle, iconClass: 'text-danger', pill: 'border-danger/30 bg-danger-subtle text-danger-subtle-fg' },
+  warning: { icon: AlertTriangle, iconClass: 'text-warning', pill: 'border-warning/30 bg-warning-subtle text-warning-subtle-fg' },
   // Advisory only (spec/26: "runs in sandbox until a connection is selected") —
   // it never blocks saving or running.
-  info: {
-    dot: 'bg-sky-500',
-    text: 'text-sky-700 dark:text-sky-300',
-    pill: 'border-sky-300 bg-sky-50 text-sky-700 dark:border-sky-800 dark:bg-sky-950/60 dark:text-sky-300',
-  },
+  info: { icon: Info, iconClass: 'text-info', pill: 'border-default bg-surface text-muted' },
 };
+
+// Bottom-left of the canvas; the zoom controls live top-left, so they never overlap.
+const DOCK = 'absolute bottom-4 left-4 z-10';
 
 export default function ValidationPanel({ errors, warnings, info = [], onSelectNode }) {
   const [open, setOpen] = useState(false);
@@ -26,8 +19,9 @@ export default function ValidationPanel({ errors, warnings, info = [], onSelectN
 
   if (!total && !info.length) {
     return (
-      <div className="pointer-events-none absolute bottom-4 left-4 z-10 rounded-full border border-green-300 bg-green-50 px-3 py-1.5 text-xs font-medium text-green-700 shadow-sm dark:border-green-800 dark:bg-green-950/60 dark:text-green-300">
-        ✓ Ready to run
+      <div className={cx(DOCK, 'pointer-events-none flex h-7 items-center gap-1.5 rounded-full border border-default bg-surface px-2.5 text-xs font-medium text-muted shadow-sm')}>
+        <CheckCircle2 className="h-3.5 w-3.5 text-success" aria-hidden="true" />
+        Ready to run
       </div>
     );
   }
@@ -40,7 +34,10 @@ export default function ValidationPanel({ errors, warnings, info = [], onSelectN
     .filter(Boolean)
     .join(' · ');
 
-  const tone = errors.length ? TONE.error : warnings.length ? TONE.warning : TONE.info;
+  const kind = errors.length ? 'error' : warnings.length ? 'warning' : 'info';
+  const tone = TONE[kind];
+  const SummaryIcon = total ? tone.icon : CheckCircle2;
+  const Chevron = open ? ChevronDown : ChevronRight;
   const entries = [
     ...errors.map((e) => ({ ...e, kind: 'error' })),
     ...warnings.map((w) => ({ ...w, kind: 'warning' })),
@@ -48,36 +45,36 @@ export default function ValidationPanel({ errors, warnings, info = [], onSelectN
   ];
 
   return (
-    <div className="absolute bottom-4 left-4 z-10 max-w-md">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className={`rounded-full border px-3 py-1.5 text-xs font-medium shadow-sm backdrop-blur-sm ${tone.pill}`}
-      >
-        {open ? '▾' : '▸'} {total ? summary : `✓ Ready to run · ${summary}`}
-      </button>
-
+    <div className={cx(DOCK, 'max-w-md')}>
       {open && (
-        <ul className="mt-2 max-h-64 space-y-1 overflow-y-auto rounded-lg border border-slate-200 bg-white/95 p-2 shadow-lg backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/95">
+        <ul className="mb-2 max-h-64 space-y-0.5 overflow-y-auto rounded-card border border-default bg-surface-raised p-1.5 shadow-popover">
           {entries.map((entry) => {
             const entryTone = TONE[entry.kind];
+            const Icon = entryTone.icon;
             const clickable = Boolean(entry.nodeId);
             return (
               <li key={entry.id}>
                 <button
                   disabled={!clickable}
                   onClick={() => onSelectNode(entry.nodeId)}
-                  className={`flex w-full items-start gap-2 rounded px-2 py-1.5 text-left text-xs ${
-                    clickable ? 'hover:bg-slate-100 dark:hover:bg-slate-800' : 'cursor-default'
-                  }`}
+                  className={cx('flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left text-xs text-fg', clickable ? 'hover:bg-bg-subtle' : 'cursor-default')}
                 >
-                  <span className={`mt-1 h-1.5 w-1.5 shrink-0 rounded-full ${entryTone.dot}`} />
-                  <span className={entryTone.text}>{entry.message}</span>
+                  <Icon className={cx('mt-px h-3.5 w-3.5 shrink-0', entryTone.iconClass)} aria-hidden="true" />
+                  <span>{entry.message}</span>
                 </button>
               </li>
             );
           })}
         </ul>
       )}
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className={cx('flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium shadow-sm', total ? tone.pill : TONE.info.pill)}
+      >
+        <SummaryIcon className={cx('h-3.5 w-3.5', total ? tone.iconClass : 'text-success')} aria-hidden="true" />
+        {total ? summary : `Ready to run · ${summary}`}
+        <Chevron className="h-3 w-3 opacity-60" aria-hidden="true" />
+      </button>
     </div>
   );
 }

@@ -4,10 +4,19 @@ import { airtableId } from '../ids.js';
 import { genericInbound } from '../inboundUtil.js';
 
 const FIXTURES = [
-  { Name: 'Northwind Traders', Stage: 'Customer', Seats: 40 },
-  { Name: 'Globex', Stage: 'Trial', Seats: 12 },
-  { Name: 'Initech', Stage: 'Lead', Seats: 5 },
+  { Name: 'Northwind Traders', Stage: 'Customer', Seats: 40, Email: 'ops@northwind.test' },
+  { Name: 'Globex', Stage: 'Trial', Seats: 12, Email: 'it@globex.test' },
+  { Name: 'Initech', Stage: 'Lead', Seats: 5, Email: 'bill@initech.test' },
 ];
+
+// An appointments table gets appointment-shaped rows, so reminder workflows
+// (the built-in "Appointment reminders" template) read like the real thing.
+const APPOINTMENT_FIXTURES = [
+  { Name: 'Maria Garcia', Phone: '+14155550101', When: 'tomorrow at 10:30', With: 'Dr. Patel' },
+  { Name: 'Tom Becker', Phone: '+14155550102', When: 'tomorrow at 14:00', With: 'Dr. Okafor' },
+];
+
+const fixturesFor = (table) => (/appoint/i.test(table) ? APPOINTMENT_FIXTURES : FIXTURES);
 
 function tableOf(params) {
   const base = String(params.base || '').trim();
@@ -19,8 +28,9 @@ function tableOf(params) {
 const present = (r) => ({ id: r.id, createdTime: r.createdTime, fields: r.fields });
 
 async function ensureTable(sandbox, { base, table }) {
-  await sandbox.seedOnce(`table:${base}:${table}`, 'records', FIXTURES.map((fields, i) => ({
-    id: airtableId(), base, table, fields, createdTime: new Date(Date.now() - (FIXTURES.length - i) * 86_400_000).toISOString(),
+  const rows = fixturesFor(table);
+  await sandbox.seedOnce(`table:${base}:${table}`, 'records', rows.map((fields, i) => ({
+    id: airtableId(), base, table, fields, createdTime: new Date(Date.now() - (rows.length - i) * 86_400_000).toISOString(),
   })));
 }
 

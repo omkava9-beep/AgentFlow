@@ -4,8 +4,7 @@ import { register as registerApi } from '../api/auth';
 import { apiErrorMessage } from '../api/client';
 import { useAuthStore } from '../store/authStore';
 import { useWorkspaceStore, defaultWorkspace, workspacePath } from '../store/workspaceStore';
-import { Card, Button, TextField, ErrorText } from '../components/ui';
-import { Wordmark } from '../components/Logo';
+import { Button, TextField, ErrorText } from '../components/ui';
 import AuthLayout from '../components/AuthLayout';
 
 export default function Register() {
@@ -42,10 +41,9 @@ export default function Register() {
 
   return (
     <AuthLayout>
-      <Card className="w-full max-w-sm p-8">
-        <Wordmark className="mb-6 justify-center text-lg lg:hidden" />
-        <h1 className="mb-1 text-xl font-semibold text-slate-900 dark:text-slate-100">Create your account</h1>
-        <p className="mb-6 text-sm text-slate-500 dark:text-slate-400">Start building agent workflows</p>
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight text-fg">Create your account</h1>
+        <p className="mb-8 mt-1.5 text-sm text-muted">Start automating with agents in a couple of minutes.</p>
         <form onSubmit={handleSubmit} className="space-y-4">
           <TextField
             label="Your name"
@@ -64,17 +62,17 @@ export default function Register() {
             required
           />
           <ErrorText>{error}</ErrorText>
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? 'Creating account...' : 'Register'}
+          <Button type="submit" size="lg" className="w-full" loading={loading}>
+            {loading ? 'Creating account…' : 'Register'}
           </Button>
         </form>
-        <p className="mt-4 text-center text-sm text-slate-500 dark:text-slate-400">
+        <p className="mt-6 text-sm text-muted">
           Already have an account?{' '}
-          <Link to={`/login${params.toString() ? `?${params}` : ''}`} className="font-medium text-brand-600 dark:text-brand-400">
+          <Link to={`/login${params.toString() ? `?${params}` : ''}`} className="font-medium text-accent hover:underline">
             Log in
           </Link>
         </p>
-      </Card>
+      </div>
     </AuthLayout>
   );
 }

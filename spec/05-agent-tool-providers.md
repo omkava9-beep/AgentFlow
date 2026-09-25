@@ -4,7 +4,7 @@
 **Milestone:** M1 (interface + mock) / M3 (real LLM option)
 **Depends on:** —
 
-> **Revised in phase 3:** `ToolRegistry` is replaced by the manifest-based `IntegrationRegistry` with sandbox/live actions ([`26`](26-integration-framework.md), [`27`](27-integration-catalog.md)); agents can call tools and the provider contract gains an engine-driven `step()` ([`37`](37-mcp.md)). Tools are live by default, not mocked. An `OpenAIAgentProvider` (`AGENT_PROVIDER=openai`, Chat Completions with function calling) is the real provider used for the demo; Anthropic's `LLMAgentProvider` stays as an alternative.
+> **Revised in phase 3:** `ToolRegistry` is replaced by the manifest-based `IntegrationRegistry` with sandbox/live actions ([`26`](26-integration-framework.md), [`27`](27-integration-catalog.md)); agents can call tools and the provider contract gains an engine-driven `step()` ([`37`](37-mcp.md)). Tools are live by default, not mocked. An `OpenAIAgentProvider` (Chat Completions with function calling) serves both OpenRouter (`AGENT_PROVIDER=openrouter`, the free-tier provider used for the demo) and OpenAI (`AGENT_PROVIDER=openai`); Anthropic's `LLMAgentProvider` stays as an alternative.
 
 ## Summary
 
