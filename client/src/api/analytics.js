@@ -1,4 +1,5 @@
 import { apiClient } from './client';
 
-export const getAnalyticsSummary = (days = 30) =>
-  apiClient.get('/analytics/summary', { params: { days } }).then((r) => r.data);
+/** `workflowId` (spec/35 §5) narrows every aggregation to one workflow and adds nodeStats. */
+export const getAnalyticsSummary = (days = 30, workflowId = null) =>
+  apiClient.get('/analytics/summary', { params: { days, ...(workflowId && { workflowId }) } }).then((r) => r.data);

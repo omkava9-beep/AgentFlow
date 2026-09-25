@@ -4,6 +4,8 @@
 **Milestone:** M3
 **Depends on:** `11-execution-history.md`
 
+> **Revised in phase 3:** Scoped per workspace ([`22`](22-workspaces-multitenancy.md)); tool usage groups by `integration`/`action` ([`26`](26-integration-framework.md)); live refresh via `run:status_changed`, a per-workflow view and `nodeStats` ([`35`](35-run-operations.md)); the Usage & plan page reuses its chart components ([`33`](33-fair-queue-and-quotas.md)).
+
 ## Summary
 
 A charts page summarizing run history across the user's workflows — success/failure rates, durations, node usage, and volume over time — using Recharts on data aggregated from the `Run` collection.

@@ -1,0 +1,12 @@
+[
+  {
+    "id": "agentflow-demo",
+    "name": "AgentFlow Demo Tools",
+    "description": "Customers, orders, KB articles and tickets (sandbox data)",
+    "command": "node",
+    "args": ["src/mcp/demoServer.js"],
+    "env": { "MONGODB_URI": "${MONGODB_URI}" },
+    "injectWorkspaceContext": true,
+    "sandboxSafe": true
+  }
+]

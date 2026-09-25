@@ -4,6 +4,8 @@
 **Milestone:** M2
 **Depends on:** `04-workflow-persistence.md`, `05-agent-tool-providers.md`, `07-async-job-queue.md`
 
+> **Revised in phase 3:** The node-type if-chain becomes a node executor registry split into work vs. orchestration nodes ([`31`](31-advanced-nodes.md)); an agent with tools spans several queue jobs via `engine/agentLoop.js` ([`37`](37-mcp.md)); runs can pause and resume across restarts, lifting the pause/resume non-goal ([`32`](32-human-in-the-loop.md)).
+
 ## Summary
 
 The backend module that takes a saved workflow graph and a run request, walks the DAG, dispatches each node's work to the job queue, and produces a `Run` document with per-node results. This is the core of the whole project.

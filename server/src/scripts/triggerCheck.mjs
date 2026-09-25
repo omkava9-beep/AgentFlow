@@ -5,12 +5,13 @@
  *   PORT=4500 MONGODB_URI=...-triggercheck npm run dev        # terminal 1
  *   BASE=http://localhost:4500/api npm run check:triggers     # terminal 2
  *
- * Registers a fresh user per run. Event names are timestamped because event
- * dispatch is global by design (see spec/21), so a fixed name would also fire
- * subscribers left behind by earlier runs.
+ * Registers a fresh user per run. Events are published per workspace with an
+ * API key (spec/24), so a fresh user's workspace has no leftover subscribers -
+ * names stay timestamped anyway so reruns against one database can't collide.
  */
 const B = process.env.BASE || 'http://localhost:4500/api';
 let pass = 0, fail = 0;
+const WS = new Map(); // token -> workspaceId
 const check = (n, ok, d = '') => { console.log(`  ${ok ? '✓' : '✗'} ${n}${d ? ` — ${d}` : ''}`); ok ? pass++ : fail++; };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -20,6 +21,9 @@ async function req(method, path, body, token, raw) {
   // parsing entirely, so a malformed body would never be rejected.
   if (body !== undefined || raw !== undefined) headers['Content-Type'] = 'application/json';
   if (token) headers.Authorization = `Bearer ${token}`;
+  // spec/22: tenant routes need the caller's workspace. Each token maps to the
+  // personal workspace it was registered with.
+  if (token && WS.has(token)) headers['X-Workspace-Id'] = WS.get(token);
   const res = await fetch(B + path, { method, headers, body: raw ?? (body !== undefined ? JSON.stringify(body) : undefined) });
   const text = await res.text();
   let json = null; try { json = text ? JSON.parse(text) : null; } catch { /* non-JSON */ }
@@ -28,6 +32,9 @@ async function req(method, path, body, token, raw) {
 
 const auth = await req('POST', '/auth/register', { email: `tr${Date.now()}@e.com`, password: 'password123' });
 const tok = auth.body.token;
+const WS_ID = auth.body.workspaces[0].id;
+const SLUG = auth.body.workspaces[0].slug;
+WS.set(tok, WS_ID);
 
 const NODES = [
   { id: 's', type: 'start', position: { x: 0, y: 0 }, data: { config: { label: 'Start' } } },
@@ -39,6 +46,9 @@ const EDGES = [{ id: 'e1', source: 's', target: 't' }, { id: 'e2', source: 't', 
 async function makeWorkflow(name) {
   const { body } = await req('POST', '/workflows', { name }, tok);
   await req('PUT', `/workflows/${body._id}`, { nodes: NODES, edges: EDGES }, tok);
+  // spec/30: schedules, webhooks and events run the PUBLISHED version, so a
+  // workflow must be published before any of them can start a run.
+  await req('POST', `/workflows/${body._id}/publish`, { acknowledgeWarnings: true }, tok);
   return body._id;
 }
 const runsOf = async (id) => (await req('GET', `/workflows/${id}/runs`, undefined, tok)).body;
@@ -123,10 +133,15 @@ console.log('\nWEBHOOK TRIGGER (spec/13)');
   check('malformed JSON body 400 with a clear message', r.status === 400 && /malformed/i.test(r.body?.error || ''), `${r.status} ${r.body?.error}`);
 }
 
-console.log('\nEXTERNAL EVENT TRIGGER (spec/21)');
+console.log('\nEXTERNAL EVENT TRIGGER (spec/21, namespaced per workspace by spec/24)');
 {
-  // Unique per run: event names are global (any caller, any owner), so a fixed
-  // name would also fire subscribers left behind by earlier runs.
+  // Publishing needs a workspace API key with the events:publish scope. The key
+  // is sent as the bearer token; it isn't in WS, so no X-Workspace-Id is added.
+  const keyRes = await req('POST', `/workspaces/${WS_ID}/api-keys`, { name: 'trigger check', scopes: ['events:publish'] }, tok);
+  check('created an events:publish API key', keyRes.status === 201 && /^af_/.test(keyRes.body?.key || ''), `${keyRes.status} ${JSON.stringify(keyRes.body)}`);
+  const KEY = keyRes.body?.key;
+  const publish = (name, payload) => req('POST', `/w/${SLUG}/events/${name}`, payload, KEY);
+
   const EVENT = `order.created.${Date.now()}`;
   const a = await makeWorkflow('subscriber A');
   const b = await makeWorkflow('subscriber B');
@@ -141,7 +156,7 @@ console.log('\nEXTERNAL EVENT TRIGGER (spec/21)');
   check('enabling without a name rejected 400', r.status === 400, `${r.status} ${r.body?.error}`);
   await req('PUT', `/workflows/${a}/event-trigger`, { eventName: EVENT, enabled: true }, tok);
 
-  r = await req('POST', `/events/${EVENT}`, { orderId: 99 });
+  r = await publish(EVENT, { orderId: 99 });
   check(`one event started 2 runs (${r.body?.triggered?.length})`, r.status === 202 && r.body.triggered.length === 2, JSON.stringify(r.body));
 
   await settle(a, 1); await settle(b, 1);
@@ -153,7 +168,7 @@ console.log('\nEXTERNAL EVENT TRIGGER (spec/21)');
   const startOut = runA?.nodeResults?.find((x) => x.nodeId === 's')?.output;
   check('event payload reached the Start node', startOut?.orderId === 99, JSON.stringify(startOut));
 
-  r = await req('POST', '/events/nobody.listens.' + Date.now(), { x: 1 });
+  r = await publish('nobody.listens.' + Date.now(), { x: 1 });
   check('no subscribers -> 202 with empty list, not 404', r.status === 202 && r.body.triggered.length === 0, `${r.status} ${JSON.stringify(r.body)}`);
 
   // a workflow mid-run is skipped, others still fire
@@ -161,14 +176,26 @@ console.log('\nEXTERNAL EVENT TRIGGER (spec/21)');
   const slowNodes = JSON.parse(JSON.stringify(NODES));
   slowNodes[1].data.config.mockOverrides.latencyMs = [1500, 1600];
   await req('PUT', `/workflows/${a}`, { nodes: slowNodes, edges: EDGES }, tok);
+  // Events run the published version (spec/30), so the slow edit is published.
+  await req('POST', `/workflows/${a}/publish`, { acknowledgeWarnings: true }, tok);
   // Unique payloads per dispatch: an identical tool input would be served from
   // the TTL cache and finish instantly, so nothing would still be running.
-  await req('POST', `/events/${EVENT}`, { expression: `1+${Date.now()}` });   // starts A (slow), B, C
+  await publish(EVENT, { expression: `1+${Date.now()}` });   // starts A (slow), B, C
   await sleep(400);
-  r = await req('POST', `/events/${EVENT}`, { expression: `2+${Date.now()}` }); // A still running
+  r = await publish(EVENT, { expression: `2+${Date.now()}` }); // A still running
   check(`second dispatch skipped the busy workflow (triggered ${r.body.triggered.length}, skipped ${r.body.skipped.length})`,
         r.body.skipped.some((s) => s.reason === 'already-running'), JSON.stringify(r.body.skipped));
   check('but still started the idle ones', r.body.triggered.length >= 1, JSON.stringify(r.body.triggered));
+
+  r = await req('POST', `/w/${SLUG}/events/${EVENT}`, { x: 1 });
+  check('publishing without an API key -> 401', r.status === 401, `${r.status} ${JSON.stringify(r.body)}`);
+
+  r = await req('POST', `/w/${SLUG}/events/bad name!`, { x: 1 }, KEY);
+  check('invalid event name -> 400', r.status === 400, `${r.status} ${JSON.stringify(r.body)}`);
+
+  r = await req('POST', `/events/${EVENT}`, { x: 1 });
+  check('old global /api/events/:name -> 410 Gone', r.status === 410, `${r.status}`);
+  check('410 carries the per-workspace newUrl hint', typeof r.body?.newUrl === 'string' && r.body.newUrl.includes('/api/w/') && r.body.newUrl.includes(EVENT), JSON.stringify(r.body));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

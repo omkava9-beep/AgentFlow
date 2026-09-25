@@ -4,6 +4,8 @@
 **Milestone:** M3
 **Depends on:** `05-agent-tool-providers.md`, `03-node-configuration-panel.md`, `13-webhook-trigger.md`
 
+> **Revised in phase 3:** `POST /api/events/:eventName` is replaced by the per-workspace, API-key-authenticated `POST /api/w/:slug/events/:eventName` and now returns `410` — see [`24`](24-socket-auth-and-namespaced-events.md). This closes the "global namespace" limitation described below. Tool node config becomes `{ integration, action, connectionId, params }` and `GET /api/tools` is replaced by `GET /api/integrations` ([`26`](26-integration-framework.md)); `http-request` makes real calls behind `safeRequest` and `MockRecord` becomes `SandboxRecord` ([`27`](27-integration-catalog.md)); event dispatch runs published versions and the response adds `skipped` ([`30`](30-workflow-versioning.md)).
+
 ## Summary
 
 Flips the four gated entries in `comingSoonCatalog.js` (`send-email`, `slack-message`, `http-request`, `database-write`) into real registered tools, and the gated `event` trigger into a working named-event dispatch. Along the way it replaces the config panel's hardcoded per-type form with a declarative `configSchema` published by each tool handler, so adding tool number nine is a registry entry rather than a UI edit.

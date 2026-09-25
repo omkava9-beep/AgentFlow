@@ -4,6 +4,8 @@
 **Milestone:** M2
 **Depends on:** `04-workflow-persistence.md`, `06-execution-engine.md`
 
+> **Revised in phase 3:** The Builder's Run button is a draft **test run** and "Run published" runs the live version ([`30`](30-workflow-versioning.md)); the 409 guard is per workflow per kind (draft/published) and ignores `waiting` and child runs ([`30`](30-workflow-versioning.md), [`31`](31-advanced-nodes.md), [`32`](32-human-in-the-loop.md)); daily quotas apply ([`33`](33-fair-queue-and-quotas.md)).
+
 ## Summary
 
 The simplest possible trigger: a "Run" button in the Workflow Builder that starts an execution of the currently saved workflow. Scheduled (`12`) and webhook (`13`) triggers build on the same run-creation path.

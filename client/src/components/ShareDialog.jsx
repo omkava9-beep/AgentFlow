@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { createShareLink, deleteShareLink } from '../api/share';
 import { apiErrorMessage } from '../api/client';
 import { Button, ErrorText } from './ui';
+import { confirm } from './ui/confirm';
 
 /** Share action for the Builder (spec/18): generate, copy, revoke. */
 export default function ShareDialog({ workflowId, initialToken, onTokenChange, onClose }) {
@@ -26,7 +27,7 @@ export default function ShareDialog({ workflowId, initialToken, onTokenChange, o
 
   const generate = () =>
     run(async () => {
-      if (token && !window.confirm('Generating a new link invalidates the current one immediately. Continue?')) return;
+      if (token && !(await confirm({ title: 'Generate a new link?', body: 'The current link stops working immediately.', confirmLabel: 'Generate new link', destructive: true }))) return;
       const saved = await createShareLink(workflowId);
       setToken(saved.shareToken);
       onTokenChange(saved.shareToken);
@@ -34,7 +35,7 @@ export default function ShareDialog({ workflowId, initialToken, onTokenChange, o
 
   const revoke = () =>
     run(async () => {
-      if (!window.confirm('Disable sharing? The existing link will stop working immediately.')) return;
+      if (!(await confirm({ title: 'Disable sharing?', body: 'The existing link will stop working immediately.', confirmLabel: 'Disable sharing', destructive: true }))) return;
       await deleteShareLink(workflowId);
       setToken(null);
       onTokenChange(null);

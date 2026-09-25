@@ -3,7 +3,7 @@
  *
  *   npm run seed:templates
  *
- * Built-ins have `ownerId: null`, which is what makes them visible to every user
+ * Built-ins have `workspaceId: null`, which is what makes them visible in every workspace
  * without anyone having to create them. Re-running is safe: each template is
  * upserted by name, so the script can be used to update a built-in's graph
  * without accumulating duplicates.
@@ -23,8 +23,10 @@ const BUILT_INS = [
       node('start', 'start', { label: 'Start' }, 40, 160),
       node('search', 'tool', {
         label: 'Research',
-        toolType: 'fake-search',
-        toolConfig: { query: '{{input.topic}}', limit: 3 },
+        integration: 'builtin',
+        action: 'fake-search',
+        connectionId: null,
+        params: { query: '{{input.topic}}', limit: 3 },
         mockOverrides: { failureRate: 0 },
       }, 220, 160),
       node('summarizer', 'agent', {
@@ -35,8 +37,11 @@ const BUILT_INS = [
       }, 420, 160),
       node('notify', 'tool', {
         label: 'Notify Slack',
-        toolType: 'slack-message',
-        toolConfig: { channel: '#research', text: 'New summary: {{input.reply}}' },
+        // No connection: runs in sandbox until a Slack connection is picked.
+        integration: 'slack',
+        action: 'post_message',
+        connectionId: null,
+        params: { channel: '#research', text: 'New summary: {{input.reply}}' },
       }, 620, 160),
       node('end', 'end', { label: 'End' }, 820, 160),
     ],
@@ -58,8 +63,10 @@ const BUILT_INS = [
       node('sales', 'agent', { label: 'Sales Agent', systemPrompt: 'Handle sales enquiries.', isHandoff: false, candidates: [] }, 440, 320),
       node('reply', 'tool', {
         label: 'Send Reply',
-        toolType: 'send-email',
-        toolConfig: { to: '{{input.email}}', subject: 'Re: your request', body: '{{input.reply}}' },
+        integration: 'email',
+        action: 'send',
+        connectionId: null,
+        params: { to: '{{input.email}}', subject: 'Re: your request', body: '{{input.reply}}' },
       }, 660, 200),
       node('end', 'end', { label: 'End' }, 860, 200),
     ],
@@ -79,8 +86,10 @@ const BUILT_INS = [
       node('start', 'start', { label: 'Start' }, 40, 180),
       node('flaky', 'tool', {
         label: 'Flaky API',
-        toolType: 'fake-weather',
-        toolConfig: { city: 'Lisbon' },
+        integration: 'builtin',
+        action: 'fake-weather',
+        connectionId: null,
+        params: { city: 'Lisbon' },
         // Fails often enough that retry/backoff is visible on a single run.
         mockOverrides: { failureRate: 0.6, maxAttempts: 5 },
       }, 220, 180),
@@ -104,8 +113,8 @@ async function main() {
 
   for (const template of BUILT_INS) {
     const result = await Template.findOneAndUpdate(
-      { ownerId: null, name: template.name },
-      { $set: { ...template, ownerId: null } },
+      { workspaceId: null, name: template.name },
+      { $set: { ...template, workspaceId: null, createdBy: null } },
       // `returnDocument: 'after'` rather than `new: true` - the latter is
       // deprecated in this Mongoose version and warns on every call.
       { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true },
@@ -113,7 +122,7 @@ async function main() {
     console.log(`  seeded "${result.name}" (${result.nodes.length} nodes, ${result.edges.length} edges)`);
   }
 
-  const total = await Template.countDocuments({ ownerId: null });
+  const total = await Template.countDocuments({ workspaceId: null });
   console.log(`${BUILT_INS.length} built-in template(s) upserted; ${total} now in the database.`);
   await mongoose.disconnect();
 }

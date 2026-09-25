@@ -7,8 +7,15 @@ import {
 } from '../api/workflows';
 import { apiErrorMessage } from '../api/client';
 import { describeCron, nextRun, parseCron } from '../utils/cron';
+import { Link } from 'react-router-dom';
+import { useWorkspaceStore } from '../store/workspaceStore';
+import { useWorkspacePath } from '../hooks/useWorkspacePath';
+import IntegrationEventPicker from './IntegrationEventPicker';
+import { confirm } from './ui/confirm';
 
-function Section({ title, active, children }) {
+// `readOnly` (viewers, spec/23) keeps sections expandable but disables every
+// control inside them; the server rejects trigger changes regardless.
+function Section({ title, active, readOnly = false, children }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
@@ -22,7 +29,11 @@ function Section({ title, active, children }) {
         </span>
         <span className="text-slate-400">{open ? '▾' : '▸'}</span>
       </button>
-      {open && <div className="space-y-2 border-t border-slate-100 px-2.5 py-2 dark:border-slate-800">{children}</div>}
+      {open && (
+        <fieldset disabled={readOnly} className="space-y-2 border-t border-slate-100 px-2.5 py-2 dark:border-slate-800">
+          {children}
+        </fieldset>
+      )}
     </div>
   );
 }
@@ -36,10 +47,34 @@ const inputClass =
 const btnClass =
   'rounded border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-40 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800';
 
-export default function TriggerPanel({ workflowId }) {
+/**
+ * Events are addressed per workspace and need an API key (spec/24): a global,
+ * unauthenticated event name let tenants fire each other's workflows.
+ */
+function EventCurl({ eventName }) {
+  const slug = useWorkspaceStore((s) => s.current?.slug);
+  const wp = useWorkspacePath();
+  return (
+    <>
+      <code className="block whitespace-pre-wrap break-all rounded bg-slate-100 p-1.5 text-[10px] text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+        {`curl -X POST ${API_BASE}/w/${slug}/events/${eventName} \\\n  -H "Authorization: Bearer <YOUR_API_KEY>" \\\n  -H "Content-Type: application/json" -d '{}'`}
+      </code>
+      <p className="text-[11px] text-slate-400">
+        Needs a key with the <span className="font-mono">events:publish</span> scope —{' '}
+        <Link to={wp('/settings/api-keys')} className="font-medium text-brand-600 hover:underline dark:text-brand-400">
+          manage API keys
+        </Link>
+        . Renaming the workspace URL changes this address.
+      </p>
+    </>
+  );
+}
+
+export default function TriggerPanel({ workflowId, readOnly = false }) {
   const { triggers, setTrigger } = useWorkflowStore();
   const [cronDraft, setCronDraft] = useState(triggers.schedule?.cronExpression || '');
   const [eventDraft, setEventDraft] = useState(triggers.eventTrigger?.eventName || '');
+  const [eventConnection, setEventConnection] = useState(triggers.eventTrigger?.connectionId || null);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
 
@@ -75,7 +110,7 @@ export default function TriggerPanel({ workflowId }) {
 
   const generateWebhook = guard(async () => {
     // Regenerating invalidates the existing URL, so make that explicit.
-    if (webhook?.token && !window.confirm('Regenerating invalidates the current webhook URL immediately. Continue?')) return;
+    if (webhook?.token && !(await confirm({ title: 'Regenerate the webhook URL?', body: 'The current URL stops working immediately; anything calling it must be updated.', confirmLabel: 'Regenerate', destructive: true }))) return;
     const saved = await regenerateWebhook(workflowId);
     setTrigger('webhook', { token: saved.token, enabled: true, url: saved.url });
   });
@@ -86,14 +121,15 @@ export default function TriggerPanel({ workflowId }) {
   });
 
   const applyEvent = guard(async (enabled = eventTrigger?.enabled) => {
-    const saved = await putEventTrigger(workflowId, { eventName: eventDraft.trim(), enabled });
+    const saved = await putEventTrigger(workflowId, { eventName: eventDraft.trim(), enabled, connectionId: eventConnection || null });
     setTrigger('eventTrigger', saved);
   });
 
   const clearEvent = guard(async () => {
     await deleteEventTrigger(workflowId);
-    setTrigger('eventTrigger', { eventName: null, enabled: false });
+    setTrigger('eventTrigger', { eventName: null, enabled: false, connectionId: null });
     setEventDraft('');
+    setEventConnection(null);
   });
 
   const webhookUrl = webhook?.url || (webhook?.token ? `${API_BASE}/hooks/${webhook.token}` : null);
@@ -120,7 +156,7 @@ export default function TriggerPanel({ workflowId }) {
         <p className="mt-0.5 text-slate-500 dark:text-slate-400">The Run button above.</p>
       </div>
 
-      <Section title="Scheduled (Cron)" active={Boolean(schedule?.enabled)}>
+      <Section title="Scheduled (Cron)" active={Boolean(schedule?.enabled)} readOnly={readOnly}>
         <input value={cronDraft} onChange={(e) => setCronDraft(e.target.value)} placeholder="0 * * * *" className={inputClass} />
         {cronDraft.trim() && !cronCheck?.valid && <p className="text-[11px] text-red-500">{cronCheck?.error}</p>}
         {cronDescription && <p className="text-[11px] text-slate-500 dark:text-slate-400">Runs {cronDescription}.</p>}
@@ -139,8 +175,13 @@ export default function TriggerPanel({ workflowId }) {
         )}
       </Section>
 
-      <Section title="Webhook" active={Boolean(webhook?.enabled && webhook?.token)}>
-        {webhookUrl ? (
+      <Section title="Webhook" active={Boolean(webhook?.enabled && webhook?.token)} readOnly={readOnly}>
+        {readOnly ? (
+          // The URL is a capability to start runs, so it isn't shown to viewers.
+          <p className="text-[11px] text-slate-500 dark:text-slate-400">
+            {webhook?.enabled && webhook?.token ? 'Webhook trigger is enabled.' : 'No webhook trigger.'}
+          </p>
+        ) : webhookUrl ? (
           <>
             <code className="block break-all rounded bg-slate-100 p-1.5 text-[10px] text-slate-700 dark:bg-slate-800 dark:text-slate-300">
               {webhookUrl}
@@ -162,7 +203,14 @@ export default function TriggerPanel({ workflowId }) {
         )}
       </Section>
 
-      <Section title="External Event" active={Boolean(eventTrigger?.enabled && eventTrigger?.eventName)}>
+      <Section title="External Event" active={Boolean(eventTrigger?.enabled && eventTrigger?.eventName)} readOnly={readOnly}>
+        <IntegrationEventPicker
+          eventName={eventDraft.trim()}
+          onEventName={setEventDraft}
+          connectionId={eventConnection}
+          onConnectionId={setEventConnection}
+          readOnly={readOnly}
+        />
         <input value={eventDraft} onChange={(e) => setEventDraft(e.target.value)} placeholder="order.created" className={inputClass} />
         <div className="flex gap-1.5">
           <button className={btnClass} disabled={!eventDraft.trim()} onClick={() => applyEvent(true)}>
@@ -175,13 +223,11 @@ export default function TriggerPanel({ workflowId }) {
           <>
             <p className="text-[11px] text-green-600 dark:text-green-400">Subscribed to {eventTrigger.eventName}</p>
             {/* A trigger nobody can work out how to fire isn't a demoable trigger. */}
-            <code className="block break-all rounded bg-slate-100 p-1.5 text-[10px] text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-              {`curl -X POST ${API_BASE}/events/${eventTrigger.eventName}`}
-            </code>
+            <EventCurl eventName={eventTrigger.eventName} />
           </>
         )}
         <p className="text-[11px] text-slate-400">
-          One event name fans out to every workflow subscribed to it — unlike a webhook, which targets just this one.
+          One event name fans out to every workflow in this workspace subscribed to it — unlike a webhook, which targets just this one.
         </p>
       </Section>
 

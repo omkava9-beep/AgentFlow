@@ -4,6 +4,8 @@
 **Milestone:** M3
 **Depends on:** `05-agent-tool-providers.md`, `06-execution-engine.md`
 
+> **Revised in phase 3:** A handoff agent can call tools before deciding; only its final step carries `handoffTarget` — see [`37`](37-mcp.md).
+
 ## Summary
 
 A more dynamic multi-agent pattern layered on top of the static DAG model: instead of a fixed next-edge, an Agent node's output can select which of several candidate next agents actually runs — simulating delegation ("route this to the right specialist agent").

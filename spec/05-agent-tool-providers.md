@@ -4,6 +4,8 @@
 **Milestone:** M1 (interface + mock) / M3 (real LLM option)
 **Depends on:** —
 
+> **Revised in phase 3:** `ToolRegistry` is replaced by the manifest-based `IntegrationRegistry` with sandbox/live actions ([`26`](26-integration-framework.md), [`27`](27-integration-catalog.md)); agents can call tools and the provider contract gains an engine-driven `step()` ([`37`](37-mcp.md)). Tools are live by default, not mocked. An `OpenAIAgentProvider` (`AGENT_PROVIDER=openai`, Chat Completions with function calling) is the real provider used for the demo; Anthropic's `LLMAgentProvider` stays as an alternative.
+
 ## Summary
 
 Defines the pluggable abstraction for how an Agent node's "reasoning" is executed, and the mock-tool registry Tool nodes draw from. This is the piece that lets the project run entirely offline/free by default, with a documented, low-effort path to a real LLM later. See `PRODUCT.md` § "Mock-to-real upgrade path" for the product-level rationale.

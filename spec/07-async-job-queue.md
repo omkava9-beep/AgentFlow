@@ -4,6 +4,8 @@
 **Milestone:** M2
 **Depends on:** —
 
+> **Revised in phase 3:** FIFO becomes per-workspace round-robin with plan caps and `QUEUE_CONCURRENCY` defaults to 8 ([`33`](33-fair-queue-and-quotas.md)); backoff honours `Retry-After` capped at 30 s ([`26`](26-integration-framework.md)); per-attempt `attemptsLog` ([`35`](35-run-operations.md)); nothing that waits holds a slot ([`31`](31-advanced-nodes.md), [`32`](32-human-in-the-loop.md), [`37`](37-mcp.md)).
+
 ## Summary
 
 A small in-process job queue standing in for a real broker (BullMQ/Redis, SQS, etc.). Gives the execution engine (`06`) bounded concurrency, retry-with-backoff, and a place to observe job lifecycle — the core "async job processing" learning objective of the project.

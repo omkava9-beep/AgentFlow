@@ -1,0 +1,2184 @@
+{
+ "_comment": "spec/30 \u00a73: one fixture set run against BOTH validators - client/src/utils/validateGraph.js (check:logic) and server/src/engine/validateGraph.js (check:versions). Ids are compared as sets.",
+ "cases": [
+  {
+   "name": "empty canvas",
+   "input": {
+    "nodes": [],
+    "edges": []
+   },
+   "expect": {
+    "errors": [
+     "empty"
+    ],
+    "warnings": [],
+    "info": []
+   }
+  },
+  {
+   "name": "no start node",
+   "input": {
+    "nodes": [
+     {
+      "id": "e",
+      "type": "end",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "e"
+       }
+      }
+     }
+    ],
+    "edges": []
+   },
+   "expect": {
+    "errors": [
+     "no-start"
+    ],
+    "warnings": [],
+    "info": []
+   }
+  },
+  {
+   "name": "minimal valid",
+   "input": {
+    "nodes": [
+     {
+      "id": "s",
+      "type": "start",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "s"
+       }
+      }
+     },
+     {
+      "id": "e",
+      "type": "end",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "e"
+       }
+      }
+     }
+    ],
+    "edges": [
+     {
+      "id": "x",
+      "source": "s",
+      "target": "e"
+     }
+    ]
+   },
+   "expect": {
+    "errors": [],
+    "warnings": [],
+    "info": []
+   }
+  },
+  {
+   "name": "no end node",
+   "input": {
+    "nodes": [
+     {
+      "id": "s",
+      "type": "start",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "s"
+       }
+      }
+     }
+    ],
+    "edges": []
+   },
+   "expect": {
+    "errors": [],
+    "warnings": [
+     "no-end"
+    ],
+    "info": []
+   }
+  },
+  {
+   "name": "two end nodes",
+   "input": {
+    "nodes": [
+     {
+      "id": "s",
+      "type": "start",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "s"
+       }
+      }
+     },
+     {
+      "id": "e1",
+      "type": "end",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "e1"
+       }
+      }
+     },
+     {
+      "id": "e2",
+      "type": "end",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "e2"
+       }
+      }
+     }
+    ],
+    "edges": [
+     {
+      "id": "a",
+      "source": "s",
+      "target": "e1"
+     },
+     {
+      "id": "b",
+      "source": "s",
+      "target": "e2"
+     }
+    ]
+   },
+   "expect": {
+    "errors": [],
+    "warnings": [
+     "many-end"
+    ],
+    "info": []
+   }
+  },
+  {
+   "name": "cycle",
+   "input": {
+    "nodes": [
+     {
+      "id": "s",
+      "type": "start",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "s"
+       }
+      }
+     },
+     {
+      "id": "a",
+      "type": "agent",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "a"
+       }
+      }
+     },
+     {
+      "id": "b",
+      "type": "agent",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "b"
+       }
+      }
+     },
+     {
+      "id": "e",
+      "type": "end",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "e"
+       }
+      }
+     }
+    ],
+    "edges": [
+     {
+      "id": "1",
+      "source": "s",
+      "target": "a"
+     },
+     {
+      "id": "2",
+      "source": "a",
+      "target": "b"
+     },
+     {
+      "id": "3",
+      "source": "b",
+      "target": "a"
+     },
+     {
+      "id": "4",
+      "source": "b",
+      "target": "e"
+     }
+    ]
+   },
+   "expect": {
+    "errors": [
+     "cycle"
+    ],
+    "warnings": [],
+    "info": []
+   }
+  },
+  {
+   "name": "unreachable node",
+   "input": {
+    "nodes": [
+     {
+      "id": "s",
+      "type": "start",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "s"
+       }
+      }
+     },
+     {
+      "id": "e",
+      "type": "end",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "e"
+       }
+      }
+     },
+     {
+      "id": "x",
+      "type": "agent",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "x"
+       }
+      }
+     }
+    ],
+    "edges": [
+     {
+      "id": "1",
+      "source": "s",
+      "target": "e"
+     }
+    ]
+   },
+   "expect": {
+    "errors": [],
+    "warnings": [
+     "unreachable:x"
+    ],
+    "info": []
+   }
+  },
+  {
+   "name": "tool with nothing selected",
+   "input": {
+    "nodes": [
+     {
+      "id": "s",
+      "type": "start",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "s"
+       }
+      }
+     },
+     {
+      "id": "t",
+      "type": "tool",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "t",
+        "integration": "",
+        "action": "",
+        "params": {}
+       }
+      }
+     },
+     {
+      "id": "e",
+      "type": "end",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "e"
+       }
+      }
+     }
+    ],
+    "edges": [
+     {
+      "id": "1",
+      "source": "s",
+      "target": "t"
+     },
+     {
+      "id": "2",
+      "source": "t",
+      "target": "e"
+     }
+    ],
+    "integrations": [
+     {
+      "id": "slack",
+      "name": "Slack",
+      "auth": {
+       "type": "webhookUrl"
+      },
+      "actions": [
+       {
+        "id": "post_message",
+        "configSchema": [
+         {
+          "key": "channel",
+          "label": "Channel",
+          "type": "text",
+          "required": true
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "builtin",
+      "name": "Built-in",
+      "auth": {
+       "type": "none"
+      },
+      "actions": [
+       {
+        "id": "calculator",
+        "configSchema": [
+         {
+          "key": "expression",
+          "label": "Expression",
+          "type": "text"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "http",
+      "name": "HTTP",
+      "auth": {
+       "type": "none"
+      },
+      "actions": [
+       {
+        "id": "request",
+        "configSchema": [
+         {
+          "key": "url",
+          "label": "URL",
+          "type": "text",
+          "required": true
+         },
+         {
+          "key": "headers",
+          "label": "Headers",
+          "type": "json"
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   "expect": {
+    "errors": [
+     "tool-unset:t"
+    ],
+    "warnings": [],
+    "info": []
+   }
+  },
+  {
+   "name": "legacy tool type is normalised",
+   "input": {
+    "nodes": [
+     {
+      "id": "s",
+      "type": "start",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "s"
+       }
+      }
+     },
+     {
+      "id": "t",
+      "type": "tool",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "t",
+        "toolType": "calculator",
+        "toolConfig": {
+         "expression": "1+1"
+        }
+       }
+      }
+     },
+     {
+      "id": "e",
+      "type": "end",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "e"
+       }
+      }
+     }
+    ],
+    "edges": [
+     {
+      "id": "1",
+      "source": "s",
+      "target": "t"
+     },
+     {
+      "id": "2",
+      "source": "t",
+      "target": "e"
+     }
+    ],
+    "integrations": [
+     {
+      "id": "slack",
+      "name": "Slack",
+      "auth": {
+       "type": "webhookUrl"
+      },
+      "actions": [
+       {
+        "id": "post_message",
+        "configSchema": [
+         {
+          "key": "channel",
+          "label": "Channel",
+          "type": "text",
+          "required": true
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "builtin",
+      "name": "Built-in",
+      "auth": {
+       "type": "none"
+      },
+      "actions": [
+       {
+        "id": "calculator",
+        "configSchema": [
+         {
+          "key": "expression",
+          "label": "Expression",
+          "type": "text"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "http",
+      "name": "HTTP",
+      "auth": {
+       "type": "none"
+      },
+      "actions": [
+       {
+        "id": "request",
+        "configSchema": [
+         {
+          "key": "url",
+          "label": "URL",
+          "type": "text",
+          "required": true
+         },
+         {
+          "key": "headers",
+          "label": "Headers",
+          "type": "json"
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   "expect": {
+    "errors": [],
+    "warnings": [],
+    "info": []
+   }
+  },
+  {
+   "name": "unknown integration",
+   "input": {
+    "nodes": [
+     {
+      "id": "s",
+      "type": "start",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "s"
+       }
+      }
+     },
+     {
+      "id": "t",
+      "type": "tool",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "t",
+        "integration": "nope",
+        "action": "x"
+       }
+      }
+     },
+     {
+      "id": "e",
+      "type": "end",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "e"
+       }
+      }
+     }
+    ],
+    "edges": [
+     {
+      "id": "1",
+      "source": "s",
+      "target": "t"
+     },
+     {
+      "id": "2",
+      "source": "t",
+      "target": "e"
+     }
+    ],
+    "integrations": [
+     {
+      "id": "slack",
+      "name": "Slack",
+      "auth": {
+       "type": "webhookUrl"
+      },
+      "actions": [
+       {
+        "id": "post_message",
+        "configSchema": [
+         {
+          "key": "channel",
+          "label": "Channel",
+          "type": "text",
+          "required": true
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "builtin",
+      "name": "Built-in",
+      "auth": {
+       "type": "none"
+      },
+      "actions": [
+       {
+        "id": "calculator",
+        "configSchema": [
+         {
+          "key": "expression",
+          "label": "Expression",
+          "type": "text"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "http",
+      "name": "HTTP",
+      "auth": {
+       "type": "none"
+      },
+      "actions": [
+       {
+        "id": "request",
+        "configSchema": [
+         {
+          "key": "url",
+          "label": "URL",
+          "type": "text",
+          "required": true
+         },
+         {
+          "key": "headers",
+          "label": "Headers",
+          "type": "json"
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   "expect": {
+    "errors": [],
+    "warnings": [
+     "tool-unknown:t"
+    ],
+    "info": []
+   }
+  },
+  {
+   "name": "missing required field, needs a connection",
+   "input": {
+    "nodes": [
+     {
+      "id": "s",
+      "type": "start",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "s"
+       }
+      }
+     },
+     {
+      "id": "t",
+      "type": "tool",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "t",
+        "integration": "slack",
+        "action": "post_message",
+        "params": {}
+       }
+      }
+     },
+     {
+      "id": "e",
+      "type": "end",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "e"
+       }
+      }
+     }
+    ],
+    "edges": [
+     {
+      "id": "1",
+      "source": "s",
+      "target": "t"
+     },
+     {
+      "id": "2",
+      "source": "t",
+      "target": "e"
+     }
+    ],
+    "integrations": [
+     {
+      "id": "slack",
+      "name": "Slack",
+      "auth": {
+       "type": "webhookUrl"
+      },
+      "actions": [
+       {
+        "id": "post_message",
+        "configSchema": [
+         {
+          "key": "channel",
+          "label": "Channel",
+          "type": "text",
+          "required": true
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "builtin",
+      "name": "Built-in",
+      "auth": {
+       "type": "none"
+      },
+      "actions": [
+       {
+        "id": "calculator",
+        "configSchema": [
+         {
+          "key": "expression",
+          "label": "Expression",
+          "type": "text"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "http",
+      "name": "HTTP",
+      "auth": {
+       "type": "none"
+      },
+      "actions": [
+       {
+        "id": "request",
+        "configSchema": [
+         {
+          "key": "url",
+          "label": "URL",
+          "type": "text",
+          "required": true
+         },
+         {
+          "key": "headers",
+          "label": "Headers",
+          "type": "json"
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   "expect": {
+    "errors": [],
+    "warnings": [
+     "tool-field:t:channel"
+    ],
+    "info": [
+     "tool-noconn:t"
+    ]
+   }
+  },
+  {
+   "name": "invalid json and a pasted token",
+   "input": {
+    "nodes": [
+     {
+      "id": "s",
+      "type": "start",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "s"
+       }
+      }
+     },
+     {
+      "id": "t",
+      "type": "tool",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "t",
+        "integration": "http",
+        "action": "request",
+        "params": {
+         "url": "https://x.dev",
+         "headers": "{ bad"
+        }
+       }
+      }
+     },
+     {
+      "id": "t2",
+      "type": "tool",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "t2",
+        "integration": "slack",
+        "action": "post_message",
+        "params": {
+         "channel": "xoxb-1-2"
+        }
+       }
+      }
+     },
+     {
+      "id": "e",
+      "type": "end",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "e"
+       }
+      }
+     }
+    ],
+    "edges": [
+     {
+      "id": "1",
+      "source": "s",
+      "target": "t"
+     },
+     {
+      "id": "2",
+      "source": "t",
+      "target": "t2"
+     },
+     {
+      "id": "3",
+      "source": "t2",
+      "target": "e"
+     }
+    ],
+    "integrations": [
+     {
+      "id": "slack",
+      "name": "Slack",
+      "auth": {
+       "type": "webhookUrl"
+      },
+      "actions": [
+       {
+        "id": "post_message",
+        "configSchema": [
+         {
+          "key": "channel",
+          "label": "Channel",
+          "type": "text",
+          "required": true
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "builtin",
+      "name": "Built-in",
+      "auth": {
+       "type": "none"
+      },
+      "actions": [
+       {
+        "id": "calculator",
+        "configSchema": [
+         {
+          "key": "expression",
+          "label": "Expression",
+          "type": "text"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "http",
+      "name": "HTTP",
+      "auth": {
+       "type": "none"
+      },
+      "actions": [
+       {
+        "id": "request",
+        "configSchema": [
+         {
+          "key": "url",
+          "label": "URL",
+          "type": "text",
+          "required": true
+         },
+         {
+          "key": "headers",
+          "label": "Headers",
+          "type": "json"
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   "expect": {
+    "errors": [],
+    "warnings": [
+     "tool-json:t:headers",
+     "tool-secret:t2:channel"
+    ],
+    "info": [
+     "tool-noconn:t2"
+    ]
+   }
+  },
+  {
+   "name": "connection missing / mismatched",
+   "input": {
+    "nodes": [
+     {
+      "id": "s",
+      "type": "start",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "s"
+       }
+      }
+     },
+     {
+      "id": "t",
+      "type": "tool",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "t",
+        "integration": "slack",
+        "action": "post_message",
+        "params": {
+         "channel": "#a"
+        },
+        "connectionId": "gone"
+       }
+      }
+     },
+     {
+      "id": "t2",
+      "type": "tool",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "t2",
+        "integration": "slack",
+        "action": "post_message",
+        "params": {
+         "channel": "#a"
+        },
+        "connectionId": "c2"
+       }
+      }
+     },
+     {
+      "id": "e",
+      "type": "end",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "e"
+       }
+      }
+     }
+    ],
+    "edges": [
+     {
+      "id": "1",
+      "source": "s",
+      "target": "t"
+     },
+     {
+      "id": "2",
+      "source": "t",
+      "target": "t2"
+     },
+     {
+      "id": "3",
+      "source": "t2",
+      "target": "e"
+     }
+    ],
+    "integrations": [
+     {
+      "id": "slack",
+      "name": "Slack",
+      "auth": {
+       "type": "webhookUrl"
+      },
+      "actions": [
+       {
+        "id": "post_message",
+        "configSchema": [
+         {
+          "key": "channel",
+          "label": "Channel",
+          "type": "text",
+          "required": true
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "builtin",
+      "name": "Built-in",
+      "auth": {
+       "type": "none"
+      },
+      "actions": [
+       {
+        "id": "calculator",
+        "configSchema": [
+         {
+          "key": "expression",
+          "label": "Expression",
+          "type": "text"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "http",
+      "name": "HTTP",
+      "auth": {
+       "type": "none"
+      },
+      "actions": [
+       {
+        "id": "request",
+        "configSchema": [
+         {
+          "key": "url",
+          "label": "URL",
+          "type": "text",
+          "required": true
+         },
+         {
+          "key": "headers",
+          "label": "Headers",
+          "type": "json"
+         }
+        ]
+       }
+      ]
+     }
+    ],
+    "connections": [
+     {
+      "id": "c2",
+      "integration": "github",
+      "name": "GH",
+      "status": "ok"
+     }
+    ]
+   },
+   "expect": {
+    "errors": [],
+    "warnings": [
+     "tool-conn-missing:t",
+     "tool-conn-mismatch:t2"
+    ],
+    "info": []
+   }
+  },
+  {
+   "name": "condition without expression or branches",
+   "input": {
+    "nodes": [
+     {
+      "id": "s",
+      "type": "start",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "s"
+       }
+      }
+     },
+     {
+      "id": "c",
+      "type": "condition",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "c",
+        "expression": ""
+       }
+      }
+     },
+     {
+      "id": "e",
+      "type": "end",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "e"
+       }
+      }
+     }
+    ],
+    "edges": [
+     {
+      "id": "1",
+      "source": "s",
+      "target": "c"
+     },
+     {
+      "id": "2",
+      "source": "c",
+      "target": "e"
+     }
+    ]
+   },
+   "expect": {
+    "errors": [],
+    "warnings": [
+     "cond-empty:c",
+     "cond-branch:c"
+    ],
+    "info": []
+   }
+  },
+  {
+   "name": "error edge from a node that can't fail over",
+   "input": {
+    "nodes": [
+     {
+      "id": "s",
+      "type": "start",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "s"
+       }
+      }
+     },
+     {
+      "id": "c",
+      "type": "condition",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "c",
+        "expression": "true"
+       }
+      }
+     },
+     {
+      "id": "e",
+      "type": "end",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "e"
+       }
+      }
+     }
+    ],
+    "edges": [
+     {
+      "id": "1",
+      "source": "s",
+      "target": "c"
+     },
+     {
+      "id": "2",
+      "source": "c",
+      "target": "e",
+      "sourceHandle": "true"
+     },
+     {
+      "id": "3",
+      "source": "c",
+      "target": "e",
+      "sourceHandle": "false"
+     },
+     {
+      "id": "err",
+      "source": "c",
+      "target": "e",
+      "sourceHandle": "error"
+     }
+    ]
+   },
+   "expect": {
+    "errors": [
+     "error-edge:err"
+    ],
+    "warnings": [],
+    "info": []
+   }
+  },
+  {
+   "name": "merge with one input, empty code, zero delay",
+   "input": {
+    "nodes": [
+     {
+      "id": "s",
+      "type": "start",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "s"
+       }
+      }
+     },
+     {
+      "id": "m",
+      "type": "merge",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "m",
+        "mode": "all"
+       }
+      }
+     },
+     {
+      "id": "k",
+      "type": "code",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "k",
+        "source": ""
+       }
+      }
+     },
+     {
+      "id": "d",
+      "type": "delay",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "d",
+        "mode": "duration",
+        "durationMs": 0
+       }
+      }
+     },
+     {
+      "id": "e",
+      "type": "end",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "e"
+       }
+      }
+     }
+    ],
+    "edges": [
+     {
+      "id": "1",
+      "source": "s",
+      "target": "m"
+     },
+     {
+      "id": "2",
+      "source": "m",
+      "target": "k"
+     },
+     {
+      "id": "3",
+      "source": "k",
+      "target": "d"
+     },
+     {
+      "id": "4",
+      "source": "d",
+      "target": "e"
+     }
+    ]
+   },
+   "expect": {
+    "errors": [],
+    "warnings": [
+     "merge-inputs:m",
+     "code-empty:k",
+     "delay-zero:d"
+    ],
+    "info": []
+   }
+  },
+  {
+   "name": "sub-workflow points at an unpublished workflow",
+   "input": {
+    "nodes": [
+     {
+      "id": "s",
+      "type": "start",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "s"
+       }
+      }
+     },
+     {
+      "id": "sw",
+      "type": "subworkflow",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "sw",
+        "workflowId": "w2"
+       }
+      }
+     },
+     {
+      "id": "e",
+      "type": "end",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "e"
+       }
+      }
+     }
+    ],
+    "edges": [
+     {
+      "id": "1",
+      "source": "s",
+      "target": "sw"
+     },
+     {
+      "id": "2",
+      "source": "sw",
+      "target": "e"
+     }
+    ],
+    "workflows": [
+     {
+      "_id": "w1",
+      "name": "me",
+      "publishedVersion": 1
+     },
+     {
+      "_id": "w2",
+      "name": "child",
+      "publishedVersion": null
+     }
+    ],
+    "currentWorkflowId": "w1"
+   },
+   "expect": {
+    "errors": [],
+    "warnings": [
+     "subworkflow-unpublished:sw"
+    ],
+    "info": []
+   }
+  },
+  {
+   "name": "loop body published, self-reference and missing",
+   "input": {
+    "nodes": [
+     {
+      "id": "s",
+      "type": "start",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "s"
+       }
+      }
+     },
+     {
+      "id": "l1",
+      "type": "loop",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "l1",
+        "workflowId": "w2",
+        "itemsPath": "{{input.items}}"
+       }
+      }
+     },
+     {
+      "id": "l2",
+      "type": "loop",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "l2",
+        "workflowId": "w1",
+        "itemsPath": "{{input.items}}"
+       }
+      }
+     },
+     {
+      "id": "l3",
+      "type": "loop",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "l3",
+        "workflowId": "gone",
+        "itemsPath": "{{input.items}}"
+       }
+      }
+     },
+     {
+      "id": "e",
+      "type": "end",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "e"
+       }
+      }
+     }
+    ],
+    "edges": [
+     {
+      "id": "1",
+      "source": "s",
+      "target": "l1"
+     },
+     {
+      "id": "2",
+      "source": "l1",
+      "target": "l2"
+     },
+     {
+      "id": "3",
+      "source": "l2",
+      "target": "l3"
+     },
+     {
+      "id": "4",
+      "source": "l3",
+      "target": "e"
+     }
+    ],
+    "workflows": [
+     {
+      "_id": "w1",
+      "name": "me",
+      "publishedVersion": 1
+     },
+     {
+      "_id": "w2",
+      "name": "body",
+      "publishedVersion": 3
+     }
+    ],
+    "currentWorkflowId": "w1"
+   },
+   "expect": {
+    "errors": [],
+    "warnings": [
+     "loop-self:l2",
+     "loop-missing:l3"
+    ],
+    "info": []
+   }
+  },
+  {
+   "name": "approval with one branch unwired and a bad minimum",
+   "input": {
+    "nodes": [
+     {
+      "id": "s",
+      "type": "start",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "s"
+       }
+      }
+     },
+     {
+      "id": "a",
+      "type": "approval",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "a",
+        "minApprovals": 0
+       }
+      }
+     },
+     {
+      "id": "e",
+      "type": "end",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "e"
+       }
+      }
+     }
+    ],
+    "edges": [
+     {
+      "id": "1",
+      "source": "s",
+      "target": "a"
+     },
+     {
+      "id": "2",
+      "source": "a",
+      "target": "e",
+      "sourceHandle": "approved"
+     }
+    ]
+   },
+   "expect": {
+    "errors": [],
+    "warnings": [
+     "approval-rejected:a",
+     "approval-min:a"
+    ],
+    "info": []
+   }
+  },
+  {
+   "name": "agent with a side-effecting tool and no opt-in",
+   "input": {
+    "nodes": [
+     {
+      "id": "s",
+      "type": "start",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "s"
+       }
+      }
+     },
+     {
+      "id": "ag",
+      "type": "agent",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "ag",
+        "tools": [
+         {
+          "integration": "slack",
+          "action": "post_message",
+          "connectionId": null
+         },
+         {
+          "integration": "builtin",
+          "action": "fake-search",
+          "connectionId": null
+         }
+        ]
+       }
+      }
+     },
+     {
+      "id": "e",
+      "type": "end",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "e"
+       }
+      }
+     }
+    ],
+    "edges": [
+     {
+      "id": "1",
+      "source": "s",
+      "target": "ag"
+     },
+     {
+      "id": "2",
+      "source": "ag",
+      "target": "e"
+     }
+    ],
+    "integrations": [
+     {
+      "id": "slack",
+      "name": "Slack",
+      "auth": {
+       "type": "webhookUrl"
+      },
+      "actions": [
+       {
+        "id": "post_message",
+        "sideEffect": true,
+        "configSchema": [
+         {
+          "key": "channel",
+          "label": "Channel",
+          "type": "text",
+          "required": true
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "builtin",
+      "name": "Built-in",
+      "auth": {
+       "type": "none"
+      },
+      "actions": [
+       {
+        "id": "fake-search",
+        "sideEffect": false,
+        "configSchema": []
+       }
+      ]
+     },
+     {
+      "id": "mcp",
+      "name": "MCP",
+      "auth": {
+       "type": "custom"
+      },
+      "dynamicActions": true,
+      "actions": []
+     }
+    ],
+    "connections": [
+     {
+      "id": "m1",
+      "integration": "mcp",
+      "name": "Demo MCP",
+      "status": "ok",
+      "config": {
+       "toolsSnapshot": {
+        "tools": [
+         {
+          "name": "lookup_customer",
+          "annotations": {
+           "readOnlyHint": true
+          }
+         },
+         {
+          "name": "create_ticket",
+          "annotations": {}
+         }
+        ]
+       }
+      }
+     }
+    ]
+   },
+   "expect": {
+    "errors": [
+     "agent-side-effects:ag"
+    ],
+    "warnings": [],
+    "info": []
+   }
+  },
+  {
+   "name": "agent MCP tools: read-only ok, gone and missing connection warn",
+   "input": {
+    "nodes": [
+     {
+      "id": "s",
+      "type": "start",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "s"
+       }
+      }
+     },
+     {
+      "id": "ag",
+      "type": "agent",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "ag",
+        "tools": [
+         {
+          "integration": "mcp",
+          "action": "lookup_customer",
+          "connectionId": "m1"
+         },
+         {
+          "integration": "mcp",
+          "action": "retired",
+          "connectionId": "m1"
+         },
+         {
+          "integration": "mcp",
+          "action": "x",
+          "connectionId": "gone"
+         }
+        ]
+       }
+      }
+     },
+     {
+      "id": "e",
+      "type": "end",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "e"
+       }
+      }
+     }
+    ],
+    "edges": [
+     {
+      "id": "1",
+      "source": "s",
+      "target": "ag"
+     },
+     {
+      "id": "2",
+      "source": "ag",
+      "target": "e"
+     }
+    ],
+    "integrations": [
+     {
+      "id": "slack",
+      "name": "Slack",
+      "auth": {
+       "type": "webhookUrl"
+      },
+      "actions": [
+       {
+        "id": "post_message",
+        "sideEffect": true,
+        "configSchema": [
+         {
+          "key": "channel",
+          "label": "Channel",
+          "type": "text",
+          "required": true
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "builtin",
+      "name": "Built-in",
+      "auth": {
+       "type": "none"
+      },
+      "actions": [
+       {
+        "id": "fake-search",
+        "sideEffect": false,
+        "configSchema": []
+       }
+      ]
+     },
+     {
+      "id": "mcp",
+      "name": "MCP",
+      "auth": {
+       "type": "custom"
+      },
+      "dynamicActions": true,
+      "actions": []
+     }
+    ],
+    "connections": [
+     {
+      "id": "m1",
+      "integration": "mcp",
+      "name": "Demo MCP",
+      "status": "ok",
+      "config": {
+       "toolsSnapshot": {
+        "tools": [
+         {
+          "name": "lookup_customer",
+          "annotations": {
+           "readOnlyHint": true
+          }
+         },
+         {
+          "name": "create_ticket",
+          "annotations": {}
+         }
+        ]
+       }
+      }
+     }
+    ]
+   },
+   "expect": {
+    "errors": [],
+    "warnings": [
+     "agent-tool-gone:ag:1",
+     "agent-tool-conn:ag:2"
+    ],
+    "info": []
+   }
+  },
+  {
+   "name": "MCP tool node without a connection, and one whose tool is gone",
+   "input": {
+    "nodes": [
+     {
+      "id": "s",
+      "type": "start",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "s"
+       }
+      }
+     },
+     {
+      "id": "t1",
+      "type": "tool",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "t1",
+        "integration": "mcp",
+        "action": "lookup_customer",
+        "connectionId": null
+       }
+      }
+     },
+     {
+      "id": "t2",
+      "type": "tool",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "t2",
+        "integration": "mcp",
+        "action": "retired",
+        "connectionId": "m1"
+       }
+      }
+     },
+     {
+      "id": "e",
+      "type": "end",
+      "position": {
+       "x": 0,
+       "y": 0
+      },
+      "data": {
+       "config": {
+        "label": "e"
+       }
+      }
+     }
+    ],
+    "edges": [
+     {
+      "id": "1",
+      "source": "s",
+      "target": "t1"
+     },
+     {
+      "id": "2",
+      "source": "t1",
+      "target": "t2"
+     },
+     {
+      "id": "3",
+      "source": "t2",
+      "target": "e"
+     }
+    ],
+    "integrations": [
+     {
+      "id": "slack",
+      "name": "Slack",
+      "auth": {
+       "type": "webhookUrl"
+      },
+      "actions": [
+       {
+        "id": "post_message",
+        "sideEffect": true,
+        "configSchema": [
+         {
+          "key": "channel",
+          "label": "Channel",
+          "type": "text",
+          "required": true
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "builtin",
+      "name": "Built-in",
+      "auth": {
+       "type": "none"
+      },
+      "actions": [
+       {
+        "id": "fake-search",
+        "sideEffect": false,
+        "configSchema": []
+       }
+      ]
+     },
+     {
+      "id": "mcp",
+      "name": "MCP",
+      "auth": {
+       "type": "custom"
+      },
+      "dynamicActions": true,
+      "actions": []
+     }
+    ],
+    "connections": [
+     {
+      "id": "m1",
+      "integration": "mcp",
+      "name": "Demo MCP",
+      "status": "ok",
+      "config": {
+       "toolsSnapshot": {
+        "tools": [
+         {
+          "name": "lookup_customer",
+          "annotations": {
+           "readOnlyHint": true
+          }
+         },
+         {
+          "name": "create_ticket",
+          "annotations": {}
+         }
+        ]
+       }
+      }
+     }
+    ]
+   },
+   "expect": {
+    "errors": [
+     "mcp-noconn:t1"
+    ],
+    "warnings": [
+     "mcp-tool-gone:t2"
+    ],
+    "info": []
+   }
+  }
+ ]
+}

@@ -5,7 +5,9 @@ export const createWorkflow = (name) => apiClient.post('/workflows', { name }).t
 export const getWorkflow = (id) => apiClient.get(`/workflows/${id}`).then((r) => r.data);
 export const updateWorkflow = (id, payload) => apiClient.put(`/workflows/${id}`, payload).then((r) => r.data);
 export const deleteWorkflow = (id) => apiClient.delete(`/workflows/${id}`);
-export const createRun = (workflowId) => apiClient.post(`/workflows/${workflowId}/runs`).then((r) => r.data);
+// spec/30: 'draft' is the Builder's test run; 'published' runs the live version.
+export const createRun = (workflowId, source = 'draft') =>
+  apiClient.post(`/workflows/${workflowId}/runs`, { source }).then((r) => r.data);
 export const listRuns = (workflowId, page = 1) =>
   apiClient.get(`/workflows/${workflowId}/runs`, { params: { page } }).then((r) => r.data);
 
@@ -20,3 +22,15 @@ export const putWebhook = (id, payload) =>
 export const putEventTrigger = (id, payload) =>
   apiClient.put(`/workflows/${id}/event-trigger`, payload).then((r) => r.data);
 export const deleteEventTrigger = (id) => apiClient.delete(`/workflows/${id}/event-trigger`);
+
+// --- versions (spec/30) ---
+export const publishWorkflow = (id, { message, acknowledgeWarnings } = {}) =>
+  apiClient.post(`/workflows/${id}/publish`, { message, acknowledgeWarnings }).then((r) => r.data);
+export const listVersions = (id) => apiClient.get(`/workflows/${id}/versions`).then((r) => r.data);
+export const getVersion = (id, version) => apiClient.get(`/workflows/${id}/versions/${version}`).then((r) => r.data);
+export const diffVersions = (id, from, to = 'draft') =>
+  apiClient.get(`/workflows/${id}/diff`, { params: { from, to } }).then((r) => r.data);
+export const restoreVersion = (id, version) =>
+  apiClient.post(`/workflows/${id}/versions/${version}/restore`).then((r) => r.data);
+export const rollbackVersion = (id, version, message) =>
+  apiClient.post(`/workflows/${id}/versions/${version}/rollback`, { message }).then((r) => r.data);

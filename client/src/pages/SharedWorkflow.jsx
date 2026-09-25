@@ -17,12 +17,28 @@ export default function SharedWorkflow() {
   const { shareToken } = useParams();
   const [data, setData] = useState(null);
   const [notFound, setNotFound] = useState(false);
+  // spec/30: a link to a workflow that has never been published shows nothing
+  // of the draft, just says so.
+  const [notPublished, setNotPublished] = useState(false);
 
   useEffect(() => {
     getSharedWorkflow(shareToken)
       .then(setData)
-      .catch(() => setNotFound(true));
+      .catch((err) => (err?.response?.data?.notPublished ? setNotPublished(true) : setNotFound(true)));
   }, [shareToken]);
+
+  if (notPublished) {
+    return (
+      <div className="flex min-h-screen items-center justify-center p-6">
+        <Card className="max-w-md p-8 text-center">
+          <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Not published yet</h1>
+          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+            This workflow hasn't been published yet. The link will show it once its owner publishes a version.
+          </p>
+        </Card>
+      </div>
+    );
+  }
 
   if (notFound) {
     return (
@@ -75,8 +91,9 @@ export default function SharedWorkflow() {
           </Card>
         ) : (
           <div className="space-y-2">
-            {runs.map((run) => (
-              <Card key={run.id} className="flex items-center justify-between p-3">
+            {runs.map((run) => {
+              const row = (
+              <Card className={`flex items-center justify-between p-3 ${run.openable ? 'transition hover:border-brand-400' : ''}`}>
                 <div className="flex items-center gap-3">
                   <StatusBadge status={run.status} />
                   <TriggerBadge trigger={run.trigger} />
@@ -88,7 +105,12 @@ export default function SharedWorkflow() {
                   {run.durationMs != null ? `${(run.durationMs / 1000).toFixed(1)}s` : '—'}
                 </span>
               </Card>
-            ))}
+              );
+              // spec/35 §4: published root runs open a read-only detail view.
+              return run.openable
+                ? <Link key={run.id} to={`/shared/${shareToken}/runs/${run.id}`} className="block">{row}</Link>
+                : <div key={run.id} title="Test runs of an unpublished draft can't be opened from a share link">{row}</div>;
+            })}
           </div>
         )}
       </main>

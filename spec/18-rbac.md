@@ -4,6 +4,8 @@
 **Milestone:** M3
 **Depends on:** `01-auth.md`, `04-workflow-persistence.md`
 
+> **Revised in phase 3:** workspace roles now exist alongside share links ([`23`](23-roles-and-invitations.md)), and a workspace-wide switch can disable all share links. The "no real roles" non-goal below no longer applies. Share links show the published version only ([`30`](30-workflow-versioning.md)) and gain a whitelisted shared run detail view ([`35`](35-run-operations.md)).
+
 ## Summary
 
 A minimal access-control extension: workflows are still single-owner (no real multi-tenant teams), but an owner can generate a read-only share link so someone else can view a workflow's design and run history without logging in as the owner.

@@ -1,0 +1,76 @@
+# spec/36 §8. CI is developer tooling on GitHub's runners, not part of
+# AgentFlow's runtime: the app itself still runs with `npm run dev` and a
+# MongoDB connection string (CLAUDE.md's no-external-infra rule is about the app).
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  server:
+    name: Server - every check suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ ping: 1 })'"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      MONGODB_URI: mongodb://127.0.0.1:27017/agentflow-ci
+      # Suites never call real services in CI (spec/36 §8).
+      INTEGRATIONS_LIVE: 'false'
+      AGENT_PROVIDER: mock
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 23
+          cache: npm
+          cache-dependency-path: |
+            server/package-lock.json
+            client/package-lock.json
+      # Secrets are generated per run and never committed.
+      - name: Generate throwaway secrets
+        run: |
+          echo "JWT_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+          echo "SECRETS_MASTER_KEY=$(openssl rand -base64 32)" >> "$GITHUB_ENV"
+          echo "APPROVAL_LINK_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+      - name: Install server
+        working-directory: server
+        run: npm ci
+      # check:all also runs the client's check:logic.
+      - name: Install client
+        working-directory: client
+        run: npm ci
+      - name: npm run check:all
+        working-directory: server
+        run: npm run check:all
+
+  client:
+    name: Client - lint, logic, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 23
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+      - name: Install
+        working-directory: client
+        run: npm ci
+      - name: Lint
+        working-directory: client
+        run: npm run lint
+      - name: Logic checks
+        working-directory: client
+        run: npm run check:logic
+      - name: Build
+        working-directory: client
+        run: npm run build

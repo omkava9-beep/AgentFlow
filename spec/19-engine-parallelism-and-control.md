@@ -4,6 +4,8 @@
 **Milestone:** M3
 **Depends on:** `06-execution-engine.md`, `07-async-job-queue.md`
 
+> **Revised in phase 3:** Error branches count as live edges and `first`-mode merges change readiness ([`31`](31-advanced-nodes.md)); the run deadline counts active time only ([`32`](32-human-in-the-loop.md)); the "resuming or retrying a run" non-goal is lifted ([`35`](35-run-operations.md)).
+
 ## Summary
 
 Deepens the execution engine from a strictly sequential topological walk into a readiness-driven scheduler that dispatches independent nodes concurrently, resolves fan-in correctly, supports per-node retry policy, and can be cancelled mid-run.

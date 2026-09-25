@@ -32,13 +32,16 @@ export function registerSchedule(workflow) {
   if (!enabled || !isValidCron(cronExpression)) return false;
 
   const task = cron.schedule(cronExpression, async () => {
-    // Reload the workflow each tick: the graph (or the schedule itself) may have
-    // changed since registration, and a stale in-memory copy would run old logic.
+    // Reload the workflow each tick: the published version (or the schedule
+    // itself) may have changed since registration.
     const result = await startRunForWorkflowId(id, { trigger: 'schedule' });
     if (result.ok) {
       console.log(`[scheduler] ${id} -> run ${result.runId}`);
     } else if (result.reason === SKIP_REASONS.ALREADY_RUNNING) {
       console.log(`[scheduler] ${id} skipped: a run is already in progress`);
+    } else if (result.reason === SKIP_REASONS.NOT_PUBLISHED) {
+      // spec/30 §2: schedules run the published version only.
+      console.log(`[scheduler] ${id} skipped: workflow has no published version`);
     } else {
       console.log(`[scheduler] ${id} skipped: ${result.reason}`);
     }
@@ -60,4 +63,13 @@ export async function bootstrapSchedules() {
 
 export function activeScheduleCount() {
   return tasks.size;
+}
+
+/** Registered schedules with their next fire time, for the status page (spec/36 §7). */
+export function listSchedules() {
+  return [...tasks.entries()].map(([workflowId, task]) => {
+    let nextRun = null;
+    try { nextRun = task.getNextRun?.() || null; } catch { nextRun = null; }
+    return { workflowId, nextRun };
+  });
 }

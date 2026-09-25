@@ -14,3 +14,7 @@ export const deleteShareLink = (workflowId) => apiClient.delete(`/workflows/${wo
  */
 export const getSharedWorkflow = (shareToken) =>
   axios.get(`${import.meta.env.VITE_API_URL}/shared/${shareToken}`).then((r) => r.data);
+
+/** spec/35 §4: the whitelisted detail of one run behind a share link. Bare axios, as above. */
+export const getSharedRun = (shareToken, runId) =>
+  axios.get(`${import.meta.env.VITE_API_URL}/shared/${shareToken}/runs/${runId}`).then((r) => r.data);

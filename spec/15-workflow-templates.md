@@ -4,6 +4,8 @@
 **Milestone:** M3
 **Depends on:** `04-workflow-persistence.md`
 
+> **Revised in phase 3:** Custom templates belong to the workspace ([`22`](22-workspaces-multitenancy.md)), snapshot the flushed draft and create unpublished workflows ([`30`](30-workflow-versioning.md)), and can be renamed and deleted ([`36`](36-production-polish.md)).
+
 ## Summary
 
 Reusable saved workflow shapes a user can clone into a new, independent workflow — useful both as a demo-friendly "starter examples" feature and as a way to avoid rebuilding similar graphs from scratch.

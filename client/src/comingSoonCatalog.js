@@ -2,7 +2,7 @@
 //
 // Triggers stay listed here because they're a small fixed set the server doesn't
 // enumerate. Tool types used to live here too, but they're now served by
-// `GET /api/tools` from the server-side ToolRegistry - one source of truth
+// `GET /api/integrations` from the server-side IntegrationRegistry - one source of truth
 // instead of a second, staler copy (spec/21).
 
 export const TRIGGER_TYPES = [

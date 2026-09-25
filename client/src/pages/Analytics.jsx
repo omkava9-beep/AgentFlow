@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { getAnalyticsSummary } from '../api/analytics';
 import { apiErrorMessage } from '../api/client';
 import { Card, ErrorText } from '../components/ui';
@@ -10,36 +10,85 @@ import CategoryBars from '../components/charts/CategoryBars';
 import OutcomeMeters from '../components/charts/OutcomeMeters';
 import DataTable from '../components/charts/DataTable';
 import { formatDayLong, formatDuration, formatPercent } from '../utils/format';
+import { useWorkspacePath } from '../hooks/useWorkspacePath';
+import { useWorkspaceWorkflows } from '../hooks/useWorkspaceWorkflows';
+import { on } from '../realtime/socket';
+import NodeStatsTable from '../components/analytics/NodeStatsTable';
+
+// spec/35 §5: a finishing run refetches the summary - debounced, so a
+// 50-child loop is one refetch, not fifty.
+const LIVE_DEBOUNCE_MS = 2000;
 
 const RANGES = [7, 30, 90];
 const TRIGGER_LABELS = { manual: 'Manual', schedule: 'Scheduled', webhook: 'Webhook', event: 'Event' };
 
 export default function Analytics() {
+  const wp = useWorkspacePath();
+  const navigate = useNavigate();
+  // spec/35 §5: /analytics/workflows/:workflowId is the per-workflow view.
+  const { workflowId = null } = useParams();
+  const { workflows } = useWorkspaceWorkflows();
   const [days, setDays] = useState(30);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showTable, setShowTable] = useState(false);
+  const [pulse, setPulse] = useState(false);
+
+  const load = useCallback(() => getAnalyticsSummary(days, workflowId)
+    .then((d) => { setData(d); setError(''); })
+    .catch((err) => setError(apiErrorMessage(err, 'Failed to load analytics'))), [days, workflowId]);
 
   useEffect(() => {
     setLoading(true);
-    getAnalyticsSummary(days)
-      .then(setData)
-      .catch((err) => setError(apiErrorMessage(err, 'Failed to load analytics')))
-      .finally(() => setLoading(false));
-  }, [days]);
+    load().finally(() => setLoading(false));
+  }, [load]);
+
+  // Live: the aggregation endpoint stays the single source of truth - the
+  // server says "something changed", the page asks again.
+  const timer = useRef(null);
+  useEffect(() => {
+    const off = on('run:status_changed', (p) => {
+      if (!['success', 'failed', 'cancelled'].includes(p?.status)) return;
+      if (workflowId && p.workflowId !== workflowId) return;
+      clearTimeout(timer.current);
+      timer.current = setTimeout(() => {
+        load().then(() => {
+          setPulse(true);
+          setTimeout(() => setPulse(false), 1500);
+        });
+      }, LIVE_DEBOUNCE_MS);
+    });
+    return () => { off(); clearTimeout(timer.current); };
+  }, [load, workflowId]);
 
   return (
     <div>
       <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">Analytics</h1>
+          <h1 className="flex items-center gap-2 text-2xl font-semibold text-slate-900 dark:text-slate-100">
+            Analytics
+            <span
+              title="Updates live as runs finish"
+              className={`inline-block h-2 w-2 rounded-full ${pulse ? 'animate-ping bg-emerald-500' : 'bg-emerald-500/40'}`}
+            />
+          </h1>
           <p className="text-sm text-slate-500 dark:text-slate-400">
             Your run history, aggregated. Dates are bucketed in UTC.
           </p>
         </div>
 
         {/* Filters sit in one row above the charts. */}
+        <div className="flex items-center gap-2">
+        <select
+          value={workflowId || ''}
+          onChange={(e) => navigate(wp(e.target.value ? `/analytics/workflows/${e.target.value}` : '/analytics'))}
+          aria-label="Workflow"
+          className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+        >
+          <option value="">All workflows</option>
+          {(workflows || []).map((w) => <option key={w._id} value={w._id}>{w.name}</option>)}
+        </select>
         <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white p-1 dark:border-slate-700 dark:bg-slate-900">
           {RANGES.map((r) => (
             <button
@@ -56,6 +105,7 @@ export default function Analytics() {
             </button>
           ))}
         </div>
+        </div>
       </div>
 
       <ErrorText>{error}</ErrorText>
@@ -67,7 +117,7 @@ export default function Analytics() {
           <p className="text-slate-600 dark:text-slate-300">No runs in the last {days} days.</p>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
             Run a workflow to see analytics here — try the{' '}
-            <Link to="/templates" className="text-brand-600 hover:underline dark:text-brand-400">
+            <Link to={wp('/templates')} className="text-brand-600 hover:underline dark:text-brand-400">
               templates gallery
             </Link>{' '}
             for something ready to execute.
@@ -87,6 +137,12 @@ export default function Analytics() {
             <StatTile label="Avg duration" value={formatDuration(data.avgDurationMs)} hint="Per completed run" />
             <StatTile label="Median duration" value={formatDuration(data.medianDurationMs)} hint="Less skewed by outliers" />
           </div>
+
+          {data.nodeStats && (
+            <ChartCard title="Nodes" subtitle={`Per-node stats for ${data.workflowName} over the last ${data.rangeDays} days`}>
+              <NodeStatsTable stats={data.nodeStats} />
+            </ChartCard>
+          )}
 
           <ChartCard
             title="Runs over time"

@@ -8,8 +8,10 @@ function isTyping(target) {
   return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable;
 }
 
-export function useCanvasShortcuts() {
+/** `enabled: false` for viewers (spec/23) - every shortcut here edits the graph. */
+export function useCanvasShortcuts({ enabled = true } = {}) {
   useEffect(() => {
+    if (!enabled) return undefined;
     function onKeyDown(event) {
       // Backspace in the workflow-name field must delete a character, not a node.
       if (isTyping(event.target)) return;
@@ -51,5 +53,5 @@ export function useCanvasShortcuts() {
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, []);
+  }, [enabled]);
 }

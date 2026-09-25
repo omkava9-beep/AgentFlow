@@ -6,3 +6,7 @@ export const createTemplate = (payload) => apiClient.post('/templates', payload)
 // readers, and this is a plain API call.
 export const createWorkflowFromTemplate = (id, workflowName) =>
   apiClient.post(`/templates/${id}/use`, { workflowName }).then((r) => r.data);
+
+/** Workspace templates only; built-ins answer 403 (spec/36 §5). */
+export const updateTemplate = (id, patch) => apiClient.patch(`/templates/${id}`, patch).then((r) => r.data);
+export const deleteTemplate = (id) => apiClient.delete(`/templates/${id}`);

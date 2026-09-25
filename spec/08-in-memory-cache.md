@@ -4,6 +4,8 @@
 **Milestone:** M2
 **Depends on:** `05-agent-tool-providers.md`
 
+> **Revised in phase 3:** the cache key is prefixed with `workspaceId` ([`22`](22-workspaces-multitenancy.md)) and later `connectionId` (`25`), so no cache hit crosses tenants. The key becomes stable (sorted-key) JSON over `{ workspaceId, integration, action, connectionId, params, input }` — see [`25`](25-secrets-and-connections.md).
+
 ## Summary
 
 A TTL-based in-process cache for Tool node results, so identical tool calls (same tool type + same input) within a short window return instantly instead of re-running the mocked latency/failure logic. Demonstrates the "caching" pillar of the project without needing Redis.

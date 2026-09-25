@@ -1,45 +1,109 @@
 import { TextField, TextArea, Select } from './ui';
+import { jsonParamError } from '../utils/integrationCatalog';
+import { jsonFieldError } from '../utils/mcpSchema';
 
 /**
- * Renders a tool's own settings from the `configSchema` the server publishes
- * (spec/21) — no per-tool branching here, so adding an eighth tool is a registry
- * entry on the backend and nothing at all on the frontend.
+ * Renders fields from a `configSchema` the server publishes (spec/21, spec/26) —
+ * an action's params, or an integration's auth fields in the connection form
+ * (spec/25). No per-integration branching here, so adding an integration is a
+ * manifest on the backend and nothing on the frontend.
+ *
+ * Secret fields (`secret: true`) render as password inputs that start empty.
+ * With a stored `hints[key]` they read "•••• 1a2b — leave blank to keep", and
+ * `onClear` offers an explicit clear (the value becomes `null`, which a PATCH
+ * treats as "delete the stored secret").
  */
-export default function ToolConfigFields({ schema = [], values = {}, onChange }) {
+export default function ToolConfigFields({
+  schema = [],
+  values = {},
+  onChange,
+  title = 'Parameters',
+  hints = {},
+  onClear,
+  showTemplateNote = true,
+}) {
   if (!schema.length) return null;
 
   const set = (key, value) => onChange({ ...values, [key]: value });
-  const valueOf = (field) => (values[field.key] !== undefined ? values[field.key] : field.default ?? '');
+  const valueOf = (field) => {
+    if (field.secret) return values[field.key] ?? '';
+    return values[field.key] !== undefined && values[field.key] !== null ? values[field.key] : field.default ?? '';
+  };
 
   return (
     <div className="space-y-3 rounded-lg border border-slate-200 p-3 dark:border-slate-800">
-      <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Tool settings</p>
+      {title && <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{title}</p>}
 
       {schema.map((field) => {
         const label = field.required ? `${field.label} *` : field.label;
+        const help = field.description ? <p className="mt-1 text-xs text-slate-400">{field.description}</p> : null;
 
-        if (field.type === 'textarea') {
+        if (field.secret) {
+          const hint = hints[field.key];
+          const cleared = values[field.key] === null;
           return (
-            <TextArea
-              key={field.key}
-              label={label}
-              rows={3}
-              value={valueOf(field)}
-              placeholder={field.placeholder}
-              onChange={(e) => set(field.key, e.target.value)}
-            />
+            <div key={field.key}>
+              <TextField
+                label={label}
+                type="password"
+                autoComplete="new-password"
+                value={cleared ? '' : valueOf(field)}
+                disabled={cleared}
+                placeholder={
+                  cleared ? 'Will be cleared on save' : hint ? `${hint} — leave blank to keep` : field.placeholder
+                }
+                onChange={(e) => set(field.key, e.target.value)}
+              />
+              {hint && onClear && (
+                <button
+                  type="button"
+                  onClick={() => (cleared ? set(field.key, '') : onClear(field.key))}
+                  className="mt-1 text-xs text-brand-600 hover:underline dark:text-brand-400"
+                >
+                  {cleared ? 'Keep the stored value' : 'Clear stored value'}
+                </button>
+              )}
+              {help}
+            </div>
+          );
+        }
+
+        if (field.type === 'textarea' || field.type === 'json') {
+          const raw = valueOf(field);
+          // A JSON param may already be stored as a value (e.g. from a template).
+          const shown = field.type === 'json' && raw !== '' && typeof raw !== 'string' ? JSON.stringify(raw, null, 2) : raw;
+          // MCP tools (spec/37) carry the property's sub-schema, so the editor
+          // can say *why* a value won't be accepted, not just that it's invalid JSON.
+          const error = field.type === 'json' ? (field.schema ? jsonFieldError(shown, field.schema) : jsonParamError(shown)) : null;
+          return (
+            <div key={field.key}>
+              <TextArea
+                label={field.type === 'json' ? `${label} (JSON)` : label}
+                rows={field.type === 'json' ? 4 : 3}
+                value={shown}
+                placeholder={field.placeholder}
+                className={field.type === 'json' ? 'font-mono text-xs' : ''}
+                onChange={(e) => set(field.key, e.target.value)}
+              />
+              {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
+              {help}
+            </div>
           );
         }
 
         if (field.type === 'select') {
           return (
-            <Select key={field.key} label={label} value={valueOf(field)} onChange={(e) => set(field.key, e.target.value)}>
-              {(field.options || []).map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label ?? option.value}
-                </option>
-              ))}
-            </Select>
+            <div key={field.key}>
+              <Select label={label} value={valueOf(field)} onChange={(e) => set(field.key, e.target.value)}>
+                {!field.required && field.default === undefined && <option value="">—</option>}
+                {(field.options || []).map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label ?? option.value}
+                  </option>
+                ))}
+              </Select>
+              {help}
+            </div>
           );
         }
 
@@ -58,20 +122,24 @@ export default function ToolConfigFields({ schema = [], values = {}, onChange })
         }
 
         return (
-          <TextField
-            key={field.key}
-            label={label}
-            type={field.type === 'number' ? 'number' : 'text'}
-            value={valueOf(field)}
-            placeholder={field.placeholder}
-            onChange={(e) => set(field.key, field.type === 'number' ? e.target.value : e.target.value)}
-          />
+          <div key={field.key}>
+            <TextField
+              label={label}
+              type={field.type === 'number' ? 'number' : 'text'}
+              value={valueOf(field)}
+              placeholder={field.placeholder}
+              onChange={(e) => set(field.key, e.target.value)}
+            />
+            {help}
+          </div>
         );
       })}
 
-      <p className="text-xs text-slate-400">
-        Text fields support <code>{'{{input.field}}'}</code> placeholders from the upstream node.
-      </p>
+      {showTemplateNote && (
+        <p className="text-xs text-slate-400">
+          Text fields support <code>{'{{input.field}}'}</code> placeholders from the upstream node.
+        </p>
+      )}
     </div>
   );
 }

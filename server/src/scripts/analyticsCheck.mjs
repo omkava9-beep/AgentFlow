@@ -14,12 +14,16 @@ import Workflow from '../models/Workflow.js';
 
 const B = process.env.BASE || 'http://localhost:4700/api';
 let pass = 0, fail = 0;
+const WS = new Map(); // token -> workspaceId
 const check = (n, ok, d = '') => { console.log(`  ${ok ? '✓' : '✗'} ${n}${d ? ` — ${d}` : ''}`); ok ? pass++ : fail++; };
 
 async function req(method, path, body, token) {
   const headers = {};
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (token) headers.Authorization = `Bearer ${token}`;
+  // spec/22: tenant routes need the caller's workspace. Each token maps to the
+  // personal workspace it was registered with.
+  if (token && WS.has(token)) headers['X-Workspace-Id'] = WS.get(token);
   const res = await fetch(B + path, { method, headers, body: body !== undefined ? JSON.stringify(body) : undefined });
   const text = await res.text();
   let json = null; try { json = text ? JSON.parse(text) : null; } catch { /* non-JSON */ }
@@ -30,12 +34,15 @@ await mongoose.connect(env.mongodbUri);
 
 const auth = (await req('POST', '/auth/register', { email: `an${Date.now()}@e.com`, password: 'password123' })).body;
 const token = auth.token;
-const ownerId = new mongoose.Types.ObjectId(auth.user.id || auth.user._id);
+const userId = new mongoose.Types.ObjectId(auth.user.id || auth.user._id);
+const workspaceId = new mongoose.Types.ObjectId(auth.workspaces[0].id);
+WS.set(token, auth.workspaces[0].id);
 const fresh = (await req('POST', '/auth/register', { email: `fr${Date.now()}@e.com`, password: 'password123' })).body;
+WS.set(fresh.token, fresh.workspaces[0].id);
 
 const node = (id, type, config) => ({ id, type, position: { x: 0, y: 0 }, data: { config } });
 const wf = await Workflow.create({
-  ownerId, name: 'Analytics fixture',
+  workspaceId, createdBy: userId, name: 'Analytics fixture',
   nodes: [
     node('s', 'start', { label: 'Start' }),
     node('a1', 'agent', { label: 'A1' }), node('a2', 'agent', { label: 'A2' }),
@@ -52,7 +59,7 @@ const daysAgo = (n, hour = 12) => { const d = new Date(); d.setDate(d.getDate() 
 const mkRun = (status, trigger, durationMs, ago) => {
   const startedAt = daysAgo(ago);
   return {
-    workflowId: wf._id, ownerId, status, trigger,
+    workflowId: wf._id, workspaceId, triggeredBy: trigger === 'manual' ? userId : null, status, trigger,
     startedAt, finishedAt: durationMs == null ? null : new Date(startedAt.getTime() + durationMs),
     createdAt: startedAt, updatedAt: startedAt, nodeResults: [],
   };
@@ -98,7 +105,8 @@ console.log('\nnode + tool type usage (design-time, across workflows)');
 const nt = Object.fromEntries(a.topNodeTypes.map((n) => [n.type, n.count]));
 check(`node types ${JSON.stringify(nt)}`, nt.agent === 2 && nt.tool === 3 && nt.condition === 1 && nt.start === 1 && nt.end === 1);
 const tt = Object.fromEntries(a.topToolTypes.map((n) => [n.type, n.count]));
-check(`tool types ${JSON.stringify(tt)}`, tt.calculator === 2 && tt['send-email'] === 1);
+// Grouped by integration.action since spec/26; legacy-shaped nodes count under their new names.
+check(`tool types ${JSON.stringify(tt)}`, tt['builtin.calculator'] === 2 && tt['email.send'] === 1);
 check('unset toolTypes excluded', !Object.keys(tt).includes('') && !Object.keys(tt).includes('null'));
 
 console.log('\n90-day window includes the older run');
@@ -127,10 +135,10 @@ check(`totalRuns = 0`, a.totalRuns === 0);
 check('successRate is null, not NaN or 0', a.successRate === null, JSON.stringify(a.successRate));
 check('durations null, not NaN', a.avgDurationMs === null && a.medianDurationMs === null, `${a.avgDurationMs}/${a.medianDurationMs}`);
 check('runsByDay still 30 zero-filled entries', a.runsByDay.length === 30 && a.runsByDay.every((d) => d.count === 0));
-check('no other user\'s data leaks in', a.topNodeTypes.length === 0 && a.topToolTypes.length === 0, JSON.stringify(a.topNodeTypes));
+check('no other workspace\'s data leaks in', a.topNodeTypes.length === 0 && a.topToolTypes.length === 0, JSON.stringify(a.topNodeTypes));
 
-await Run.deleteMany({ ownerId });
-await Workflow.deleteMany({ ownerId });
+await Run.deleteMany({ workspaceId });
+await Workflow.deleteMany({ workspaceId });
 await mongoose.disconnect();
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -4,6 +4,8 @@
 **Milestone:** M2
 **Depends on:** `06-execution-engine.md`
 
+> **Revised in phase 3:** Runs record and display their version ("v3" / "Draft") and the monitor renders the run's own graph ([`30`](30-workflow-versioning.md)); history is replaced by the filterable, cursor-paginated `GET /api/runs` and a Runs page ([`35`](35-run-operations.md)).
+
 ## Summary
 
 A list of past runs for a workflow (or across all of a user's workflows) with a detail view showing the full per-node timeline/log — the record you review after a run has finished, distinct from the live Run Monitor (`09`).

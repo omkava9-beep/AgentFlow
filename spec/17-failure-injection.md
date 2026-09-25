@@ -4,6 +4,8 @@
 **Milestone:** M3
 **Depends on:** `05-agent-tool-providers.md`, `07-async-job-queue.md`
 
+> **Revised in phase 3:** Failure injection applies to sandbox calls only; `maxAttempts` applies to live calls too — see [`26`](26-integration-framework.md).
+
 ## Summary
 
 Lets a user deliberately configure a Tool node's simulated failure rate so retry/backoff behavior (`07`) is easy to demonstrate on demand, instead of relying on the small built-in random failure chance to happen to show up during a demo.

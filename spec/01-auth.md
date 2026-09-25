@@ -4,6 +4,8 @@
 **Milestone:** M1
 **Depends on:** —
 
+> **Revised in phase 3:** ownership moved from users to workspaces — see [`22`](22-workspaces-multitenancy.md) (workspaces, `X-Workspace-Id`, migration) and [`23`](23-roles-and-invitations.md) (roles). The "multi-tenant orgs/teams" non-goal below no longer applies. Profile editing, password change and sign-out-everywhere (`tokenVersion`) are added in [`36`](36-production-polish.md).
+
 ## Summary
 
 JWT-based authentication so workflows and runs can be scoped to a single owning user. No social login, no email verification, no password reset flow — just enough auth to make "your workflows" a meaningful concept.

@@ -4,6 +4,8 @@
 **Milestone:** M1
 **Depends on:** `02-workflow-builder-canvas.md`, `05-agent-tool-providers.md`
 
+> **Revised in phase 3:** Tool forms render from integration manifests with a connection picker and a `json` field type ([`26`](26-integration-framework.md)); MCP tool forms come from each tool's JSON Schema ([`37`](37-mcp.md)); new node types get their own panels ([`31`](31-advanced-nodes.md), [`32`](32-human-in-the-loop.md)); an open panel takes a soft lock ([`28`](28-realtime-collaboration.md)).
+
 ## Summary
 
 A side panel that opens when a node is selected on the canvas, letting the user configure that node's behavior. What fields appear depends on the node's type.

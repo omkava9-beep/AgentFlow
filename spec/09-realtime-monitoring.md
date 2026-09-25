@@ -4,6 +4,8 @@
 **Milestone:** M2
 **Depends on:** `06-execution-engine.md`
 
+> **Revised in phase 3:** sockets authenticate with the JWT, every room join is authorized, and `queue:stats` is per workspace — see [`24`](24-socket-auth-and-namespaced-events.md). `queue:stats` gains `cap`/`poolSaturated` and nodes report `waiting`/`queuedMs` ([`33`](33-fair-queue-and-quotas.md)); adds `agent:tool_call` and a nested tool-call timeline ([`37`](37-mcp.md)); adds `run:waiting`/`run:resumed` ([`32`](32-human-in-the-loop.md)) and `node:attempt`/`run:status_changed` ([`35`](35-run-operations.md)).
+
 ## Summary
 
 Socket.io wiring that streams live per-node status/log updates from the execution engine to the frontend, powering the Run Monitor view: watching a workflow execute node-by-node in real time.

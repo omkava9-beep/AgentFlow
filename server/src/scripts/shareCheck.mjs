@@ -9,19 +9,27 @@
  */
 const B = process.env.BASE || 'http://localhost:4800/api';
 let pass = 0, fail = 0;
+const WS = new Map(); // token -> workspaceId
 const check = (n, ok, d = '') => { console.log(`  ${ok ? '✓' : '✗'} ${n}${d ? ` — ${d}` : ''}`); ok ? pass++ : fail++; };
 
 async function req(method, path, body, token) {
   const headers = {};
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (token) headers.Authorization = `Bearer ${token}`;
+  // spec/22: tenant routes need the caller's workspace. Each token maps to the
+  // personal workspace it was registered with.
+  if (token && WS.has(token)) headers['X-Workspace-Id'] = WS.get(token);
   const res = await fetch(B + path, { method, headers, body: body !== undefined ? JSON.stringify(body) : undefined });
   const text = await res.text();
   let json = null; try { json = text ? JSON.parse(text) : null; } catch { /* non-JSON */ }
   return { status: res.status, body: json };
 }
 
-const register = async (tag) => (await req('POST', '/auth/register', { email: `${tag}${Date.now()}@e.com`, password: 'password123' })).body.token;
+const register = async (tag) => {
+  const { body } = await req('POST', '/auth/register', { email: `${tag}${Date.now()}@e.com`, password: 'password123' });
+  WS.set(body.token, body.workspaces[0].id);
+  return body.token;
+};
 const alice = await register('al');
 const bob = await register('bo');
 
@@ -32,6 +40,8 @@ await req('PUT', `/workflows/${wfId}`, {
   nodes: [N('s', 'start', { label: 'Start' }), N('t', 'tool', { label: 'Calc', toolType: 'calculator', toolConfig: { expression: '2+2' } }), N('e', 'end', { label: 'End' })],
   edges: [{ id: 'e1', source: 's', target: 't' }, { id: 'e2', source: 't', target: 'e' }],
 }, alice);
+// spec/30: a share link shows the PUBLISHED version, so publish the design.
+await req('POST', `/workflows/${wfId}/publish`, { acknowledgeWarnings: true }, alice);
 
 // Give it a webhook, a schedule and an event subscription — all things the share
 // payload must withhold.
@@ -64,6 +74,7 @@ check('no webhook object at all', shared.workflow.webhook === undefined);
 check('no schedule', shared.workflow.schedule === undefined);
 check('no event subscription', shared.workflow.eventTrigger === undefined);
 check('no ownerId', shared.workflow.ownerId === undefined && !/ownerId/.test(flat));
+check('no createdBy or workspaceId (spec/22)', !/createdBy|workspaceId/.test(flat));
 check('does not echo the shareToken', !flat.includes(token1));
 check('no per-node run outputs', !/nodeResults/.test(flat));
 

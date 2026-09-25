@@ -1,15 +1,30 @@
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { on } from '../realtime/socket';
+import { useWorkspacePath } from '../hooks/useWorkspacePath';
 import { FlowIcon, TrashIcon, ArrowRightIcon, NodeDotsIcon, LinkIcon } from './icons';
 import { formatRelativeTime } from '../utils/time';
 
 export default function WorkflowCard({ workflow, onDelete }) {
   const navigate = useNavigate();
+  const wp = useWorkspacePath();
   const nodeCount = workflow.nodeCount ?? 0;
   const edgeCount = workflow.edgeCount ?? 0;
+  // spec/30: "v3" with an amber dot for unpublished changes, kept live by the
+  // workspace room's version events.
+  const [version, setVersion] = useState({ published: workflow.publishedVersion ?? null, dirty: Boolean(workflow.hasUnpublishedChanges) });
+  useEffect(() => {
+    const mine = (p) => String(p?.workflowId) === String(workflow._id);
+    const offs = [
+      on('version:draft_state', (p) => mine(p) && setVersion((v) => ({ ...v, dirty: Boolean(p.hasUnpublishedChanges) }))),
+      on('version:published', (p) => mine(p) && setVersion((v) => ({ ...v, published: p.version }))),
+    ];
+    return () => offs.forEach((off) => off());
+  }, [workflow._id]);
 
   return (
     <div
-      onClick={() => navigate(`/workflows/${workflow._id}`)}
+      onClick={() => navigate(wp(`/workflows/${workflow._id}`))}
       className="group relative flex cursor-pointer flex-col overflow-hidden rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-brand-400 hover:shadow-lg dark:border-slate-800 dark:bg-slate-900 dark:hover:border-brand-600"
     >
       <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-brand-500 via-purple-500 to-brand-400 opacity-0 transition group-hover:opacity-100" />
@@ -18,19 +33,37 @@ export default function WorkflowCard({ workflow, onDelete }) {
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-brand-500 to-purple-600 text-white shadow-sm">
           <FlowIcon />
         </div>
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete(workflow._id);
-          }}
-          title="Delete workflow"
-          className="rounded-lg p-2 text-slate-300 opacity-0 transition hover:bg-red-50 hover:text-red-500 group-hover:opacity-100 dark:text-slate-600 dark:hover:bg-red-950/40 dark:hover:text-red-400"
-        >
-          <TrashIcon />
-        </button>
+        {/* No `onDelete` means the caller's role can't delete (spec/23). */}
+        {onDelete && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(workflow._id);
+            }}
+            title="Delete workflow"
+            className="rounded-lg p-2 text-slate-300 opacity-0 transition hover:bg-red-50 hover:text-red-500 group-hover:opacity-100 dark:text-slate-600 dark:hover:bg-red-950/40 dark:hover:text-red-400"
+          >
+            <TrashIcon />
+          </button>
+        )}
       </div>
 
-      <h2 className="mt-3 truncate font-semibold text-slate-900 dark:text-slate-100">{workflow.name}</h2>
+      <div className="mt-3 flex items-center gap-2">
+        <h2 className="truncate font-semibold text-slate-900 dark:text-slate-100">{workflow.name}</h2>
+        {version.published ? (
+          <span
+            className="flex shrink-0 items-center gap-1 rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-semibold text-brand-700 dark:bg-brand-950 dark:text-brand-300"
+            title={version.dirty ? `Live: v${version.published} · unpublished changes` : `Live: v${version.published}`}
+          >
+            v{version.published}
+            {version.dirty && <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />}
+          </span>
+        ) : (
+          <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-500 dark:bg-slate-800 dark:text-slate-400" title="Never published: triggers skip it">
+            draft
+          </span>
+        )}
+      </div>
 
       <div className="mt-2 flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
         <span className="flex items-center gap-1">

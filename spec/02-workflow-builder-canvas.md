@@ -4,6 +4,8 @@
 **Milestone:** M1
 **Depends on:** `01-auth.md`
 
+> **Revised in phase 3:** New node types (transform, code, delay, loop, merge, sub-workflow, approval) and a grouped palette — see [`31`](31-advanced-nodes.md), [`32`](32-human-in-the-loop.md). The canvas is collaborative — see [`28`](28-realtime-collaboration.md).
+
 ## Summary
 
 The visual canvas (React Flow) where a user builds a workflow by adding nodes (Agent, Tool, Condition, Start, End) and connecting them with edges. This is the primary authoring surface of the product.

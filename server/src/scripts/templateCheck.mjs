@@ -7,19 +7,27 @@
  */
 const B = process.env.BASE || 'http://localhost:4600/api';
 let pass = 0, fail = 0;
+const WS = new Map(); // token -> workspaceId
 const check = (n, ok, d = '') => { console.log(`  ${ok ? '✓' : '✗'} ${n}${d ? ` — ${d}` : ''}`); ok ? pass++ : fail++; };
 
 async function req(method, path, body, token) {
   const headers = {};
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (token) headers.Authorization = `Bearer ${token}`;
+  // spec/22: tenant routes need the caller's workspace. Each token maps to the
+  // personal workspace it was registered with.
+  if (token && WS.has(token)) headers['X-Workspace-Id'] = WS.get(token);
   const res = await fetch(B + path, { method, headers, body: body !== undefined ? JSON.stringify(body) : undefined });
   const text = await res.text();
   let json = null; try { json = text ? JSON.parse(text) : null; } catch { /* non-JSON */ }
   return { status: res.status, body: json };
 }
 
-const register = async () => (await req('POST', '/auth/register', { email: `tp${Date.now()}${Math.floor(Math.random()*1e6)}@e.com`, password: 'password123' })).body.token;
+const register = async () => {
+  const { body } = await req('POST', '/auth/register', { email: `tp${Date.now()}${Math.floor(Math.random()*1e6)}@e.com`, password: 'password123' });
+  WS.set(body.token, body.workspaces[0].id);
+  return body.token;
+};
 const alice = await register();
 const bob = await register();
 
@@ -69,7 +77,8 @@ check('clone has the template graph', r.body.nodes.length === 4 && r.body.edges.
 check('clone is a different workflow', cloneId !== srcId);
 check('clone preserved handoff candidates', JSON.stringify(r.body.nodes.find((n) => n.id === 'a').data.config.candidates) === '["x","y"]',
       JSON.stringify(r.body.nodes.find((n) => n.id === 'a').data.config.candidates));
-check('clone preserved tool config', r.body.nodes.find((n) => n.id === 't').data.config.toolConfig.expression === '2+2');
+// spec/26: legacy toolConfig is normalized into params on save.
+check('clone preserved tool config', r.body.nodes.find((n) => n.id === 't').data.config.params?.expression === '2+2');
 check('clone preserved edge labels', r.body.edges.find((e) => e.id === 'e2').label === 'x');
 
 console.log('\nediting the clone never touches the template');
@@ -115,8 +124,10 @@ r = await req('POST', '/templates', { workflowId: legacyId, name: 'Legacy templa
 const legacyTpl = r.body._id;
 r = await req('POST', `/templates/${legacyTpl}/use`, {}, alice);
 check('clones without crashing', r.status === 201, String(r.status));
-check('unknown tool type preserved, not wiped', r.body.nodes.find((n) => n.id === 't').data.config.toolType === 'retired-tool');
-check('its config preserved too', r.body.nodes.find((n) => n.id === 't').data.config.toolConfig.keep === 'me');
+// spec/26 §6: an unknown legacy tool type maps to builtin.<toolType> - kept, never dropped.
+const legacyCfg = r.body.nodes.find((n) => n.id === 't').data.config;
+check('unknown tool type preserved, not wiped', legacyCfg.integration === 'builtin' && legacyCfg.action === 'retired-tool', JSON.stringify(legacyCfg));
+check('its config preserved too', legacyCfg.params?.keep === 'me');
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

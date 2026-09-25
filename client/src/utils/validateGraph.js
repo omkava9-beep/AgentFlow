@@ -8,6 +8,17 @@
  * graph couldn't be parked.
  */
 
+import { normalizeToolConfig, legacyTarget } from './normalizeToolConfig.js';
+import {
+  catalogFromLegacyTools,
+  findIntegration,
+  jsonParamError,
+  looksLikeSecret,
+  needsCredentials,
+} from './integrationCatalog.js';
+import { validateAdvanced } from './validateAdvancedNodes.js';
+import { validateMcpToolNode, validateAgentTools } from './validateMcp.js';
+
 function hasCycle(nodes, edges) {
   const adjacency = new Map(nodes.map((n) => [n.id, []]));
   for (const e of edges) adjacency.get(e.source)?.push(e.target);
@@ -61,14 +72,25 @@ const sameSet = (a, b) => {
   return x.length === y.length && x.every((v, i) => v === y[i]);
 };
 
-export function validateGraph({ nodes = [], edges = [], tools = null }) {
+/**
+ * `integrations` is the spec/26 catalogue (null while it loads, which skips the
+ * catalogue-dependent checks rather than flagging everything as unknown).
+ * `connections` is the workspace's connection list (null = not loaded). A
+ * phase-2 `tools` list is still accepted and converted.
+ *
+ * Returns `{ errors, warnings, info }`. `info` is advisory only — it never
+ * blocks saving or running.
+ */
+export function validateGraph({ nodes = [], edges = [], integrations = null, connections = null, tools = null, workflows = null, currentWorkflowId = null }) {
   const errors = [];
   const warnings = [];
+  const info = [];
+  const catalog = integrations || (tools ? catalogFromLegacyTools(tools, legacyTarget) : null);
   const label = (n) => n.data?.config?.label || n.id;
 
   if (!nodes.length) {
     errors.push({ id: 'empty', message: 'The canvas is empty — add a node to get started.' });
-    return { errors, warnings };
+    return { errors, warnings, info };
   }
 
   const startNodes = nodes.filter((n) => n.type === 'start');
@@ -90,28 +112,7 @@ export function validateGraph({ nodes = [], edges = [], tools = null }) {
   const outgoing = (id) => edges.filter((e) => e.source === id);
 
   for (const node of nodes) {
-    if (node.type === 'tool') {
-      const { toolType, toolConfig } = node.data?.config || {};
-      const tool = tools?.find((t) => t.type === toolType);
-
-      if (!toolType) {
-        warnings.push({ id: `tool-unset:${node.id}`, nodeId: node.id, message: `"${label(node)}" has no tool type selected.` });
-      } else if (tools && !tool) {
-        warnings.push({ id: `tool-unknown:${node.id}`, nodeId: node.id, message: `"${label(node)}" uses unknown tool type "${toolType}".` });
-      } else if (tool) {
-        // A required field left blank fails the node at run time, so say so now.
-        for (const field of tool.configSchema || []) {
-          const value = toolConfig?.[field.key] ?? field.default;
-          if (field.required && (value === undefined || value === null || String(value).trim() === '')) {
-            warnings.push({
-              id: `tool-field:${node.id}:${field.key}`,
-              nodeId: node.id,
-              message: `"${label(node)}" is missing required field "${field.label}".`,
-            });
-          }
-        }
-      }
-    }
+    if (node.type === 'tool') validateToolNode(node, { catalog, connections, errors, warnings, info, label });
 
     if (node.type === 'condition') {
       const expression = node.data?.config?.expression || '';
@@ -131,6 +132,9 @@ export function validateGraph({ nodes = [], edges = [], tools = null }) {
       }
     }
 
+    // spec/37: MCP tools and integration actions an agent may call.
+    if (node.type === 'agent') validateAgentTools(node, { catalog, connections, errors, warnings, name: label(node) });
+
     if (node.type === 'agent' && node.data?.config?.isHandoff) {
       const candidates = node.data.config.candidates || [];
       const edgeLabels = outgoing(node.id).map((e) => e.label).filter(Boolean);
@@ -146,6 +150,9 @@ export function validateGraph({ nodes = [], edges = [], tools = null }) {
     }
   }
 
+  // spec/31: transform, code, delay, loop, merge, sub-workflow and error edges.
+  validateAdvanced({ nodes, edges, workflows, currentWorkflowId, errors, warnings, label });
+
   if (startNodes.length) {
     const reachable = reachableFrom(startNodes[0].id, nodes, edges);
     for (const node of nodes) {
@@ -155,5 +162,79 @@ export function validateGraph({ nodes = [], edges = [], tools = null }) {
     }
   }
 
-  return { errors, warnings };
+  return { errors, warnings, info };
+}
+
+/** spec/26 §8 + spec/25's connection checks for one tool node. */
+function validateToolNode(node, { catalog, connections, errors, warnings, info, label }) {
+  const config = normalizeToolConfig(node.data?.config || {});
+  const name = label(node);
+  const at = (kind, suffix = '') => `${kind}:${node.id}${suffix}`;
+
+  if (!config.integration || !config.action) {
+    errors.push({
+      id: at('tool-unset'),
+      nodeId: node.id,
+      message: `"${name}" has no ${config.integration ? 'action' : 'integration'} selected.`,
+    });
+    return;
+  }
+  if (!catalog) return;
+
+  const integration = findIntegration(catalog, config.integration);
+  if (!integration) {
+    warnings.push({ id: at('tool-unknown'), nodeId: node.id, message: `"${name}" uses unknown integration "${config.integration}".` });
+    return;
+  }
+
+  const action = (integration.actions || []).find((a) => a.id === config.action);
+  // Dynamic integrations (MCP) discover actions per connection, so an action
+  // missing from the static list can't be called unknown from here.
+  if (!action && !integration.dynamicActions) {
+    warnings.push({
+      id: at('tool-unknown-action'),
+      nodeId: node.id,
+      message: `"${name}" uses unknown action "${config.integration}.${config.action}".`,
+    });
+  }
+
+  for (const field of action?.configSchema || []) {
+    const value = config.params?.[field.key] ?? field.default;
+    if (field.required && (value === undefined || value === null || String(value).trim() === '')) {
+      warnings.push({ id: at('tool-field', `:${field.key}`), nodeId: node.id, message: `"${name}" is missing required field "${field.label}".` });
+    }
+    if (field.type === 'json' && jsonParamError(value)) {
+      warnings.push({ id: at('tool-json', `:${field.key}`), nodeId: node.id, message: `"${name}" has invalid JSON in "${field.label}".` });
+    }
+    if (looksLikeSecret(value)) {
+      warnings.push({
+        id: at('tool-secret', `:${field.key}`),
+        nodeId: node.id,
+        message: `"${name}" has what looks like a token in "${field.label}" — store it in a connection so it's encrypted and redacted.`,
+      });
+    }
+  }
+
+  // spec/37: an MCP node is meaningless without a server to call.
+  if (integration.dynamicActions && integration.id === 'mcp') {
+    if (validateMcpToolNode(node, config, { connections, errors, warnings, name })) return;
+  }
+
+  const { connectionId } = config;
+  if (!connectionId) {
+    if (needsCredentials(integration)) {
+      info.push({ id: at('tool-noconn'), nodeId: node.id, message: `"${name}" runs in sandbox until a connection is selected.` });
+    }
+    return;
+  }
+  if (connectionId === 'sandbox' || !connections) return;
+
+  const connection = connections.find((c) => c.id === connectionId || c._id === connectionId);
+  if (!connection) {
+    warnings.push({ id: at('tool-conn-missing'), nodeId: node.id, message: `"${name}" uses a connection that no longer exists.` });
+  } else if (connection.integration !== config.integration) {
+    warnings.push({ id: at('tool-conn-mismatch'), nodeId: node.id, message: `"${name}" uses a ${connection.integration} connection for ${integration.name}.` });
+  } else if (connection.status === 'error') {
+    warnings.push({ id: at('tool-conn-error'), nodeId: node.id, message: `"${name}"'s connection "${connection.name}" failed its last test.` });
+  }
 }

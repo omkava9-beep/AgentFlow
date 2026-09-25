@@ -22,7 +22,20 @@ function NodeMix({ nodes = [] }) {
   );
 }
 
-export default function TemplateCard({ template, onUse, busy }) {
+function ago(date) {
+  if (!date) return '';
+  const days = Math.floor((Date.now() - new Date(date).getTime()) / 86400000);
+  if (days <= 0) return 'today';
+  if (days === 1) return 'yesterday';
+  if (days < 30) return `${days} days ago`;
+  return new Date(date).toLocaleDateString();
+}
+
+/**
+ * `onEdit` / `onDelete` are passed only for workspace templates the caller may
+ * manage (spec/36 §5); built-ins are immutable and never get them.
+ */
+export default function TemplateCard({ template, onUse, onEdit, onDelete, busy }) {
   return (
     <div className="flex flex-col rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-brand-400 hover:shadow-lg dark:border-slate-800 dark:bg-slate-900 dark:hover:border-brand-600">
       <div className="flex items-start justify-between gap-2">
@@ -34,7 +47,7 @@ export default function TemplateCard({ template, onUse, busy }) {
               : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
           }`}
         >
-          {template.builtIn ? 'Built-in' : 'Yours'}
+          {template.builtIn ? 'Built-in' : template.mine ? 'Yours' : 'Workspace'}
         </span>
       </div>
 
@@ -46,14 +59,35 @@ export default function TemplateCard({ template, onUse, busy }) {
         {template.nodeCount} {template.nodeCount === 1 ? 'node' : 'nodes'} · {template.edgeCount}{' '}
         {template.edgeCount === 1 ? 'connection' : 'connections'}
       </p>
+      {!template.builtIn && template.createdByName && (
+        <p className="mt-0.5 text-xs text-slate-400">by {template.createdByName} · {ago(template.createdAt)}</p>
+      )}
 
-      <button
-        onClick={() => onUse(template)}
-        disabled={busy}
-        className="mt-4 rounded-lg bg-gradient-to-br from-brand-500 to-purple-600 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:brightness-110 disabled:opacity-50"
-      >
-        {busy ? 'Creating...' : 'Use template'}
-      </button>
+      {(onEdit || onDelete) && (
+        <div className="mt-3 flex gap-3 text-xs">
+          {onEdit && (
+            <button type="button" onClick={() => onEdit(template)} className="font-medium text-slate-500 hover:text-brand-600 dark:text-slate-400">
+              Edit
+            </button>
+          )}
+          {onDelete && (
+            <button type="button" onClick={() => onDelete(template)} className="font-medium text-slate-500 hover:text-red-600 dark:text-slate-400">
+              Delete
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* No `onUse` means the caller's role can't create workflows (spec/23). */}
+      {onUse && (
+        <button
+          onClick={() => onUse(template)}
+          disabled={busy}
+          className="mt-4 rounded-lg bg-gradient-to-br from-brand-500 to-purple-600 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:brightness-110 disabled:opacity-50"
+        >
+          {busy ? 'Creating...' : 'Use template'}
+        </button>
+      )}
     </div>
   );
 }

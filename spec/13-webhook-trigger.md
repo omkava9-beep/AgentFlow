@@ -4,6 +4,8 @@
 **Milestone:** M3
 **Depends on:** `10-manual-run-trigger.md`
 
+> **Revised in phase 3:** Webhook runs always execute the published version (`409` if none) — see [`30`](30-workflow-versioning.md). Provider-shaped integration webhooks are separate — see [`27`](27-integration-catalog.md).
+
 ## Summary
 
 An HTTP endpoint external systems (or a `curl`/Postman demo) can hit to start a workflow run — the "event-driven trigger" pillar of the product brief.

@@ -4,6 +4,8 @@
 **Milestone:** M3
 **Depends on:** `10-manual-run-trigger.md`
 
+> **Revised in phase 3:** Scheduled runs always execute the published version and skip with `not-published` if there is none — see [`30`](30-workflow-versioning.md).
+
 ## Summary
 
 Let a workflow run automatically on a recurring cron schedule, using `node-cron` in-process — no external scheduler service.

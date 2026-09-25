@@ -2,9 +2,13 @@ import { useEffect, useMemo } from 'react';
 import ReactFlow, { Background, Controls, useNodesState, useEdgesState } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { nodeTypes } from './nodes';
+import { ERROR_COLOR } from './nodes/nodeStyles';
 
 const TAKEN_EDGE = { stroke: '#6366f1', strokeWidth: 3 };
 const PRUNED_EDGE = { stroke: '#94a3b8', strokeWidth: 1, strokeDasharray: '4 4', opacity: 0.45 };
+// spec/31 §7: error branches are always red and dashed; taken ones animate.
+const ERROR_EDGE = { stroke: ERROR_COLOR, strokeWidth: 1.5, strokeDasharray: '6 4' };
+const TAKEN_ERROR_EDGE = { stroke: ERROR_COLOR, strokeWidth: 3, strokeDasharray: '6 4' };
 
 /**
  * Which branch a run actually took, per edge (spec/16, spec/09).
@@ -17,6 +21,11 @@ const PRUNED_EDGE = { stroke: '#94a3b8', strokeWidth: 1, strokeDasharray: '4 4',
  */
 function branchStateFor(edge, sourceNode, sourceResult) {
   if (!sourceNode || !sourceResult) return null;
+
+  if (edge.sourceHandle === 'error') {
+    if (sourceResult.handled) return 'taken-error';
+    return ['success', 'failed', 'skipped'].includes(sourceResult.status) ? 'pruned-error' : 'error';
+  }
 
   if (sourceNode.data?.config?.isHandoff) {
     if (!sourceResult.handoffTarget) return null;
@@ -42,7 +51,16 @@ export default function RunGraphView({ workflow, nodeResults }) {
         const result = resultsByNodeId.get(n.id);
         return {
           ...n,
-          data: { ...n.data, runStatus: result?.status, cached: result?.cached },
+          data: {
+            ...n.data,
+            // A handled failure shows amber with a chip, not red (spec/31).
+            runStatus: result?.handled ? 'handled' : result?.status,
+            cached: result?.cached,
+            runMode: result?.mode || null,
+            waiting: result?.waiting,
+            progress: result?.progress || null,
+            childCount: result?.childRunIds?.length || 0,
+          },
         };
       }),
     [workflow, resultsByNodeId]
@@ -52,6 +70,9 @@ export default function RunGraphView({ workflow, nodeResults }) {
     () =>
       (workflow?.edges || []).map((e) => {
         const state = branchStateFor(e, nodesById.get(e.source), resultsByNodeId.get(e.source));
+        if (state === 'taken-error') return { ...e, animated: true, style: TAKEN_ERROR_EDGE };
+        if (state === 'pruned-error') return { ...e, style: { ...ERROR_EDGE, opacity: 0.35 } };
+        if (state === 'error' || (!state && e.sourceHandle === 'error')) return { ...e, style: ERROR_EDGE };
         if (state === 'taken') {
           return { ...e, animated: true, style: TAKEN_EDGE, labelStyle: { fill: '#6366f1', fontWeight: 600 } };
         }

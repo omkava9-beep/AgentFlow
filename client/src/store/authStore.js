@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { useWorkspaceStore } from './workspaceStore';
 
 const STORAGE_KEY = 'agent-orch-auth';
 
@@ -19,6 +20,9 @@ export const useAuthStore = create((set) => ({
   },
   logout: () => {
     localStorage.removeItem(STORAGE_KEY);
+    // The next person to sign in on this browser must not inherit the previous
+    // user's workspace context.
+    useWorkspaceStore.getState().reset();
     set({ token: null, user: null });
   },
 }));

@@ -74,6 +74,8 @@ export function StatusBadge({ status }) {
     skipped: 'bg-slate-100 text-slate-400 line-through dark:bg-slate-800 dark:text-slate-500',
     // Distinct from `failed` on purpose - a cancelled run isn't a broken one.
     cancelled: 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300',
+    // spec/32: parked on an approval or a long delay - amber like cancelled, but it will continue.
+    waiting: 'bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300',
   };
   return (
     <span className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${styles[status] || styles.pending}`}>

@@ -4,6 +4,8 @@
 **Milestone:** M1
 **Depends on:** `01-auth.md`, `02-workflow-builder-canvas.md`
 
+> **Revised in phase 3:** workflows are scoped by `workspaceId`, not `ownerId` — see [`22`](22-workspaces-multitenancy.md). Saves go through the collaboration hub as ops instead of last-write-wins `PUT`, and version history exists — see [`28`](28-realtime-collaboration.md), [`30`](30-workflow-versioning.md).
+
 ## Summary
 
 CRUD API and MongoDB schema for saving/loading workflow graphs (nodes + edges), and the Dashboard screen that lists a user's workflows.

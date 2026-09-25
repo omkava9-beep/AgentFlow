@@ -4,6 +4,8 @@
 **Milestone:** M3
 **Depends on:** `02-workflow-builder-canvas.md`, `03-node-configuration-panel.md`
 
+> **Revised in phase 3:** Undo/redo is per user (inverse ops), Save is replaced by autosave, and the "no collaborative editing" non-goal no longer applies ([`28`](28-realtime-collaboration.md)); validation gains rules for the new node types ([`31`](31-advanced-nodes.md)) and is ported to the server for publish ([`30`](30-workflow-versioning.md)).
+
 ## Summary
 
 Brings the canvas up to the level of editing comfort the rest of the app implies: undo/redo, duplication, edge label editing, and a live validation panel that explains why a graph won't run — replacing the current single-line error string.

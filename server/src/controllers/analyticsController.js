@@ -1,6 +1,26 @@
 import mongoose from 'mongoose';
 import Run from '../models/Run.js';
 import Workflow from '../models/Workflow.js';
+import { scopedFilter, findInWorkspace } from '../tenancy/scoped.js';
+import { nodeStatsFor } from '../services/runOpsService.js';
+import { normalizeToolConfig } from '../integrations/normalizeToolConfig.js';
+
+/**
+ * `[{ type: 'builtin.calculator', integration, action, count }]`, most used
+ * first. Nodes with no integration or action picked yet are left out.
+ */
+function groupToolUsage(rows) {
+  const counts = new Map();
+  for (const { config } of rows) {
+    const { integration, action } = normalizeToolConfig(config || {}) || {};
+    if (!integration || !action) continue;
+    const type = `${integration}.${action}`;
+    const entry = counts.get(type) || { type, integration, action, count: 0 };
+    entry.count += 1;
+    counts.set(type, entry);
+  }
+  return [...counts.values()].sort((a, b) => b.count - a.count || a.type.localeCompare(b.type));
+}
 
 const ALLOWED_RANGES = [7, 30, 90];
 const DEFAULT_RANGE = 30;
@@ -42,11 +62,18 @@ function median(values) {
 export async function summary(req, res, next) {
   try {
     const days = ALLOWED_RANGES.includes(Number(req.query.days)) ? Number(req.query.days) : DEFAULT_RANGE;
-    const ownerId = new mongoose.Types.ObjectId(req.userId);
+    // aggregate() skips Mongoose casting, so the id has to be an ObjectId here.
+    const workspaceId = new mongoose.Types.ObjectId(req.workspaceId);
     const since = rangeStart(days);
-    const runMatch = { ownerId, createdAt: { $gte: since } };
+    // spec/35 §5: `?workflowId=` narrows every aggregation to one workflow and
+    // adds per-node stats. A foreign or unknown id is a 404, as everywhere.
+    const workflowId = req.params.workflowId || req.query.workflowId || null;
+    const workflow = workflowId ? await findInWorkspace(Workflow, workflowId, req, { lean: true }) : null;
+    const only = workflow ? { workflowId: workflow._id } : {};
+    const runMatch = scopedFilter(req, { workspaceId, createdAt: { $gte: since }, ...only });
+    const workflowMatch = scopedFilter(req, { workspaceId, ...(workflow && { _id: workflow._id }) });
 
-    const [totals, byDay, byTrigger, nodeTypes, toolTypes] = await Promise.all([
+    const [totals, byDay, byTrigger, nodeTypes, toolTypes, nodeStats] = await Promise.all([
       Run.aggregate([
         { $match: runMatch },
         {
@@ -87,19 +114,23 @@ export async function summary(req, res, next) {
       // from runs would mean joining every nodeResult back to its workflow's node
       // list to recover a type that nodeResults doesn't store.
       Workflow.aggregate([
-        { $match: { ownerId } },
+        { $match: workflowMatch },
         { $unwind: '$nodes' },
         { $group: { _id: '$nodes.type', count: { $sum: 1 } } },
         { $sort: { count: -1 } },
       ]),
 
+      // Grouped by integration.action (spec/26). Both node shapes are read and
+      // normalized in JS, so a workflow saved before the tool-node migration
+      // still counts under its new name.
       Workflow.aggregate([
-        { $match: { ownerId } },
+        { $match: workflowMatch },
         { $unwind: '$nodes' },
-        { $match: { 'nodes.type': 'tool', 'nodes.data.config.toolType': { $nin: [null, ''] } } },
-        { $group: { _id: '$nodes.data.config.toolType', count: { $sum: 1 } } },
-        { $sort: { count: -1 } },
+        { $match: { 'nodes.type': 'tool' } },
+        { $project: { _id: 0, config: '$nodes.data.config' } },
       ]),
+
+      workflow ? nodeStatsFor(runMatch, workflow) : null,
     ]);
 
     const t = totals[0] || { totalRuns: 0, success: 0, failed: 0, cancelled: 0, active: 0, durations: [] };
@@ -119,7 +150,8 @@ export async function summary(req, res, next) {
       runsByDay: fillDays(byDay, days),
       runsByTrigger: byTrigger.map((b) => ({ trigger: b._id, count: b.count })),
       topNodeTypes: nodeTypes.map((n) => ({ type: n._id, count: n.count })),
-      topToolTypes: toolTypes.map((n) => ({ type: n._id, count: n.count })),
+      topToolTypes: groupToolUsage(toolTypes),
+      ...(workflow && { workflowId: String(workflow._id), workflowName: workflow.name, nodeStats }),
     });
   } catch (err) {
     next(err);

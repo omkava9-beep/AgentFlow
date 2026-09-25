@@ -19,7 +19,9 @@ import { toolCache } from '../cache/TTLCache.js';
 
 const CHECK_DB_URI = `${env.mongodbUri.replace(/\/+$/, '')}-enginecheck`;
 
-const OWNER = new mongoose.Types.ObjectId();
+// Runs are tenant-scoped since spec/22: every run and the workflow it executes
+// carry a workspaceId (the engine hands it to tools and the cache key).
+const WORKSPACE = new mongoose.Types.ObjectId();
 const WF = new mongoose.Types.ObjectId();
 
 let pass = 0, fail = 0;
@@ -34,12 +36,12 @@ const tool = (id, toolType, over = {}) => node(id, 'tool', { label: id, toolType
 
 async function run(workflow, options) {
   toolCache.clear();
-  const doc = await Run.create({ workflowId: WF, ownerId: OWNER, status: 'pending' });
+  const doc = await Run.create({ workflowId: WF, workspaceId: WORKSPACE, status: 'pending' });
   const id = doc._id.toString();
   let peakActive = 0;
   const onStats = (s) => { peakActive = Math.max(peakActive, s.active); };
   queue.on('stats', onStats);
-  const finished = await executeRun(id, workflow, options);
+  const finished = await executeRun(id, { _id: WF, workspaceId: WORKSPACE, ...workflow }, options);
   queue.off('stats', onStats);
   const byId = Object.fromEntries(finished.nodeResults.map((r) => [r.nodeId, r]));
   return { runDoc: finished, byId, peakActive, id };
@@ -125,9 +127,9 @@ console.log('\nF. cancellation mid-run');
     edges: [edge('s', 'slow1'), edge('slow1', 'slow2'), edge('slow2', 'never')],
   };
   toolCache.clear();
-  const doc = await Run.create({ workflowId: WF, ownerId: OWNER, status: 'pending' });
+  const doc = await Run.create({ workflowId: WF, workspaceId: WORKSPACE, status: 'pending' });
   const id = doc._id.toString();
-  const p = executeRun(id, wf, { timeoutMs: 10_000 });
+  const p = executeRun(id, { _id: WF, workspaceId: WORKSPACE, ...wf }, { timeoutMs: 10_000 });
   await new Promise((r) => setTimeout(r, 250));
   const accepted = requestCancel(id);
   const finished = await p;
