@@ -193,3 +193,4 @@ server/
   mcp-servers.json   operator allowlist of local MCP servers
 spec/            numbered feature specs (the contract for each feature)
 ```
+# AgentFlow
