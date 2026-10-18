@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { apiClient } from './client';
+import { apiClient, API_BASE_URL } from './client';
 
 const base = (workspaceId) => `/workspaces/${workspaceId}/invitations`;
 
@@ -17,7 +17,7 @@ export const revokeInvitation = (workspaceId, invId) => apiClient.delete(`${base
  * would turn a 401 into a redirect to /login and attach a stale workspace id.
  */
 export const getInvitation = (token) =>
-  axios.get(`${import.meta.env.VITE_API_URL}/invitations/${encodeURIComponent(token)}`).then((r) => r.data);
+  axios.get(`${API_BASE_URL}/invitations/${encodeURIComponent(token)}`).then((r) => r.data);
 
 export const acceptInvitation = (token) =>
   apiClient.post(`/invitations/${encodeURIComponent(token)}/accept`).then((r) => r.data);

@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { apiClient } from './client';
+import { apiClient, API_BASE_URL } from './client';
 
 export const createShareLink = (workflowId) =>
   apiClient.post(`/workflows/${workflowId}/share`).then((r) => r.data);
@@ -13,8 +13,8 @@ export const deleteShareLink = (workflowId) => apiClient.delete(`/workflows/${wo
  * must render a "link not found" page rather than bounce them to a login screen.
  */
 export const getSharedWorkflow = (shareToken) =>
-  axios.get(`${import.meta.env.VITE_API_URL}/shared/${shareToken}`).then((r) => r.data);
+  axios.get(`${API_BASE_URL}/shared/${shareToken}`).then((r) => r.data);
 
 /** spec/35 §4: the whitelisted detail of one run behind a share link. Bare axios, as above. */
 export const getSharedRun = (shareToken, runId) =>
-  axios.get(`${import.meta.env.VITE_API_URL}/shared/${shareToken}/runs/${runId}`).then((r) => r.data);
+  axios.get(`${API_BASE_URL}/shared/${shareToken}/runs/${runId}`).then((r) => r.data);

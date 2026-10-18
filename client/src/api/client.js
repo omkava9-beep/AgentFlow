@@ -4,8 +4,15 @@ import { useWorkspaceStore, defaultWorkspace, workspacePath } from '../store/wor
 import { useToastStore } from '../store/toastStore';
 import { navigateTo } from '../navigation';
 
+function apiBaseUrl() {
+  const raw = (import.meta.env.VITE_API_URL || 'http://localhost:4000/api').replace(/\/+$/, '');
+  return raw.endsWith('/api') ? raw : `${raw}/api`;
+}
+
+export const API_BASE_URL = apiBaseUrl();
+
 export const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
+  baseURL: API_BASE_URL,
 });
 
 // Auth and the workspace endpoints identify their workspace (if any) through

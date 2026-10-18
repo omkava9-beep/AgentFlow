@@ -13,6 +13,10 @@ export const env = {
   mongodbUri: required('MONGODB_URI'),
   jwtSecret: required('JWT_SECRET'),
   clientOrigin: process.env.CLIENT_ORIGIN || 'http://localhost:5173',
+  clientOrigins: (process.env.CLIENT_ORIGIN || 'http://localhost:5173')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean),
   agentProvider: process.env.AGENT_PROVIDER || 'mock',
   anthropicApiKey: process.env.ANTHROPIC_API_KEY || '',
   openaiApiKey: process.env.OPENAI_API_KEY || '',
