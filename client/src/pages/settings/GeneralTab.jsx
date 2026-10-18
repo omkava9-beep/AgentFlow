@@ -2,14 +2,14 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { TriangleAlert } from 'lucide-react';
 import { updateWorkspace, deleteWorkspace } from '../../api/workspaces';
-import { apiErrorMessage } from '../../api/client';
+import { apiErrorMessage, API_BASE_URL } from '../../api/client';
 import { useWorkspaceStore, workspacePath } from '../../store/workspaceStore';
 import { useToastStore } from '../../store/toastStore';
 import { useCan } from '../../hooks/useCan';
 import { Button, Field, Input, Switch, confirm } from '../../components/ui/index';
 import SettingsCard from './SettingsCard';
 
-const API_BASE = String(import.meta.env.VITE_API_URL || '').replace(/\/+$/, '');
+const API_BASE = API_BASE_URL;
 const APP_ORIGIN = typeof window !== 'undefined' ? window.location.origin : '';
 
 export default function GeneralTab() {

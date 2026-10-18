@@ -5,7 +5,7 @@ import {
   regenerateWebhook, putWebhook,
   putEventTrigger, deleteEventTrigger,
 } from '../api/workflows';
-import { apiErrorMessage } from '../api/client';
+import { apiErrorMessage, API_BASE_URL } from '../api/client';
 import { describeCron, nextRun, parseCron } from '../utils/cron';
 import { Link } from 'react-router-dom';
 import { useWorkspaceStore } from '../store/workspaceStore';
@@ -40,7 +40,7 @@ function Section({ title, active, readOnly = false, children }) {
 
 // Derived from the configured API base rather than rewriting the browser's port,
 // so these URLs stay correct wherever the API actually lives.
-const API_BASE = String(import.meta.env.VITE_API_URL || '').replace(/\/+$/, '');
+const API_BASE = API_BASE_URL;
 
 const inputClass =
   'w-full rounded border border-default bg-surface px-2 py-1 text-xs text-fg focus:border-accent focus:outline-none   ';

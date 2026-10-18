@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import { env } from './config/env.js';
+import { connectDB } from './config/db.js';
 import { notFoundHandler, errorHandler } from './middleware/errorHandler.js';
 import authRoutes from './routes/auth.js';
 import workflowRoutes from './routes/workflows.js';
@@ -35,7 +36,19 @@ import { workspaceStatusRoutes, globalStatusRoutes } from './routes/status.js';
 export function createApp() {
 
   const app = express();
-  app.use(cors({ origin: env.clientOrigin }));
+  app.use(cors({
+    origin(origin, callback) {
+      if (!origin || env.clientOrigins.includes(origin) || env.clientOrigins.includes('*')) {
+        callback(null, true);
+        return;
+      }
+      callback(null, false);
+    },
+  }));
+  // Vercel never runs src/index.js, so the first request has to open Mongo.
+  app.use((req, res, next) => {
+    connectDB().then(() => next()).catch(next);
+  });
   // Before express.json(): inbound provider webhooks need the raw bytes for
   // their signatures (spec/27 §5), and Knowledge Base uploads need a bigger
   // body limit than the app-wide default (spec/27 §7). Each parses its own body.
@@ -94,5 +107,7 @@ export function createApp() {
   return app;
 }
 
-// Default export configured for serverless platform lifecycle discovery
-export default createApp();
+// Vercel inspects this identifier: `export default createApp()` is not treated
+// as a function/server even though it returns one.
+const app = createApp();
+export default app;

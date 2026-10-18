@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { apiClient } from './client';
+import { apiClient, API_BASE_URL } from './client';
 
 /** The caller's approvals inbox (spec/32). `all` needs runs:approve_any. */
 export const listApprovals = ({ status = 'pending', all = false } = {}) =>
@@ -13,7 +13,7 @@ export const decideApproval = (runId, nodeId, decision, comment = '') =>
  * Bare axios for the signed link page: the approver may be signed out, and
  * apiClient would turn a 401 into a redirect and attach a workspace id.
  */
-const linkUrl = (token) => `${import.meta.env.VITE_API_URL}/approval-links/${encodeURIComponent(token)}`;
+const linkUrl = (token) => `${API_BASE_URL}/approval-links/${encodeURIComponent(token)}`;
 export const getApprovalLink = (token) => axios.get(linkUrl(token)).then((r) => r.data);
 export const decideApprovalLink = (token, decision, comment = '') =>
   axios.post(linkUrl(token), { decision, comment }).then((r) => r.data);

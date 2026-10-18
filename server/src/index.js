@@ -2,7 +2,7 @@ import http from 'node:http';
 import { Server } from 'socket.io';
 import { env } from './config/env.js';
 import { connectDB } from './config/db.js';
-import { createApp } from './app.js';
+import app from './app.js';
 import { registerSocketHandlers } from './sockets/index.js';
 import { setIo } from './sockets/ioInstance.js';
 import { bootstrapSchedules } from './scheduler/index.js';
@@ -34,9 +34,8 @@ export async function main() {
   const { waitingRuns, armed } = await bootstrapWaits();
   console.log(`[reconcile] ${interrupted} interrupted run(s) marked failed, ${waitingRuns} waiting run(s), ${armed} timer(s) re-armed`);
 
-  const app = createApp();
   const server = http.createServer(app);
-  const io = new Server(server, { cors: { origin: env.clientOrigin } });
+  const io = new Server(server, { cors: { origin: env.clientOrigins } });
   setIo(io);
   registerSocketHandlers(io);
 

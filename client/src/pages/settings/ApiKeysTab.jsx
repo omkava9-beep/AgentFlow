@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { KeyRound, MoreHorizontal, Plus, ShieldAlert, Terminal, XCircle } from 'lucide-react';
 import { listApiKeys, createApiKey, revokeApiKey, API_KEY_SCOPES } from '../../api/apiKeys';
-import { apiErrorMessage } from '../../api/client';
+import { apiErrorMessage, API_BASE_URL } from '../../api/client';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import { useCan } from '../../hooks/useCan';
 import { formatRelativeTime } from '../../utils/time';
@@ -11,7 +11,7 @@ import {
 import LastAuditChange from '../../components/LastAuditChange';
 import SettingsCard from './SettingsCard';
 
-const API_BASE = String(import.meta.env.VITE_API_URL || '').replace(/\/+$/, '');
+const API_BASE = API_BASE_URL;
 
 function creator(createdBy) {
   if (!createdBy) return null;
