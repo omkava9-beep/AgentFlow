@@ -36,15 +36,18 @@ import { workspaceStatusRoutes, globalStatusRoutes } from './routes/status.js';
 export function createApp() {
 
   const app = express();
+  
+  // CORS configured to dynamically reflect any incoming origin request
   app.use(cors({
-    origin(origin, callback) {
-      if (!origin || env.clientOrigins.includes(origin) || env.clientOrigins.includes('*')) {
-        callback(null, true);
-        return;
-      }
-      callback(null, false);
+    origin: function (origin, callback) {
+      // Allows all origins, including extension setups, local testing, and serverless edge requests
+      callback(null, true);
     },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
   }));
+
   // Vercel never runs src/index.js, so the first request has to open Mongo.
   app.use((req, res, next) => {
     connectDB().then(() => next()).catch(next);
