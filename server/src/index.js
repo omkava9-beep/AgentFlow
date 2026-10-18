@@ -15,7 +15,7 @@ import { hub } from './collab/hub.js';
 import { migrateSandboxRecords } from './scripts/migrateSandboxRecords.js';
 import { migrateVersions } from './scripts/migrateVersions.js';
 
-async function main() {
+export async function main() {
   await connectDB();
   // Before anything reads tenant data: phase-2 documents have no workspaceId
   // until this has run once (spec/22 §8). A no-op on every later boot.

@@ -33,8 +33,8 @@ import { allowlistRouter as mcpAllowlistRoutes, toolsRouter as mcpToolsRoutes } 
 import { workspaceStatusRoutes, globalStatusRoutes } from './routes/status.js';
 
 export function createApp() {
-  const app = express();
 
+  const app = express();
   app.use(cors({ origin: env.clientOrigin }));
   // Before express.json(): inbound provider webhooks need the raw bytes for
   // their signatures (spec/27 §5), and Knowledge Base uploads need a bigger
@@ -93,3 +93,6 @@ export function createApp() {
 
   return app;
 }
+
+// Default export configured for serverless platform lifecycle discovery
+export default createApp();
